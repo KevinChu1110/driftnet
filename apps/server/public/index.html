@@ -313,7 +313,8 @@
   .conn h4 { margin: 0 0 4px; font-size: 15px; }
   .conn p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
   .conn pre { margin: 0; background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; white-space: pre; overflow-x: auto; }
-  .conn-mint { margin-top: 8px; }
+  .conn-mint { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .conn-mint .conn-name { flex: 1 1 140px; min-width: 0; max-width: 220px; }
   .conn-mint .warn { margin: 0; }
   .conn-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .conn .copy { min-height: 36px; padding: 4px 12px; font-size: 13px; flex: none; }
@@ -631,7 +632,10 @@
         agentTokens: "Agent tokens", agentTokensHelp: "One key per agent instead of the admin password. A write token can add, move and tidy; a read token can only look. Revoke one and only that agent is cut off; changing the admin password doesn't affect them.",
         tokName: "Agent name", tokScope: "Access", tokScopes: { write: "Read and write", read: "Read only" }, tokCreate: "Create token",
         tokNew: "New token for “{name}”", tokNewWarn: "Copy it now. It will not be shown again; only a fingerprint is kept.",
-        tokNone: "No tokens yet.", tokCreatedOn: "created", tokLastUsed: "last used", tokNever: "never", tokRevoke: "Revoke", tokRevoked: "revoked",
+        tokNone: "No tokens yet.", tokCreatedOn: "created", tokLastUsed: "last used", tokNever: "never", tokRevoke: "Revoke", tokRevoked: "revoked", tokRemove: "Remove",
+        tokDuplicate: "A token named “{name}” already exists. The old one keeps working; revoke it in Settings → Access if it's a replacement.",
+        tokCardName: "Token name", tokCardCreate: "Create a token for this agent",
+        tokCardDone: "Token “{name}” created and filled in above. Copy it now: it will not be shown again. Revoke it in Settings → Access when you no longer need it.",
         tokNameNeeded: "Give the token a name.", tokPasswordOnly: "Set an admin password first: tokens are what you give agents instead of it.",
         tunnel: "Public URL for cloud AIs", tunnelHelp: "Claude.ai, ChatGPT, Grok and agents on other machines can't reach localhost. This opens a temporary https address through Cloudflare (no account). It changes every time and closes when driftnet stops.",
         tunnelOn: "Open a public URL", tunnelOff: "Close it", tunnelNeedsPassword: "Save an admin password first.",
@@ -735,7 +739,10 @@
         agentTokens: "Agent 專用金鑰", agentTokensHelp: "每個 agent 用自己的金鑰，不必拿管理密碼出去。可寫入的金鑰能收錄、搬移、整理；唯讀的只能看。撤銷其中一把只會斷掉那個 agent，換管理密碼也不影響它們。",
         tokName: "Agent 名稱", tokScope: "權限", tokScopes: { write: "可讀寫", read: "唯讀" }, tokCreate: "建立金鑰",
         tokNew: "「{name}」的新金鑰", tokNewWarn: "請現在複製。之後不會再顯示，系統只留下指紋。",
-        tokNone: "還沒有金鑰。", tokCreatedOn: "建立於", tokLastUsed: "最後使用", tokNever: "從未", tokRevoke: "撤銷", tokRevoked: "已撤銷",
+        tokNone: "還沒有金鑰。", tokCreatedOn: "建立於", tokLastUsed: "最後使用", tokNever: "從未", tokRevoke: "撤銷", tokRevoked: "已撤銷", tokRemove: "移除",
+        tokDuplicate: "已經有一把叫「{name}」的金鑰。舊的仍然有效；如果是要換新，請到「設定 → 存取」撤銷舊的。",
+        tokCardName: "金鑰名稱", tokCardCreate: "幫這個 agent 建一把專用金鑰",
+        tokCardDone: "已建立「{name}」專用金鑰，已填進上面的設定。請現在複製：之後不會再顯示。不用時到「設定 → 存取」撤銷。",
         tokNameNeeded: "請幫金鑰取個名字。", tokPasswordOnly: "請先設定管理密碼：金鑰就是用來取代它交給 agent 的。",
         tunnel: "給雲端 AI 的公開網址", tunnelHelp: "Claude 網頁版、ChatGPT、Grok 和其他機器上的 agent 連不到 localhost。這會透過 Cloudflare（免帳號）開一個臨時的 https 網址；每次都不一樣，driftnet 關掉就跟著關。",
         tunnelOn: "開啟公開網址", tunnelOff: "關閉", tunnelNeedsPassword: "要先儲存管理密碼。",
@@ -1234,6 +1241,9 @@
   let serverSettings = null;
   /** The token just created: shown once in the Access tab, then gone. */
   let justMinted = null;
+  /** The token list Settings last fetched, to warn when a new token repeats an active name. */
+  let knownTokens = [];
+  const nameTaken = (list, name) => list.some((k) => !k.revokedAt && k.name.toLowerCase() === name.toLowerCase());
   async function openSettings(welcome = false) {
     const t = T(), st = t.st;
     const token = store.get("driftnet-token");
@@ -1242,6 +1252,7 @@
     // Agent tokens: only the admin password may list them, so a failure just hides the section.
     const tokRes = serverSettings ? await fetch("/api/agent-tokens", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null) : null;
     const agentTokens = tokRes?.ok ? await tokRes.json() : null;
+    knownTokens = agentTokens ?? [];
     const minted = justMinted; justMinted = null;
     const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label)}</option>`;
     const local = `<fieldset class="set-group"><legend>${esc(st.display)}</legend>
@@ -1363,10 +1374,11 @@
     const rows = tokens.length ? tokens.map((k) => `<div class="keyrow tok ${k.revokedAt ? "revoked" : ""}">
         <span class="tok-name"><b>${esc(k.name)}</b> <span class="badge">${esc(st.tokScopes[k.scope])}</span>
         <small>${esc(st.tokCreatedOn)} ${when(k.createdAt)} · ${esc(st.tokLastUsed)} ${k.lastUsedAt ? when(k.lastUsedAt) : esc(st.tokNever)}${k.revokedAt ? ` · ${esc(st.tokRevoked)}` : ""}</small></span>
-        ${k.revokedAt ? "" : `<button class="btn danger" type="button" data-revoke="${esc(k.id)}">${esc(st.tokRevoke)}</button>`}</div>`).join("")
+        ${k.revokedAt ? `<button class="btn" type="button" data-remove="${esc(k.id)}">${esc(st.tokRemove)}</button>` : `<button class="btn danger" type="button" data-revoke="${esc(k.id)}">${esc(st.tokRevoke)}</button>`}</div>`).join("")
       : `<small>${esc(st.tokNone)}</small>`;
     const box = minted ? `<div class="warn"><b>${esc(st.tokNew.replace("{name}", minted.name))}</b><br>${esc(st.tokNewWarn)}
-        <div class="keyrow"><input id="ac-newtok" readonly value="${esc(minted.token)}"><button class="btn" type="button" data-copy="#ac-newtok">${esc(st.copy)}</button></div></div>` : "";
+        <div class="keyrow"><input id="ac-newtok" readonly value="${esc(minted.token)}"><button class="btn" type="button" data-copy="#ac-newtok">${esc(st.copy)}</button></div>
+        ${minted.duplicate ? `<small>${esc(st.tokDuplicate.replace("{name}", minted.name))}</small>` : ""}</div>` : "";
     const form = a.passwordSet
       ? `<div class="keyrow"><input id="at-name" maxlength="60" placeholder="${esc(st.tokName)}" autocomplete="off" aria-label="${esc(st.tokName)}">
           <select id="at-scope" aria-label="${esc(st.tokScope)}">${["write", "read"].map((c) => `<option value="${c}">${esc(st.tokScopes[c])}</option>`).join("")}</select>
@@ -1421,8 +1433,11 @@
       if (!name) { $("st-error").textContent = st.tokNameNeeded; return; }
       // Whatever was typed elsewhere in Settings is saved first, not thrown away by the redraw.
       if (!(await saveSettings())) return;
+      const duplicate = nameTaken(knownTokens, name);
       const made = await adminFetch("/api/agent-tokens", "POST", { name, scope: $("at-scope").value });
-      if (made) { justMinted = made; openSettings(); }
+      if (made) { justMinted = { ...made, duplicate }; openSettings(); }
+    } else if (b.dataset.remove) {
+      if (await adminFetch(`/api/agent-tokens/${encodeURIComponent(b.dataset.remove)}?purge=1`, "DELETE")) openSettings();
     } else if (b.dataset.revoke) {
       if (await adminFetch(`/api/agent-tokens/${encodeURIComponent(b.dataset.revoke)}`, "DELETE")) openSettings();
     } else if (b.id === "ac-tunnel") {
@@ -2021,7 +2036,7 @@
     const secrets = {};
     const card = (id, title, desc, code, agent) => `<div class="conn" id="cc-${id}"><div class="conn-head"><h4>${esc(title)}</h4>
       <button class="btn copy" type="button" data-copy="#cx-${id}">${esc(st.copy)}</button></div><p>${esc(desc)}</p><pre id="cx-${id}">${esc(code)}</pre>
-      ${agent && canMint ? `<div class="conn-mint"><button class="btn" type="button" data-mint="${id}" data-agent="${esc(agent)}">${esc(zh ? "幫這個 agent 建一把專用金鑰" : "Create a token for this agent")}</button></div>` : ""}</div>`;
+      ${agent && canMint ? `<div class="conn-mint"><input id="cn-${id}" class="conn-name" maxlength="60" value="${esc(agent)}" autocomplete="off" aria-label="${esc(st.tokCardName)}"><button class="btn" type="button" data-mint="${id}">${esc(st.tokCardCreate)}</button></div>` : ""}</div>`;
     const cards = [
       card("ccp", zh ? "Claude Code：裝插件" : "Claude Code: the plugin", zh ? "在 Claude Code 裡輸入。會裝好 skill 和本機 MCP。" : "Type it inside Claude Code. Brings the skill and a local MCP server.",
         `/plugin install driftnet --marketplace KevinChu1110/driftnet`),
@@ -2061,16 +2076,19 @@
     if (e.target === $("connect-dlg")) return $("connect-dlg").close();
     const mint = e.target.closest("button[data-mint]");
     if (mint) {
-      const zh = locale === "zh-TW", id = mint.dataset.mint, agent = mint.dataset.agent;
+      const id = mint.dataset.mint, st = T().st;
+      const name = $(`cn-${id}`).value.trim();
+      if (!name) { $(`cn-${id}`).focus(); toast(st.tokNameNeeded); return; }
       const token = store.get("driftnet-token");
+      const headers = { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) };
       mint.disabled = true;
-      const res = await fetch("/api/agent-tokens", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ name: agent, scope: "write" }) }).catch(() => null);
+      // Names needn't be unique, so never block: just say so when an active one already has this name.
+      const before = await fetch("/api/agent-tokens", { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      const res = await fetch("/api/agent-tokens", { method: "POST", headers, body: JSON.stringify({ name, scope: "write" }) }).catch(() => null);
       const made = res?.ok ? await res.json().catch(() => null) : null;
       if (!made) { mint.disabled = false; toast(T().failed); return; }
       $(`cx-${id}`).textContent = snippets[id](made.token);
-      mint.closest(".conn-mint").innerHTML = `<p class="warn">${esc(zh ? `已建立「${agent}」專用金鑰，已填進上面的設定。請現在複製：之後不會再顯示。不用時到「設定 → 存取」撤銷。`
-        : `Token “${agent}” created and filled in above. Copy it now: it will not be shown again. Revoke it in Settings → Access when you no longer need it.`)}</p>`;
+      mint.closest(".conn-mint").innerHTML = `<p class="warn">${esc(st.tokCardDone.replace("{name}", made.name))}${nameTaken(before, made.name) ? `<br>${esc(st.tokDuplicate.replace("{name}", made.name))}` : ""}</p>`;
       return;
     }
     const b = e.target.closest("button[data-copy]");

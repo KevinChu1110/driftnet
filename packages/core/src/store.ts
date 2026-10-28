@@ -516,9 +516,9 @@ export class Store {
     return { id, name, scope: input.scope, token };
   }
 
-  /** Every token, revoked ones included (they show greyed out); never the hash. */
+  /** Active tokens, and ones revoked in the last 30 days (they show greyed out); never the hash. */
   listAgentTokens(): AgentToken[] {
-    const rows = this.db.prepare("SELECT id, name, scope, created_at, last_used_at, revoked_at FROM agent_tokens ORDER BY created_at DESC, rowid DESC").all() as {
+    const rows = this.db.prepare("SELECT id, name, scope, created_at, last_used_at, revoked_at FROM agent_tokens WHERE revoked_at IS NULL OR revoked_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-30 days') ORDER BY created_at DESC, rowid DESC").all() as {
       id: string; name: string; scope: "read" | "write"; created_at: string; last_used_at: string | null; revoked_at: string | null;
     }[];
     return rows.map((r) => ({ id: r.id, name: r.name, scope: r.scope, createdAt: r.created_at, lastUsedAt: r.last_used_at, revokedAt: r.revoked_at }));
@@ -526,6 +526,11 @@ export class Store {
 
   revokeAgentToken(id: string): boolean {
     return this.db.prepare("UPDATE agent_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND revoked_at IS NULL").run(id).changes > 0;
+  }
+
+  /** Forget a revoked token. An active one must be revoked first: false then, and for an unknown id. */
+  deleteAgentToken(id: string): boolean {
+    return this.db.prepare("DELETE FROM agent_tokens WHERE id = ? AND revoked_at IS NOT NULL").run(id).changes > 0;
   }
 
   /** The active token with this sha256, if any. */

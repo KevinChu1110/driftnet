@@ -223,7 +223,7 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 ```
 
 每個 agent 各用自己的金鑰，不要拿管理密碼出去：**設定 → 存取 → Agent 專用金鑰**（或「連接 AI」卡片上的
-「幫這個 agent 建一把專用金鑰」）。把金鑰放在 `$DRIFTNET_TOKEN` 的位置即可。
+「幫這個 agent 建一把專用金鑰」，可先改名稱）。把金鑰放在 `$DRIFTNET_TOKEN` 的位置即可。
 
 | MCP 工具 | 用途 |
 |---|---|
@@ -335,7 +335,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）·
-`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id`（限管理密碼）· `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -350,7 +350,7 @@ ChatGPT、Grok、架在伺服器上的 Hermes 或 OpenClaw）。伺服器只聽 
 3. **唯讀分享碼。**給只會開連結的 AI：`…/llms.txt?key=…` 只能讀清單。外流就按「重新產生」。管理密碼永遠不能放在網址裡。
    聊天機器人和 agent 給你的卡片連結會帶著它，手機點開不用輸入密碼；網頁會記住分享碼，並把它從網址列拿掉。
 4. **Agent 專用金鑰。**每個 agent（Hermes、Claude Code、OpenClaw……）一把，不必用管理密碼：「可讀寫」能收錄、
-   搬移、整理，「唯讀」只能看。金鑰建立時只顯示一次，系統只存它的雜湊值。按「撤銷」立刻斷掉那一個 agent；
+   搬移、整理，「唯讀」只能看。金鑰建立時只顯示一次，系統只存它的雜湊值。按「撤銷」立刻斷掉那一個 agent，「移除」把已撤銷的從清單清掉（撤銷超過 30 天也會自動消失）；
    換管理密碼不會影響它們。金鑰只能放在 Bearer header，不能放網址，也不能改設定或再建金鑰。
    佇列領取和卡片搬移都會記下是哪一把金鑰做的。
 5. **公開網址。**按一下就透過 Cloudflare 開一個臨時的 `https://….trycloudflare.com`（免帳號；

@@ -127,3 +127,27 @@ test("who leased or moved is recorded: the token's id, or admin", async () => {
   assert.equal(row().moved_by, "admin");
   await client.close();
 });
+
+test("one request looks its token up once, however many questions it asks", () => {
+  const w = store.createAgentToken({ name: "once", scope: "write" });
+  const original = store.findAgentToken.bind(store);
+  let calls = 0;
+  store.findAgentToken = (hash) => (calls++, original(hash));
+  try {
+    const r = req(w.token);
+    assert.ok(isAdmin(r, env, store));
+    assert.ok(canRead(r, env, store));
+    assert.equal(role(r, env, store), "admin");
+    assert.equal(actorOf(r, env, store), `agent:${w.id}`);
+    assert.equal(calls, 1);
+    // A caller with no valid token is remembered too.
+    calls = 0;
+    const nobody = req("dn_not-a-token");
+    assert.ok(!isAdmin(nobody, env, store));
+    assert.ok(!canRead(nobody, env, store));
+    assert.equal(role(nobody, env, store), "none");
+    assert.equal(calls, 1);
+  } finally {
+    store.findAgentToken = original;
+  }
+});

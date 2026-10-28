@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
+import { tokenRoute } from "./tokens.ts";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
@@ -297,18 +298,9 @@ const server = createServer(async (req, res) => {
     const tokenMatch = /^\/api\/agent-tokens(?:\/([^/]+))?$/.exec(path);
     if (tokenMatch) {
       const id = tokenMatch[1] ? decodeURIComponent(tokenMatch[1]) : null;
-      if (!authorizedAsPassword(req) || (!token(env) && !isLocal(req))) return send(res, 403, { error: token(env) ? "unauthorized" : "set an admin password to manage agent tokens remotely" });
-      if (req.method === "GET" && !id) return send(res, 200, dn.store.listAgentTokens());
-      if (req.method === "POST" && !id) {
-        if (!/^application\/json\b/.test(req.headers["content-type"] ?? "")) return send(res, 415, { error: "send application/json" });
-        const body = await readJson<{ name?: string; scope?: string }>(req);
-        if (!String(body.name ?? "").trim()) throw new BadRequest("name is required");
-        if (body.scope !== "read" && body.scope !== "write") throw new BadRequest("scope must be read or write");
-        // The token is in this response and nowhere else.
-        return send(res, 200, dn.store.createAgentToken({ name: String(body.name), scope: body.scope }));
-      }
-      if (req.method === "DELETE" && id) return dn.store.revokeAgentToken(id) ? send(res, 200, { ok: true }) : send(res, 404, { error: "not found" });
-      return send(res, 405, { error: "method not allowed" });
+      const body = req.method === "POST" && !id ? await readJson<unknown>(req) : undefined;
+      const r = tokenRoute(dn.store, env, req, id, body);
+      return send(res, r.status, r.body);
     }
     // A fresh read-only key; the old one stops working at once.
     if (req.method === "POST" && path === "/api/read-key") {
