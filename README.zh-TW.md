@@ -113,6 +113,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 - **資料夾就是分類。**在側邊欄用 ＋ 和 ⋯ 新增、巢狀、改名、寫說明；AI 會照資料夾的路徑和說明分新連結，
   例如「遊戲 › 楓之谷 — Artale 小工具」就會收到楓之谷的工具。卡片可以按 📁 **移動到…**，電腦上也能拖著 ⠿ 丟到資料夾；
   自己放好的卡片不會再被 AI 搬走。刪掉資料夾時，裡面的連結會移到上一層。
+- **樹狀圖。**資料夾像 XMind 一樣從中心往右展開，每條分支一個顏色。點資料夾展開，點卡片預覽；把卡片拖到資料夾上就完成整理
+  （手機上先按住一下再拖，所以快速滑動還是在移動畫面）。資料夾拖到另一個資料夾底下就變子資料夾。搜尋會標亮符合的節點，
+  卡片太多的資料夾會收成「還有 N 張」。
 - **往右滑**加入最愛，**往左滑**移到垃圾桶；滑太短不會觸發，上下捲動也不會被當成滑動。電腦上可以按 ☆ 和 🗑，或用滑鼠拖曳。
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
 - **筆記。**每張卡片都能按 📝 寫自己的筆記（試過了嗎？要 GPU 嗎？）。大家丟連結時在聊天室說的話也會顯示在卡片上（💬），
@@ -121,7 +124,12 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   不用重新啟動就生效。每個瀏覽器各自的顯示：排序（值得看／最新／最多人分享）、精簡卡片、標籤、聊天原文、深淺色。
 - **匯出**全部內容：一個 Markdown 檔，或一包附 front matter 的 Markdown（zip），Obsidian 可以直接當 vault 開，
   Notion 可以匯入（匯入 → Markdown & CSV）。
+- **分享出去的連結是唯讀的。**聊天機器人和 agent 給你的卡片連結帶著唯讀分享碼，手機點開不用密碼；按「解鎖編輯」輸入管理密碼後，
+  才會出現編輯按鈕。忘記密碼的話，到跑 driftnet 的那台電腦打開網頁，設定裡可以直接設新的。
+- **鍵盤。**`j`／`k` 上下一張、`f` 最愛、`m` 移動（打字找資料夾）、`n` 筆記、`#` 垃圾桶、`z` 復原、`/` 搜尋、`g m` 樹狀圖、`?` 看全部快捷鍵。
 - 用瀏覽器的**加入主畫面**，就能像 App 一樣打開。
+
+<p align="center"><img src="assets/map-zh-TW.jpg" alt="樹狀圖：資料夾從 driftnet 往外展開、底下掛著卡片；以及手機上的唯讀瀏覽" width="100%"></p>
 
 <p align="center"><img src="assets/notes-settings-zh-TW.jpg" alt="筆記頁（可以連到卡片）和設定視窗" width="100%"></p>
 
@@ -367,6 +375,7 @@ pnpm typecheck && pnpm test
 CHROME=/path/to/chromium pnpm e2e:extension   # 在真的瀏覽器裡測擴充（Chrome for Testing 或 Chromium）
 CHROME=/path/to/chrome pnpm e2e:web             # 用手機尺寸和真的觸控滑動測網頁
 pnpm build:npm                                  # 打包 npm 套件到 dist/npm（試用：cd dist/npm && npm pack）
+pnpm demo -- --many --private --password demo-pass-123 --read-key demo-share-key-0000   # 開一個帶示範資料的臨時 driftnet
 ```
 
 發新版：改 `apps/server/package.json`、`server.json` 和 `.claude-plugin/` 裡的版號，再推一個標籤

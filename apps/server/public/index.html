@@ -56,6 +56,11 @@
   .lock { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--star); color: var(--text); background: var(--star-soft);
           border-radius: 99px; padding: 6px 12px; font-size: 13px; cursor: pointer; min-height: 40px; white-space: nowrap; }
   .lock[hidden] { display: none; }
+  .lock.bump { animation: bump .7s ease 2; }
+  .card.shake { animation: shake .35s ease; }
+  @keyframes shake { 25% { transform: translateX(-10px); } 75% { transform: translateX(8px); } }
+  @media (max-width: 720px) { .lock .long { display: none; } .lock { padding: 6px 10px; } }
+  @media (min-width: 721px) { .lock .short { display: none; } }
   /* Browsing with a read-only share key: nothing that edits is offered. */
   body.readonly .tools, body.readonly .link-btn[data-act="note"], body.readonly nav .more, body.readonly nav [data-new],
   body.readonly .map-bar [data-map="new"], body.readonly #new-note, body.readonly .hint.swipe-hint { display: none !important; }
@@ -205,9 +210,17 @@
   .mnode.lift { transform: scale(1.08); box-shadow: 0 8px 22px rgba(0,0,0,.22); }
   .mnode.drop { transform: scale(1.1); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 40%, transparent); }
   .mnode.dragging { opacity: .35; }
+  .mnode.picked { outline: 3px solid var(--c); outline-offset: 3px; transform: scale(1.06); }
+  .pickbar { position: fixed; left: 12px; right: 12px; bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px)); z-index: 6; display: flex; gap: 10px;
+             align-items: center; justify-content: space-between; background: var(--accent); color: #fff; border-radius: 14px; padding: 10px 10px 10px 16px;
+             box-shadow: 0 8px 26px rgba(0,0,0,.28); }
+  .pickbar[hidden] { display: none; }
+  .pickbar button { border: 0; background: rgba(255,255,255,.2); color: #fff; border-radius: 10px; min-height: 40px; padding: 0 14px; font-weight: 600; }
   .mnode.bump { animation: bump .6s ease; }
   @keyframes bump { 30% { transform: scale(1.14); box-shadow: 0 0 0 6px color-mix(in srgb, var(--c) 35%, transparent); } }
   .map-wrap.panning { cursor: grabbing; }
+  body.map-view { overflow: hidden; }
+  body.map-view main { padding-bottom: 0; }
   .map-wrap { user-select: none; -webkit-user-select: none; }
   .mghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -130%) rotate(-2deg); opacity: .95; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
   .peek h3 { margin: 0 0 8px; font-size: 18px; }
@@ -239,6 +252,8 @@
   .empty.first .add input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
   .empty.first .btn { display: inline-flex; align-items: center; gap: 6px; }
   @media (pointer: coarse) {
+    .mnode .opt { padding: 10px; margin: -6px -12px -6px 0; }
+    .meta .link-btn { min-height: 44px; }
     nav .icon, nav .twist, nav .folder .more { width: 44px; min-width: 44px; height: 44px; }
     .mnode { height: 40px; } .mnode.item { height: 36px; } .mnode.root { height: 48px; }
   }
@@ -277,6 +292,8 @@
   /* A card sits on top of two action strips that show while it is dragged. */
   .swipe { position: relative; border-radius: 12px; overflow: hidden; scroll-margin-top: 90px; transition: height .25s ease, margin .25s ease, opacity .25s ease; }
   .swipe.gone { opacity: 0; }
+  .swipe.flash .card { animation: flash 1.6s ease; }
+  @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: var(--shadow); } }
   .act { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 22px; font-weight: 600; font-size: 14px; }
   .act.right { justify-content: flex-start; background: var(--star-soft); color: var(--star); }
   .act.left { justify-content: flex-end; background: var(--danger-soft); color: var(--danger); }
@@ -487,6 +504,7 @@
     </div>
   </form>
 </dialog>
+<div class="pickbar" id="pickbar" role="status" hidden><span id="pick-text"></span><button type="button" id="pick-cancel"></button></div>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
   const STRINGS = {
@@ -521,8 +539,9 @@
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
       noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
-      emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "Export Markdown", exportVault: "Export for Obsidian / Notion",
-      saved: "Saved", settings: "Settings", filterFolders: "Type to find a folder…", undoHint: "z undoes",
+      emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "Download a backup (Markdown)", exportVault: "Download for Obsidian / Notion",
+      saved: "Saved", settings: "Settings", pickedUp: (n) => `Picked up “${n}” — tap the folder it goes into`, alreadyThere: "It's already in that folder",
+      readOnlyNudge: "You can only look here — tap Unlock at the top to change things", filterFolders: "Type to find a folder…", undoHint: "z undoes",
       addLink: "Add", addPlaceholder: "Paste a link to a tool, post or video…", added: "Saved — sorting it now",
       shortcuts: "Keys: j / k next / previous · f favorite · m move · n note · # trash · / search · g m mind map",
       st: {
@@ -550,10 +569,10 @@
         tunnelInstall: "Needs cloudflared (driftnet never downloads it for you):", tunnelPrivate: "Opening it switches reading to “only with the password or the share key”.",
         tunnelStarting: "Starting the tunnel… (up to 30 s)", saveFirst: "Save first, then open the public URL.",
         connect: "Connect an AI",
-        login: "Enter admin password", logout: "Log out on this device", loginTitle: "Unlock editing", loginOk: "Unlock",
+        login: "Enter admin password", logout: "Log out on this device", loginTitle: "Unlock editing", loginOk: "Unlock", unlocked: "Unlocked — you can edit now", unlockShort: "Unlock",
         loginWrong: "That's not the admin password.", viewOnly: "View only · Unlock",
-        loginHelp: "The password was set on the computer that runs driftnet. Don't know it? Open driftnet on that computer: ⚙ Settings there shows a field to set a new one — no old password needed.",
-        loginAdvanced: "driftnet runs on a server? From your computer run  ssh -L PORT:127.0.0.1:PORT <server>  and open http://localhost:PORT.",
+        loginHelp: "Type this driftnet's password — usually from whoever set it up. Without it you can still look at everything.",
+        loginAdvanced: "Forgot it (you set it up)? Open driftnet on the computer it runs on — Settings there sets a new one. On a server: From your computer run  ssh -L PORT:127.0.0.1:PORT <server>  and open http://localhost:PORT.",
         keyWrong: "That's neither the admin password nor a share key.",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["Model provider", "Summaries. None: links are still sorted, only without a summary."],
@@ -610,8 +629,9 @@
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
       noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
-      emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "匯出 Markdown", exportVault: "匯出到 Obsidian／Notion",
-      saved: "已儲存", settings: "設定", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
+      emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "下載備份（Markdown）", exportVault: "下載給 Obsidian／Notion",
+      saved: "已儲存", settings: "設定", pickedUp: (n) => `已拿起「${n}」，點要放進去的資料夾`, alreadyThere: "它已經在這個資料夾裡了",
+      readOnlyNudge: "目前只能看。要修改，請點上方的「解鎖」", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
       addLink: "收錄", addPlaceholder: "貼上工具、貼文或影片的連結…", added: "收到，正在整理",
       shortcuts: "快捷鍵：j／k 下一張／上一張 · f 最愛 · m 移動 · n 筆記 · # 垃圾桶 · / 搜尋 · g m 樹狀圖",
       st: {
@@ -639,10 +659,10 @@
         tunnelInstall: "需要 cloudflared（driftnet 不會自動幫你下載）：", tunnelPrivate: "開啟後，「誰可以讀」會改成要有密碼或分享碼。",
         tunnelStarting: "正在開通道…（最多 30 秒）", saveFirst: "先按儲存，再開公開網址。",
         connect: "連接 AI",
-        login: "輸入管理密碼", logout: "在這台裝置登出", loginTitle: "解鎖編輯", loginOk: "解鎖",
+        login: "輸入管理密碼", logout: "在這台裝置登出", loginTitle: "解鎖編輯", loginOk: "解鎖", unlocked: "已解鎖，現在可以編輯了", unlockShort: "解鎖",
         loginWrong: "管理密碼不對。", viewOnly: "只能看 · 解鎖編輯",
-        loginHelp: "密碼是在跑 driftnet 的那台電腦上設的。不知道的話，到那台電腦打開 driftnet，⚙ 設定裡可以直接設新密碼，不用舊密碼。",
-        loginAdvanced: "driftnet 跑在伺服器上？在你的電腦執行  ssh -L PORT:127.0.0.1:PORT <伺服器>  再打開 http://localhost:PORT。",
+        loginHelp: "輸入這個 driftnet 的密碼，通常是架設它的人給你的。沒有密碼也能看所有內容，只是不能修改。",
+        loginAdvanced: "密碼是你自己設的但忘了？到跑 driftnet 的那台電腦打開網頁，設定裡可以直接設新的。跑在伺服器上的話：在你的電腦執行  ssh -L PORT:127.0.0.1:PORT <伺服器>  再打開 http://localhost:PORT。",
         keyWrong: "這不是管理密碼，也不是分享碼。",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要。選「不使用」也會分類，只是沒有摘要。"],
@@ -820,7 +840,7 @@
     if (!STRINGS[saved] && STRINGS[ui.locale]) locale = ui.locale;
     applyLocale();
     $("stats").textContent = T().stats(stats.items, stats.shares);
-    $("lock").innerHTML = `${ic("lock")}<span>${esc(T().st.viewOnly)}</span>`;
+    $("lock").innerHTML = `${ic("lock")}<span class="long">${esc(T().st.viewOnly)}</span><span class="short">${esc(T().st.unlockShort)}</span>`;
     const btn = (field, key, label, n, icon) =>
       `<button type="button" data-field="${field}" data-value="${esc(key)}" aria-pressed="${state[field] === key}">
          <span class="lbl">${icon ? ic(icon) : ""}<span>${esc(label)}</span></span><span class="count">${n ?? ""}</span></button>`;
@@ -1338,8 +1358,15 @@
           <button type="button" data-map="in" aria-label="${esc(t.zoomIn)}">${ic("plus")}</button></div></div>`;
     drawMap();
     sizeMap();
-    // On a phone the whole tree rarely fits: start zoomed to fit, once.
-    if (isDrawer() && !store.get("driftnet-map-zoom")) fitMap();
+    // On a phone the whole tree rarely fits: start fitted to the width (still readable), root in view.
+    if (isDrawer() && !store.get("driftnet-map-zoom")) fitWidth();
+  }
+  function fitWidth() {
+    const wrap = $("map-wrap"), c = $("map-canvas");
+    if (!wrap || !c) return;
+    mapZoomTo(Math.max(0.6, Math.min(1, (wrap.clientWidth - 8) / c.offsetWidth)));
+    const root = c.querySelector('.mnode[data-key="root"]');
+    if (root) wrap.scrollTop = root.offsetTop * mapZoom - wrap.clientHeight / 2;
   }
   function fitMap() {
     const wrap = $("map-wrap"), c = $("map-canvas");
@@ -1450,9 +1477,13 @@
   }
 
   function mapZoomTo(z) {
+    const wrap = $("map-wrap");
+    // Zoom around the centre of what is on screen, not the top-left corner.
+    const cx = wrap ? (wrap.scrollLeft + wrap.clientWidth / 2) / mapZoom : 0, cy = wrap ? (wrap.scrollTop + wrap.clientHeight / 2) / mapZoom : 0;
     mapZoom = Math.min(2, Math.max(0.3, Math.round(z * 20) / 20));
     store.set("driftnet-map-zoom", String(mapZoom));
     drawMap();
+    if (wrap) { wrap.scrollLeft = cx * mapZoom - wrap.clientWidth / 2; wrap.scrollTop = cy * mapZoom - wrap.clientHeight / 2; }
   }
   const pulse = (key) => {
     const n = $("map-canvas")?.querySelector(`.mnode[data-key="${CSS.escape(key)}"]`);
@@ -1469,7 +1500,7 @@
 
   $("list").addEventListener("click", (e) => {
     const edit = e.target.closest(".mnode [data-edit]");
-    if (edit) { e.stopPropagation(); return openFolderDialog(edit.dataset.edit); }
+    if (edit && !picked && !justDropped) { e.stopPropagation(); return openFolderDialog(edit.dataset.edit); }
     const b = e.target.closest("[data-map]");
     if (!b) return;
     const a = b.dataset.map;
@@ -1526,7 +1557,8 @@
     addEventListener("pointerup", () => { if (pan) { pan.wrap.classList.remove("panning"); pan = null; } });
     $("list").addEventListener("pointerdown", (e) => {
       const node = e.target.closest(".mnode");
-      if (!node || e.button > 0 || e.target.closest("[data-edit]")) return;
+      // While something is picked up, the whole folder (its ⋯ too) is a drop target.
+      if (!node || e.button > 0 || (e.target.closest("[data-edit]") && !picked)) return;
       const key = node.dataset.key;
       const movable = role === "admin" && (key.startsWith("i:") || key.startsWith("f:"));
       press = { key, el: node, x: e.clientX, y: e.clientY, drag: false, armed: false, touch: e.pointerType === "touch", movable, id: e.pointerId };
@@ -1560,11 +1592,12 @@
       }
     });
     // While a lifted node is dragged by a finger, the page must not scroll.
-    document.addEventListener("touchmove", (e) => { if (press && (press.armed || press.drag)) e.preventDefault(); }, { passive: false });
+    document.addEventListener("touchmove", (e) => { if (press && press.drag && e.cancelable) e.preventDefault(); }, { passive: false });
     const finish = async (e) => {
       if (!press || e.pointerId !== press.id) return;
       const p = press;
-      if (p.touch && p.armed && !p.drag) { endPress(); return; }   // held, then let go: nothing
+      // Held, then let go without dragging: the card stays picked up; the next tapped folder receives it.
+      if (p.touch && p.armed && !p.drag) { endPress(); if (p.movable) pickUp(p.key); return; }
       const target = p.drag ? document.querySelector(".mnode.drop") : null;
       endPress();
       if (!p.drag) return tapNode(p.key, !p.touch);
@@ -1584,7 +1617,38 @@
     });
   })();
   let folderTap = null;
+  /**
+   * Picking up (touch): hold a card or folder, let go, then tap the folder it goes into.
+   * Nothing competes with scrolling, and no precise finger drag is needed.
+   */
+  let picked = null;
+  function pickUp(key) {
+    picked = key;
+    const t = T();
+    const label = key.startsWith("i:") ? nameOf(mapItems.find((i) => i.id === Number(key.slice(2))) ?? { title: "" }) : catLabel(key.slice(2));
+    $("pick-text").textContent = t.pickedUp(label);
+    $("pick-cancel").textContent = t.cancel;
+    $("pickbar").hidden = false;
+    $("map-canvas")?.querySelector(`.mnode[data-key="${CSS.escape(key)}"]`)?.classList.add("picked");
+  }
+  let justDropped = false;
+  function dropPicked() {
+    picked = null;
+    justDropped = true;
+    setTimeout(() => (justDropped = false), 400);   // the click that follows the tap isn't an edit
+    $("pickbar").hidden = true;
+    document.querySelectorAll(".mnode.picked").forEach((n) => n.classList.remove("picked"));
+  }
   function tapNode(key, viaMouse = false) {
+    if (picked) {
+      const what = picked;
+      if (key === what) return dropPicked();
+      if (key.startsWith("f:") || (key === "root" && what.startsWith("f:"))) {
+        dropPicked();
+        const to = key === "root" ? null : key.slice(2);
+        return what.startsWith("i:") ? mapMoveItem(Number(what.slice(2)), to) : mapMoveFolder(what.slice(2), to);
+      }
+    }
     // A mouse double-click edits the folder, so a single click waits a moment to be sure.
     if (key.startsWith("f:") && viaMouse) { clearTimeout(folderTap); folderTap = setTimeout(() => toggleFolder(key.slice(2)), 230); return; }
     if (key.startsWith("f:")) toggleFolder(key.slice(2));
@@ -1617,6 +1681,7 @@
     $("peek-dlg").showModal();
   }
   $("pk-close").onclick = () => $("peek-dlg").close();
+  $("pick-cancel").onclick = () => dropPicked();
   $("peek-dlg").addEventListener("click", (e) => { if (e.target === $("peek-dlg")) $("peek-dlg").close(); });
   $("pk-move").onclick = () => { $("peek-dlg").close(); openMovePicker(peeking); };
   $("pk-list").onclick = () => {
@@ -1637,7 +1702,8 @@
   }
   async function mapMoveItem(id, to) {
     const item = mapItems.find((i) => i.id === id);
-    if (!item || !to || item.category === to) return;
+    if (!item || !to) return;
+    if (item.category === to) return toast(T().alreadyThere);
     const from = item.category;
     if (!(await mapWrite(`/api/items/${id}/move`, "POST", { folder: to }))) return;
     item.category = to;
@@ -1673,9 +1739,9 @@
   function openLogin() {
     const st = T().st;
     $("lg-title").textContent = st.loginTitle;
-    $("lg-label").textContent = st.password;
+    $("lg-label").textContent = locale === "zh-TW" ? "密碼" : "Password";
     $("lg-help").textContent = st.loginHelp;
-    $("lg-adv-s").textContent = locale === "zh-TW" ? "進階" : "Advanced";
+    $("lg-adv-s").textContent = locale === "zh-TW" ? "忘記密碼？" : "Forgot it?";
     $("lg-adv").textContent = st.loginAdvanced.replaceAll("PORT", String(serverPort));
     $("lg-ok").textContent = st.loginOk;
     $("lg-cancel").textContent = T().cancel;
@@ -1695,7 +1761,7 @@
     if (!res?.ok) { $("lg-error").textContent = T().st.loginWrong; return; }
     store.set("driftnet-token", pw);
     $("login-dlg").close();
-    toast(T().saved);
+    toast(T().st.unlocked);
     // Another dialog (a note being written) stays open: only refresh the page behind it.
     if (!document.querySelector("dialog[open]")) load();
     else { role = "admin"; document.body.classList.remove("readonly"); $("lock").hidden = true; }
@@ -1906,6 +1972,8 @@
 
   async function render() {
     updateCrumb();
+    document.body.classList.toggle("map-view", state.view === "map");
+    if (state.view !== "map" && picked) dropPicked();
     if (state.view === "notes") return renderNotes();
     if (state.view === "map") return renderMap();
     const p = new URLSearchParams({ limit: "300" });
@@ -1925,7 +1993,15 @@
     $("list").querySelector("[data-connect-empty]")?.addEventListener("click", () => openConnect());
     for (const el of $("list").querySelectorAll(".swipe")) attachSwipe(el);
     // Only #item-<n> is ours; anything else in the hash must not break the page.
-    if (/^#item-\d+$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+    if (/^#item-\d+$/.test(location.hash)) {
+      const target = document.getElementById(location.hash.slice(1));
+      if (target) {
+        // Clear the sticky header (taller on a phone), then flash the card so it's obvious which one was meant.
+        const top = target.getBoundingClientRect().top + scrollY - document.querySelector("header").offsetHeight - ($("crumb").offsetHeight || 0) - 12;
+        scrollTo({ top });
+        target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
+      }
+    }
   }
 
   function card(i) {
@@ -2050,9 +2126,25 @@
     }
   });
 
+  /** A reader who swipes gets a nudge (and a shake), not silence. */
+  let nudged = 0;
+  function readerSwipe(el) {
+    const cardEl = el.querySelector(".card");
+    let x0 = 0, y0 = 0, on = false;
+    cardEl.addEventListener("pointerdown", (e) => { x0 = e.clientX; y0 = e.clientY; on = true; });
+    cardEl.addEventListener("pointermove", (e) => {
+      if (!on || Math.abs(e.clientX - x0) < 30 || Math.abs(e.clientX - x0) < Math.abs(e.clientY - y0)) return;
+      on = false;
+      cardEl.classList.remove("shake"); void cardEl.offsetWidth; cardEl.classList.add("shake");
+      if (Date.now() - nudged > 4000) { nudged = Date.now(); toast(T().readOnlyNudge); $("lock").classList.remove("bump"); void $("lock").offsetWidth; $("lock").classList.add("bump"); }
+    });
+    cardEl.addEventListener("pointerup", () => (on = false));
+  }
+
   // ── Swipe: right = favorite (restore in the trash), left = trash ─────────
   function attachSwipe(el) {
-    if (!el || role !== "admin") return;
+    if (el && role !== "admin") return readerSwipe(el);
+    if (!el) return;
     const cardEl = el.querySelector(".card");
     let x0 = 0, y0 = 0, dx = 0, active = false, horizontal = null;
     const limit = () => Math.min(140, el.offsetWidth * 0.32);

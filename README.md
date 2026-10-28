@@ -122,6 +122,10 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   the AI files new links by each folder's path and description, so “Games › MapleStory — Artale
   helpers” gets the MapleStory tools. Move a card with 📁 **Move to…**, or drag it by ⠿ onto a folder
   on a computer; a card you placed stays put. Deleting a folder moves its links up one level.
+- **Mind map.** Folders branch out from the root like XMind, a colour per branch. Tap a folder to open
+  it, tap a card to preview it, and drag a card onto a folder to file it (on a phone, hold it a moment
+  first, so a quick swipe still pans). Drag a folder onto another to nest it. Search highlights the
+  matches; big folders fold into “+N”.
 - **Swipe right** to add a favorite, **swipe left** to move to the trash; a short swipe does nothing,
   and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.
 - **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
@@ -134,7 +138,14 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   newest, most shared), compact cards, tags, chat text, light or dark.
 - **Export** everything as one Markdown file, or as a zip of Markdown files with front matter that
   Obsidian opens as a vault and Notion imports (Import → Markdown & CSV).
+- **Shared links open read-only.** A card link from a chat bot or an agent carries the read-only share
+  key, so it opens on a phone without a password; edit buttons appear after **Unlock** with the admin
+  password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
+- **Keyboard.** `j`/`k` step through cards, `f` favorite, `m` move (type to find the folder), `n` note,
+  `#` trash, `z` undo, `/` search, `g m` mind map, `?` the list.
 - **Add to Home Screen** to open it like an app.
+
+<p align="center"><img src="assets/map-en.jpg" alt="The mind map: folders branching out from driftnet, cards under them, the read-only view on a phone" width="100%"></p>
 
 <p align="center"><img src="assets/notes-settings-en.jpg" alt="The notes page with links to cards, and the settings dialog" width="100%"></p>
 
@@ -398,6 +409,7 @@ pnpm typecheck && pnpm test
 CHROME=/path/to/chromium pnpm e2e:extension   # the extension in a real browser (Chrome for Testing or Chromium)
 CHROME=/path/to/chrome pnpm e2e:web             # the web page on a phone-sized screen, with real touch swipes
 pnpm build:npm                                  # the npm package in dist/npm (try: cd dist/npm && npm pack)
+pnpm demo -- --many --private --password demo-pass-123 --read-key demo-share-key-0000   # a throwaway driftnet with demo data
 ```
 
 Releasing: bump the version in `apps/server/package.json`, `server.json` and `.claude-plugin/`, then push a tag

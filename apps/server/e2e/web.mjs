@@ -393,6 +393,26 @@ try {
     await evaluate(s, `document.querySelector('[data-map="fit"]').click()`);
     await sleep(300);
     await shoot(`web-phone-map-${LANG}.png`);
+    // Touch: hold a card, let go, tap a folder — filed, with nothing fighting the scroll.
+    {
+      const cardKey = await evaluate(s, `document.querySelector(".mnode.item").dataset.key`);
+      const cid = Number(cardKey.slice(2));
+      const was = (await api(`/api/items/${cid}`)).category;
+      const dest = await evaluate(s, `[...document.querySelectorAll(".mnode.folder")].map((n) => n.dataset.key.slice(2)).find((k) => k !== ${JSON.stringify(was)})`);
+      await evaluate(s, `document.querySelector('.mnode[data-key="${cardKey}"]').scrollIntoView({ block: "center", inline: "center" })`);
+      const at = await evaluate(s, `(() => { const r = document.querySelector('.mnode[data-key="${cardKey}"]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      await cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] }, s);
+      await sleep(450);
+      await cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }, s);
+      await waitFor(s, `!document.getElementById("pickbar").hidden`, "picked up by holding");
+      await shoot(`web-phone-pickup-${LANG}.png`);
+      await evaluate(s, `document.querySelector('.mnode[data-key="f:${dest}"]').scrollIntoView({ block: "center", inline: "center" })`);
+      await tap(`.mnode[data-key="f:${dest}"]`);
+      await waitFor(s, `document.getElementById("pickbar").hidden`, "dropped");
+      for (let k = 0; k < 20 && (await api(`/api/items/${cid}`)).category !== dest; k++) await sleep(150);
+      assert.equal((await api(`/api/items/${cid}`)).category, dest, "hold + tap a folder files the card");
+      console.log("✓ phone map: hold a card, tap a folder — filed");
+    }
     await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
     console.log("✓ mind map: expand, drag a card onto a folder (mouse), phone layout");
   }
