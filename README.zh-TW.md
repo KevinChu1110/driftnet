@@ -12,6 +12,7 @@
 ![Runs locally](https://img.shields.io/badge/runs-locally-0f9f8f.svg)
 ![Any model](https://img.shields.io/badge/model-any%20%C2%B7%20or%20none-2459e0.svg)
 ![MCP](https://img.shields.io/badge/agents-MCP-8a63d2.svg)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/guanrung11n)
 
 </div>
 
@@ -356,6 +357,13 @@ pnpm build:npm                                  # 打包 npm 套件到 dist/npm�
 - [ ] **每週摘要**推回聊天室。
 - [ ] **擴充打磨。** Threads／X／Instagram 專屬擷取、上架 Chrome 線上應用程式商店。
 - [ ] **更多轉接。** 原生 Gemini、Bedrock、Vertex，以及更多判斷器。
+
+## 支持
+
+driftnet 免費、MIT 授權。如果它幫你省了時間，按個星星能讓更多人找到它，也可以
+[請我喝杯咖啡](https://buymeacoffee.com/guanrung11n)。
+
+<a href="https://buymeacoffee.com/guanrung11n"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="48"></a>
 
 ## 授權
 

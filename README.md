@@ -12,6 +12,7 @@
 ![Runs locally](https://img.shields.io/badge/runs-locally-0f9f8f.svg)
 ![Any model](https://img.shields.io/badge/model-any%20%C2%B7%20or%20none-2459e0.svg)
 ![MCP](https://img.shields.io/badge/agents-MCP-8a63d2.svg)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/guanrung11n)
 
 </div>
 
@@ -383,6 +384,13 @@ platform (`handleChatText()`), browser capture (`collect.js`), or a bot language
 - [ ] **Weekly digest** posted back to the chat.
 - [ ] **Extension polish.** Threads / X / Instagram capture, a Chrome Web Store build.
 - [ ] **More adapters.** Native Gemini, Bedrock, Vertex; more judges.
+
+## Support
+
+driftnet is free and MIT. If it saves you time, a star helps others find it, and you can
+[buy me a coffee](https://buymeacoffee.com/guanrung11n).
+
+<a href="https://buymeacoffee.com/guanrung11n"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="48"></a>
 
 ## License
 
