@@ -57,7 +57,7 @@ test("agents can read the folder tree, add a folder and file an item into it", a
 test("every tool explains itself: descriptions, a description on every parameter, annotations", async () => {
   const client = await connect();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 18);
+  assert.equal(tools.length, 19);
   for (const t of tools) {
     assert.ok((t.description ?? "").length > 150, `${t.name}: description too thin`);
     assert.ok(t.annotations && t.annotations.readOnlyHint !== undefined && t.annotations.destructiveHint !== undefined, `${t.name}: annotations`);

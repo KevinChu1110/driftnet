@@ -13,6 +13,18 @@ test("canonicalize strips tracking and unifies hosts", () => {
   assert.equal(canonicalize("ftp://example.com"), null);
 });
 
+test("canonicalize drops Xiaohongshu, Douyin and TikTok share tracking but keeps the content", () => {
+  assert.equal(
+    canonicalize("https://www.xiaohongshu.com/explore/66aa1b?xsec_token=AB&xsec_source=pc_share&share_from_user_hidden=true&apptime=1700&share_id=x&exSource=a"),
+    "https://xiaohongshu.com/explore/66aa1b",
+  );
+  assert.equal(canonicalize("https://www.douyin.com/video/7300?_r=1&_t=abc&u_code=1&did=2&iid=3&share_item_id=4&is_from_webapp=1&sender_device=pc&web_id=5&region=TW&utm_medium=x"), "https://douyin.com/video/7300");
+  assert.equal(canonicalize("https://www.tiktok.com/@u/video/123?_r=1&_t=z&is_from_webapp=1&sender_device=pc&share_app_id=1"), "https://tiktok.com/@u/video/123");
+  // Parameters that identify content survive, and "_t"/"did" are only treated as tracking on those hosts.
+  assert.equal(canonicalize("https://www.tiktok.com/search?q=cats&_t=1"), "https://tiktok.com/search?q=cats");
+  assert.equal(canonicalize("https://example.com/p?did=7&_t=2&id=5"), "https://example.com/p?_t=2&did=7&id=5");
+});
+
 test("extractUrls handles CJK punctuation and dedups", () => {
   const urls = extractUrls("看這個https://github.com/a/b，超好用！還有 https://github.com/a/b/issues 跟（https://x.com/y）");
   assert.deepEqual(urls, ["https://github.com/a/b", "https://x.com/y"]);

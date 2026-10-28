@@ -247,6 +247,28 @@ export class Store {
     return toItem(row);
   }
 
+  /**
+   * Overwrite what a fresh fetch decides (content, summary, judgement), keep what the
+   * reader owns: shares, note, favorite, trash state, and a folder they placed.
+   */
+  refreshItem(id: number, input: {
+    title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[];
+  }): Item | null {
+    const j = input.judgement;
+    const row = this.db
+      .prepare(
+        `UPDATE items SET title = ?, kind = ?, category = CASE WHEN user_placed = 1 THEN category ELSE ? END,
+           worth = ?, is_ai_tool = ?, summary = ?, judge_engine = ?, flags = ?, source = ?, suggestions = ?,
+           enriched_by = NULL, claimed_at = NULL, claimed_by = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+         WHERE id = ? RETURNING *`,
+      )
+      .get(
+        input.title, j.kind, j.category, j.worth, j.isAiTool, input.summary ? JSON.stringify(input.summary) : null,
+        j.engine, input.flags.join(","), input.source, input.suggestions?.length ? JSON.stringify(input.suggestions) : null, id,
+      ) as unknown as ItemRow | undefined;
+    return row ? toItem(row) : null;
+  }
+
   recordShare(itemId: number, ctx: ShareContext): void {
     this.db
       .prepare("INSERT INTO shares (item_id, platform, chat_id, user_id, note) VALUES (?, ?, ?, ?, ?)")

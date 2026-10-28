@@ -421,6 +421,8 @@
           display: grid; place-items: center; color: var(--muted); }
   .tool:hover, .tool:focus-visible { background: var(--bg); color: var(--text); }
   .tool.on { color: var(--star); }
+  .tool.spin .ico, .btn.spin .ico { animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .empty { color: var(--muted); padding: 48px 0; text-align: center; }
 
   .toast { position: fixed; left: 50%; bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px)); transform: translate(-50%, 140%);
@@ -492,6 +494,7 @@
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11.5M7 10.5l5 5 5-5M4.5 20.5h15"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 20.5H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h3.5M15.5 16.5 20 12l-4.5-4.5M20 12H9.5"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4M4 4v4h4M4 13a8 8 0 0 0 14.5 4M20 20v-4h-4"/></symbol>
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20.5 11.5a8 8 0 0 1-11.7 7.1L4 20l1.4-4.6A8 8 0 1 1 20.5 11.5z"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -562,6 +565,7 @@
   <div class="dlg-actions peek-actions">
     <a class="btn primary" id="pk-open" target="_blank" rel="noopener noreferrer"></a>
     <button class="btn" type="button" id="pk-move"></button>
+    <button class="btn" type="button" id="pk-refresh"></button>
     <button class="btn" type="button" id="pk-list"></button>
     <span class="spacer"></span><button class="btn" type="button" id="pk-close"></button>
   </div>
@@ -641,6 +645,7 @@
       folders: "Folders", newFolder: "New folder", newSub: "New folder inside", editFolder: "Edit folder", folderName: "Name",
       folderDesc: "What goes here? (driftnet's AI reads this to sort new links)", folderParent: "Inside", topLevel: "— Top level —",
       save: "Save", cancel: "Cancel", del: "Delete folder", delSure: "Delete? Links move up",
+      refresh: "Refresh (fetch and summarise again)", refreshed: (n) => `Refreshed “${n}”`, refreshBusy: "Already refreshing this one.", refreshWait: "Refreshed a moment ago — try again in a minute.", refreshFailed: (why) => `Couldn’t refresh${why ? `: ${why}` : ""}`,
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
@@ -767,6 +772,7 @@
       folders: "資料夾", newFolder: "新資料夾", newSub: "在裡面新增資料夾", editFolder: "編輯資料夾", folderName: "名稱",
       folderDesc: "放什麼？（driftnet 的 AI 會照這段說明把新連結分進來）", folderParent: "放在", topLevel: "— 最上層 —",
       save: "儲存", cancel: "取消", del: "刪除資料夾", delSure: "確定刪除？內容移到上一層",
+      refresh: "重新整理（再抓一次並重新摘要）", refreshed: (n) => `已重新整理「${n}」`, refreshBusy: "這張卡片正在重新整理。", refreshWait: "剛剛才整理過，請一分鐘後再試。", refreshFailed: (why) => `重新整理失敗${why ? `：${why}` : ""}`,
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
@@ -2250,6 +2256,7 @@
     $("pk-open").innerHTML = `${ic("link")} ${esc(t.openLink)}`;
     $("pk-move").innerHTML = `${ic("move")} ${esc(t.moveTo)}`;
     $("pk-move").hidden = role !== "admin";
+    paintPeekRefresh();
     $("pk-list").innerHTML = `${ic("list")} ${esc(t.showInList)}`;
     $("pk-close").textContent = t.close;
     $("pk-close").hidden = matchMedia("(max-width: 720px)").matches;   // tap outside closes it on a phone
@@ -2258,6 +2265,14 @@
   $("pk-close").onclick = () => $("peek-dlg").close();
   $("pick-cancel").onclick = () => dropPicked();
   $("peek-dlg").addEventListener("click", (e) => { if (e.target === $("peek-dlg")) $("peek-dlg").close(); });
+  const paintPeekRefresh = () => {
+    const b = $("pk-refresh"), busy = refreshing.has(peeking);
+    b.innerHTML = `${ic("refresh")} ${esc(T().refresh)}`;
+    b.hidden = role !== "admin" || state.view === "trash";
+    b.classList.toggle("spin", busy);
+    b.disabled = busy;
+  };
+  $("pk-refresh").onclick = () => refreshItem(peeking);
   $("pk-move").onclick = () => { $("peek-dlg").close(); openMovePicker(peeking); };
   $("pk-list").onclick = () => {
     $("peek-dlg").close();
@@ -2689,6 +2704,7 @@
       ? `<button class="tool" type="button" data-act="restore" title="${esc(t.restore)}" aria-label="${esc(t.restore)}">${ic("undo")}</button>`
       : `<button class="tool grip" type="button" draggable="true" data-grip="${i.id}" title="${esc(t.dragHint)}" aria-hidden="true" tabindex="-1">${ic("grip")}</button>
          <button class="tool" type="button" data-act="move" title="${esc(t.moveTo)}" aria-label="${esc(t.moveTo)}">${ic("move")}</button>
+         <button class="tool ${refreshing.has(i.id) ? "spin" : ""}" type="button" data-act="refresh" title="${esc(t.refresh)}" aria-label="${esc(t.refresh)}" ${refreshing.has(i.id) ? "disabled" : ""}>${ic("refresh")}</button>
          <button class="tool ${i.favorite ? "on" : ""}" type="button" data-act="favorite" aria-pressed="${i.favorite}"
            title="${esc(i.favorite ? t.unfavorite : t.favorite)}" aria-label="${esc(i.favorite ? t.unfavorite : t.favorite)}">${ic("star")}</button>
          <button class="tool" type="button" data-act="trash" title="${esc(t.remove)}" aria-label="${esc(t.remove)}">${ic("trash")}</button>`;
@@ -2793,6 +2809,36 @@
       if (on) toast(t.faved(nameOf(item)));
     }
     refreshCounts();
+  }
+
+  /** Fetch a card's page again and redo its summary. The note, star, shares and a folder you chose stay. */
+  const refreshing = new Set();
+  function repaintItem(id) {
+    const el = document.getElementById(`item-${id}`), item = find(id);
+    if (el && item) { const focus = el.contains(document.activeElement); el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); if (focus) document.querySelector(`#item-${id} [data-act="refresh"]`)?.focus(); }
+    if (mapShown()) drawMap();
+    if (peeking === id && $("peek-dlg").open) paintPeekRefresh();
+  }
+  async function refreshItem(id) {
+    const item = find(id);
+    if (!item || refreshing.has(id)) return;
+    const t = T();
+    refreshing.add(id);
+    repaintItem(id);
+    try {
+      const token = store.get("driftnet-token");
+      const res = await fetch(`/api/items/${id}/refresh`, { method: "POST", headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
+      if (res?.status === 401) return needAdmin();
+      const data = await res?.json().catch(() => ({}));
+      if (!res?.ok) return toast(res?.status === 429 ? t.refreshWait : res?.status === 409 ? t.refreshBusy : res ? t.refreshFailed(data?.error) : t.failed);
+      Object.assign(item, data);
+      toast(t.refreshed(nameOf(item)));
+    } finally {
+      refreshing.delete(id);
+      repaintItem(id);
+      if (peeking === id && $("peek-dlg").open) openPeek(id);
+      refreshCounts();
+    }
   }
 
   async function refreshCounts() {
@@ -2900,6 +2946,7 @@
     const b = e.target.closest(".tool");
     if (!b || b.dataset.grip) return;
     if (b.dataset.act === "move") return openMovePicker(Number(b.closest(".swipe").dataset.id));
+    if (b.dataset.act === "refresh") return refreshItem(Number(b.closest(".swipe").dataset.id));
     run(b.closest(".swipe"), b.dataset.act);
   });
   $("list").addEventListener("dragstart", (e) => {
