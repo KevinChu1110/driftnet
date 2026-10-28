@@ -48,12 +48,15 @@ export function agentOf(req: IncomingMessage, store: Store | undefined): { id: s
   return found;
 }
 
-/** Who to write in the audit columns: "admin", or "agent:<token id>". Undefined when it can't be told. */
+/**
+ * Who to write in the audit columns: "agent:<token id>", or "admin" for the
+ * password, this machine, or anyone at all while no password is set. Undefined
+ * for a caller the write routes would refuse anyway.
+ */
 export function actorOf(req: IncomingMessage, env: NodeJS.ProcessEnv, store: Store | undefined): string | undefined {
   const a = agentOf(req, store);
   if (a) return `agent:${a.id}`;
-  const t = token(env);
-  return t && same(bearer(req), t) ? "admin" : undefined;
+  return isPassword(req, env) || isTrustedLocal(req) ? "admin" : undefined;
 }
 
 /** Writes and everything else that changes state. With no admin password set, anyone who can reach the server. */

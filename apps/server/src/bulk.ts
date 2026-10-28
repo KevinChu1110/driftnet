@@ -28,14 +28,14 @@ const undoRequest = z.object({
 type Reply = { status: number; body: unknown };
 
 /** Run one bulk action in a single transaction. Pure over the store so it can be tested without HTTP. */
-export function bulkAction(store: Store, input: unknown): Reply {
+export function bulkAction(store: Store, input: unknown, actor?: string): Reply {
   const parsed = request.safeParse(input);
   if (!parsed.success) return { status: 400, body: { error: `expected { ids: 1-${BULK_LIMIT} item ids, action: move | trash | restore | favorite | unfavorite, folder? }` } };
   const req = parsed.data;
   const unique = [...new Set(req.ids)];
   try {
     if (req.action === "move") {
-      const previous = store.moveItems(unique, req.folder).map(({ id, category, user_placed }) => ({ id, folder: category, user_placed }));
+      const previous = store.moveItems(unique, req.folder, actor).map(({ id, category, user_placed }) => ({ id, folder: category, user_placed }));
       return { status: 200, body: { ok: true, previous } };
     }
     if (req.action === "trash" || req.action === "restore") return { status: 200, body: { ok: true, previous: store.setTrashedMany(unique, req.action === "trash") } };

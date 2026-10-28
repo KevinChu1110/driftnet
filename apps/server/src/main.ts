@@ -200,7 +200,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && (path === "/api/items/bulk" || path === "/api/items/bulk/undo")) {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const body = await readJson<unknown>(req);
-      const out = path === "/api/items/bulk" ? bulkAction(dn.store, body) : bulkUndo(dn.store, body);
+      const out = path === "/api/items/bulk" ? bulkAction(dn.store, body, actorOf(req, env, dn.store)) : bulkUndo(dn.store, body);
       return send(res, out.status, out.body);
     }
     const moveMatch = /^\/api\/items\/(\d+)\/move$/.exec(path);
@@ -208,7 +208,7 @@ const server = createServer(async (req, res) => {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const { folder } = await readJson<{ folder?: string }>(req);
       try {
-        return dn.store.moveItem(Number(moveMatch[1]), String(folder ?? ""), actorOf(req, env, dn.store) ?? (token(env) ? undefined : "admin"))
+        return dn.store.moveItem(Number(moveMatch[1]), String(folder ?? ""), actorOf(req, env, dn.store))
           ? send(res, 200, dn.store.get(Number(moveMatch[1])))
           : send(res, 404, { error: "not found" });
       } catch (err) {
@@ -427,7 +427,7 @@ const server = createServer(async (req, res) => {
       const admin = authorized(req);
       if (!admin && !canRead(req, env, dn.store)) return send(res, 401, { error: "unauthorized" });
       const agent = (req.headers["x-driftnet-agent"] as string | undefined)?.slice(0, 40) ?? "agent";
-      const mcp = createMcpServer(dn, agent, { readOnly: !admin, actor: actorOf(req, env, dn.store) ?? (admin && !token(env) ? "admin" : undefined) });
+      const mcp = createMcpServer(dn, agent, { readOnly: !admin, actor: actorOf(req, env, dn.store) });
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on("close", () => { void transport.close(); void mcp.close(); });
       await mcp.connect(transport);

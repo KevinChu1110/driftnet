@@ -326,10 +326,10 @@ export class Store {
   }
 
   /** Move many items at once, all or nothing. Returns each item's earlier folder so the whole batch can be undone. */
-  moveItems(ids: number[], folderId: string): { id: number; category: string; user_placed: number }[] {
+  moveItems(ids: number[], folderId: string, actor?: string): { id: number; category: string; user_placed: number }[] {
     if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
     return this.inTransaction(ids, "category, user_placed", (id, before) => {
-      this.db.prepare("UPDATE items SET category = ?, user_placed = 1 WHERE id = ?").run(folderId, id);
+      this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, id);
       return { id, category: String(before.category), user_placed: Number(before.user_placed) };
     });
   }
@@ -505,7 +505,6 @@ export class Store {
     return { source, up: r.up, down: r.down, score: (r.up + 1) / (r.up + r.down + 2) };
   }
 
-  /** Small key/value memory for adapters, e.g. the last message seen per channel. */
   /** Mint a token. The only time the plain value exists: keep it out of logs. */
   createAgentToken(input: { name: string; scope: "read" | "write" }): { id: string; name: string; scope: "read" | "write"; token: string } {
     const name = input.name.trim().slice(0, 60);
@@ -542,6 +541,7 @@ export class Store {
       .run(id);
   }
 
+  /** Small key/value memory for adapters, e.g. the last message seen per channel. */
   getState(key: string): string | undefined {
     return (this.db.prepare("SELECT value FROM state WHERE key = ?").get(key) as { value: string } | undefined)?.value;
   }
