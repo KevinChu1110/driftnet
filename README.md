@@ -25,22 +25,13 @@ on your own computer, works with any model or none at all, and your agents read 
 over MCP.
 
 ```text
-you ▸ https://www.facebook.com/share/v/1DfVB2odi3/
+you ▸ this week's AI roundup https://www.facebook.com/share/v/1DfVB2odi3/
 
-bot ▸ 📌 This week in AI (3/11)｜News
-      A one-minute roundup of this week's AI releases
-      • Paperclip: an open-source framework for agent "companies"
-      • RealWonder: real-time physical video from a single image
-      Mentions: Paperclip, Symphony, GPT-5.4, NotebookLM, Krea AI, RealWonder
-      #1 · reply 👍1 / 👎1
-
-      ↳ 📌 Paperclip｜Agent frameworks
-        https://github.com/paperclipai/paperclip
-      ↳ ⭐ RealWonder｜Image & video
-        https://github.com/liuwei283/realwonder
+bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
+      https://driftnet.example/#item-1
 ```
 
-<sub>From a real run, translated from Chinese. The post had no links: driftnet read the caption and found both repos on GitHub by name.</sub>
+<sub>From a real run. The post had no links: driftnet read the caption and found both repos on GitHub by name. The chat gets one line; the summary is on the page.</sub>
 
 <p align="center"><img src="assets/screenshot-en.jpg" alt="The driftnet web page: categories on the left, summarised tools on the right" width="100%"></p>
 
@@ -95,8 +86,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 | Your agent | MCP, OpenAPI or `/llms.txt`, see [Agents](#agents) | ✅ | — |
 | Anything else | `POST /api/chat {"text": "…"}` returns the reply | ✅ | — |
 
-**In a chat**, messages without a link are ignored. Replies end with the item number: vote with
-`👍12` or `👎12 reason`.
+**In a chat**, messages without a link are ignored. Each link gets one line back: what it is and
+where to read it on the web page. Want the summary in the chat instead, or no reply at all? Set
+`DRIFTNET_REPLY=full` or `off`. Vote with `👍12` or `👎12 reason`.
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet replying in a Discord channel to a GitHub link and to a Facebook reel, which it traced to the Paperclip repo" width="70%"></p>
 <sub>A real run in Discord, with <code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>. The reel had no link; driftnet found Paperclip by name, and since the repo had just been shared too, it shows "already saved · shared 2×". Server address replaced.</sub>
@@ -263,6 +255,7 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `DRIFTNET_CLI_CONCURRENCY` | `1` | CLI processes at once |
 | `DRIFTNET_LANGUAGE` | `English` | Language of summaries and bot replies |
 | `DRIFTNET_LOCALE` | from `DRIFTNET_LANGUAGE` | Force the bot's own words to `en` or `zh-TW` |
+| `DRIFTNET_REPLY` | `link` | Chat replies: `link` (one line + web link), `full` (the summary in chat) or `off` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge; `DRIFTNET_JUDGE=off` disables it |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |

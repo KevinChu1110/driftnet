@@ -23,10 +23,30 @@ test("messages without a link get no reply", async () => {
   assert.equal(await handleChatText(dn, "good morning", ctx), null);
 });
 
-test("a link is catalogued and the reply ends with how to vote", async () => {
-  const reply = await handleChatText(dn, "nice one https://chat.test/a", ctx);
-  assert.match(reply!, /Fixture tool/);
-  assert.match(reply!, /#1 · reply 👍1 \/ 👎1$/);
+test("a link is catalogued; by default the reply is one line and where to read it", async () => {
+  process.env.DRIFTNET_PUBLIC_URL = "https://driftnet.example";
+  try {
+    const reply = await handleChatText(dn, "nice one https://chat.test/a", ctx);
+    assert.equal(reply, "📌 Fixture tool｜Other ⏳\nhttps://driftnet.example/#item-1");
+    // The same link again is marked as seen before.
+    assert.match((await handleChatText(dn, "https://chat.test/a", ctx))!, /\(already saved\)/);
+  } finally {
+    delete process.env.DRIFTNET_PUBLIC_URL;
+  }
+});
+
+test("DRIFTNET_REPLY=full puts the summary and voting help in the chat; off stays silent", async () => {
+  process.env.DRIFTNET_REPLY = "full";
+  try {
+    const reply = await handleChatText(dn, "https://chat.test/full", ctx);
+    assert.match(reply!, /Fixture tool/);
+    assert.match(reply!, /reply 👍\d+ \/ 👎\d+$/);
+    process.env.DRIFTNET_REPLY = "off";
+    assert.equal(await handleChatText(dn, "https://chat.test/quiet", ctx), null);
+    assert.ok(dn.store.findByUrl("https://chat.test/quiet"), "still catalogued");
+  } finally {
+    delete process.env.DRIFTNET_REPLY;
+  }
 });
 
 test("votes in every spelling are recorded, once per person", async () => {

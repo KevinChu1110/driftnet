@@ -25,3 +25,22 @@ export function renderText(r: IngestResult, baseUrl?: string, t: Messages = mess
   for (const rel of r.related ?? []) lines.push("", "↳ " + renderText(rel, baseUrl, t).replace(/\n/g, "\n  "));
   return lines.join("\n");
 }
+
+/**
+ * One line per link: what it is and where to read it. The summary lives on the
+ * web page; a group chat only needs to know the link was caught. Repos found
+ * inside a post are named on the same line.
+ */
+export function renderLink(r: IngestResult, baseUrl?: string, t: Messages = messages()): string {
+  const { item } = r;
+  const name = (item.summary?.name ?? item.title).slice(0, 80);
+  const where = baseUrl ? `${baseUrl}/#item-${item.id}` : item.summary?.primaryUrl || item.url;
+  const found = (r.related ?? []).map((x) => x.item.summary?.name ?? x.item.title);
+  return [
+    `${WORTH_MARK[item.worth]} ${name}｜${categoryLabel(item.category, t.locale)}`,
+    found.length ? ` ${t.alsoFound}${found.join(t.listSep)}` : "",
+    item.pending ? " ⏳" : "",
+    r.cached ? ` ${t.seenBefore}` : "",
+    `\n${where}`,
+  ].join("");
+}

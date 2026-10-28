@@ -22,22 +22,13 @@ agent 都可以。driftnet 會追到每個連結真正介紹的工具，分類�
 它跑在你自己的電腦上，可以接任何模型，也可以完全不接；你的 agent 也能透過 MCP 讀同一份清單。
 
 ```text
-你  ▸ https://www.facebook.com/share/v/1DfVB2odi3/
+你  ▸ 這週的 AI 整理 https://www.facebook.com/share/v/1DfVB2odi3/
 
-bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態
-      一支短影音彙整 3/11 當週 9 則 AI 新聞與工具重點。
-      • 列出 9 則 AI 動態，包括龍蝦 CEO 自主公司、Paperclip 開源組織框架、OpenAI Symphony 任務管理工具
-      • 提及 OpenAI GPT-5.4（可像真人操作滑鼠、整合 Office）與 Google Gemini 3.1 Flash-Lite
-      提到：Paperclip、Symphony、GPT-5.4、NotebookLM、Krea AI、RealWonder
-      #1 · 回覆 👍1 / 👎1
-
-      ↳ 📌 Paperclip｜Agent 框架
-        https://github.com/paperclipai/paperclip
-      ↳ ⭐ RealWonder｜圖片影片
-        https://github.com/liuwei283/realwonder
+bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、RealWonder
+      https://driftnet.example/#item-1
 ```
 
-<sub>實測結果（省略一行重點）。這篇貼文沒有附任何連結，driftnet 讀了說明文字，再用名稱到 GitHub 找到兩個 repo。</sub>
+<sub>實測結果。這篇貼文沒有附任何連結，driftnet 讀了說明文字，再用名稱到 GitHub 找到兩個 repo。聊天室只回一行，整理好的摘要在網頁上。</sub>
 
 <p align="center"><img src="assets/screenshot-zh-TW.jpg" alt="driftnet 網頁：左邊是分類，右邊是整理好的工具" width="100%"></p>
 
@@ -88,7 +79,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 | 你的 agent | MCP、OpenAPI 或 `/llms.txt`，見 [Agent](#agent) | ✅ | — |
 | 其他 | `POST /api/chat {"text": "…"}` 會回傳回覆 | ✅ | — |
 
-**在聊天室裡**，沒有連結的訊息一律忽略。回覆最後有項目編號，用 `👍12` 或 `👎12 原因` 投票。
+**在聊天室裡**，沒有連結的訊息一律忽略。每個連結只回一行：它是什麼，以及在網頁上的哪裡看。想在聊天室直接看摘要，
+或完全不回？設 `DRIFTNET_REPLY=full` 或 `off`。用 `👍12` 或 `👎12 原因` 投票。
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 在 Discord 頻道回覆一個 GitHub 連結和一則 FB reel，並從 reel 追到 Paperclip repo" width="70%"></p>
 <sub>Discord 實測畫面。reel 沒有附連結，driftnet 用名稱找到 Paperclip；因為這個 repo 剛好也被貼了，所以顯示「已收錄過 · 分享 2 次」。伺服器網址已替換。</sub>
@@ -244,6 +236,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_CLI_CONCURRENCY` | `1` | 同時最多跑幾個 CLI |
 | `DRIFTNET_LANGUAGE` | `English` | 摘要和 bot 回覆的語言 |
 | `DRIFTNET_LOCALE` | 跟 `DRIFTNET_LANGUAGE` | 強制 bot 自己的用語用 `en` 或 `zh-TW` |
+| `DRIFTNET_REPLY` | `link` | 聊天回覆：`link`（一行＋網頁連結）、`full`（摘要直接貼在聊天室）或 `off` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | 啟用 Jev 判斷；`DRIFTNET_JUDGE=off` 可關閉 |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
