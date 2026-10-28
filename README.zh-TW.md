@@ -39,7 +39,7 @@ bot ▸ 📌 本週 AI 大事 (3/11)｜news
 <sub>回覆示意。貼文本身沒有附連結，兩個 repo 是從貼文裡提到的名稱找到的。</sub>
 
 **目錄** · [功能](#功能) · [開始使用](#開始使用) · [聊天平台](#聊天平台) · [模型](#模型隨你選) ·
-[給 agent 用](#給-agent-用) · [設定](#設定) · [資料去哪裡](#資料去哪裡) · [參與開發](#參與開發)
+[給 agent 用](#給-agent-用) · [設定](#設定) · [放上網路](#放上網路選用) · [資料去哪裡](#資料去哪裡) · [參與開發](#參與開發)
 
 ## 功能
 
@@ -90,14 +90,21 @@ README 開頭的 `<strong>Quickstart</strong> &middot;` 這類殘渣也不會再
 
 ## 開始使用
 
+driftnet 跑在你自己的電腦上，不需要伺服器，也不需要雲端帳號。
+
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-cp .env.example .env   # 選模型供應商（可不選）和要用的聊天平台
-pnpm dev               # http://localhost:8787
+mkdir -p ~/.driftnet && cp .env.example ~/.driftnet/.env   # 選填：模型、聊天平台
+pnpm start                                                 # http://localhost:8787
+pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
 ```
 
-需要 Node.js 22.13 以上（使用內建的 `node:sqlite`）。不接任何聊天平台也能先試：
+需要 Node.js 22.13 以上（使用內建的 `node:sqlite`）。不管從哪裡啟動，設定都在 `~/.driftnet/.env`，
+清單在 `~/.driftnet/driftnet.db`（用 `DRIFTNET_HOME` 可以一起搬走）。搭配本機的 [Ollama](https://ollama.com)
+模型並關掉 Jev，就完全不會有資料離開你的電腦；driftnet 偵測到 Ollama 在跑時，會印出要填的設定。
+
+不接任何聊天平台也能先試：
 
 ```bash
 curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
@@ -106,15 +113,18 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ## 聊天平台
 
-| 平台 | 要設定 | 需要公開網址？ |
-|---|---|---|
-| Telegram | `TELEGRAM_BOT_TOKEN`（向 @BotFather 申請）。要在群組裡用，得先用 `/setprivacy` 關閉隱私模式 | 不用（long polling） |
-| Discord | `DISCORD_BOT_TOKEN`，並開啟 **Message Content** intent | 不用（gateway） |
-| LINE | `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`，Webhook 網址 `/webhooks/line` | 要 |
-| Slack | `SLACK_SIGNING_SECRET`、`SLACK_BOT_TOKEN`（權限 `channels:history`、`groups:history`、`chat:write`），Events 網址 `/webhooks/slack` | 要 |
-| 其他 | `POST /api/chat {"text": "…"}` 會回傳回覆文字 | — |
+| 平台 | 要設定 | 筆電上能用嗎？ | 關機期間的訊息 |
+|---|---|---|---|
+| Chrome 擴充 | 不用設定，直接連 `localhost:8787` | ✅ | — |
+| Telegram | `TELEGRAM_BOT_TOKEN`（向 @BotFather 申請）。要在群組裡用，得先用 `/setprivacy` 關閉隱私模式 | ✅ long polling | 啟動時補上（Telegram 保留 24 小時） |
+| Discord | `DISCORD_BOT_TOKEN`，並開啟 **Message Content** intent | ✅ gateway | 啟動時逐頻道補讀，不會回覆舊訊息 |
+| Slack | `SLACK_APP_TOKEN`（xapp-，開啟 Socket Mode）＋ `SLACK_BOT_TOKEN`（`channels:history`、`groups:history`、`chat:write`） | ✅ Socket Mode | 漏掉 |
+| Slack（webhook） | `SLACK_SIGNING_SECRET`＋`SLACK_BOT_TOKEN`，Events 網址 `/webhooks/slack` | 要公開網址 | Slack 會短暫重送 |
+| LINE | `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`，Webhook 網址 `/webhooks/line` | 要公開網址 | 漏掉 |
+| 其他 | `POST /api/chat {"text": "…"}` 會回傳回覆文字 | ✅ | — |
 
-本機開發時可用 `cloudflared tunnel` 或 `ngrok` 把 webhook 開出去。
+LINE 只會把訊息送到公開的 HTTPS 網址。在筆電上可以用 `cloudflared tunnel --url http://localhost:8787` 取得一個
+（每次啟動網址都會變，除非設定具名通道）；不然就把 driftnet 放到一台小伺服器上，見[放上網路](#放上網路選用)。
 
 ### Chrome 擴充：送出你登入後看到的內容
 
@@ -126,7 +136,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 - **選取文字後按右鍵**：只送選取的內容。
 
 只有你按下時才讀取該分頁（`activeTab`），內容只送到你自己的伺服器。安裝：`chrome://extensions` → 開發人員模式 →
-**載入未封裝項目** → 選 `apps/chrome-extension`，再到擴充的設定填伺服器網址和 `DRIFTNET_TOKEN`。
+**載入未封裝項目** → 選 `apps/chrome-extension`。預設就連 `http://localhost:8787`；用遠端伺服器的話，再到擴充的設定填網址和
+`DRIFTNET_TOKEN`。
 
 實測：圖片貼文從不登入時的 0 字，變成完整內文加留言；說「連結在留言」的 reel，從留言裡找到了 GitHub repo。
 
@@ -233,17 +244,20 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 | `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀，寫入要 token。`private`：連讀取都要 token，網頁第一次開會請你輸入 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 送給判斷器和模型的頁面大綱的 token 預算 |
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
-| `DRIFTNET_DB` | `./data/driftnet.db` | SQLite 檔案位置 |
+| `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite 檔案位置 |
 | `PORT` | `8787` | HTTP 埠號 |
+| `DRIFTNET_HOME` | `~/.driftnet` | 放 `.env`、資料庫和服務日誌的資料夾 |
+| `SLACK_APP_TOKEN` | — | Slack Socket Mode（不需公開網址），優先於 webhook |
 | `DRIFTNET_HOST` | `127.0.0.1` | 監聽位址。要對外請在前面加反向代理；在容器裡用 `0.0.0.0` |
 
 **HTTP 端點：** `GET /` 網頁 · `GET /api/items` · `GET /api/items/:id` ·
 `POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
-## 放上網路
+## 放上網路（選用）
 
-伺服器預設只聽 `127.0.0.1`。要從手機或其他電腦連，在前面加一個有 HTTPS 的反向代理，並選擇誰可以讀：
+不做這步也能用 driftnet。這是給想用手機看清單、24 小時收 LINE 訊息，或要分享清單的人。伺服器預設只聽
+`127.0.0.1`；在前面加一個有 HTTPS 的反向代理，並選擇誰可以讀：
 
 ```bash
 DRIFTNET_TOKEN=$(openssl rand -hex 24)

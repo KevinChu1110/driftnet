@@ -2,15 +2,20 @@
   "name": "driftnet",
   "private": true,
   "type": "module",
-  "description": "Drop links into any chat. Get them sorted, explained and searchable — for a fraction of a cent each.",
+  "description": "Drop links into any chat. Get them sorted, explained and searchable \u2014 for a fraction of a cent each.",
   "license": "MIT",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "dev": "pnpm --filter @driftnet/server dev",
     "start": "pnpm --filter @driftnet/server start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test packages/core/test/*.test.ts"
+    "test": "node --import tsx --test packages/core/test/*.test.ts",
+    "service:install": "scripts/service.sh install",
+    "service:uninstall": "scripts/service.sh uninstall",
+    "service:status": "scripts/service.sh status"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

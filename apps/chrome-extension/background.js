@@ -24,7 +24,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 });
 
 async function settings() {
-  const { serverUrl = "", token = "" } = await chrome.storage.local.get(["serverUrl", "token"]);
+  // A local install is the default; change it in the settings for a remote server.
+  const { serverUrl = "http://localhost:8787", token = "" } = await chrome.storage.local.get(["serverUrl", "token"]);
   return { serverUrl: serverUrl.replace(/\/+$/, ""), token };
 }
 

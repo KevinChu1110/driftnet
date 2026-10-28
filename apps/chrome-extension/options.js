@@ -5,7 +5,7 @@ for (const [id, key] of [["title", "settingsTitle"], ["serverLabel", "serverUrl"
   ["tokenLabel", "token"], ["save", "save"], ["privacy", "privacy"]]) $(id).textContent = t(key);
 
 const saved = await chrome.storage.local.get(["serverUrl", "token"]);
-$("serverUrl").value = saved.serverUrl ?? "";
+$("serverUrl").value = saved.serverUrl ?? "http://localhost:8787";
 $("token").value = saved.token ?? "";
 
 $("save").addEventListener("click", async () => {

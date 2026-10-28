@@ -7,6 +7,7 @@ import { Pipeline } from "./pipeline.ts";
 import { Store } from "./store.ts";
 import { createProvider } from "./llm/index.ts";
 import { Summarizer } from "./summarize.ts";
+import { defaultDbPath } from "./home.ts";
 
 export * from "./types.ts";
 export { canonicalize, extractUrls } from "./url.ts";
@@ -16,6 +17,7 @@ export { Pipeline } from "./pipeline.ts";
 export { Store, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
 export { Summarizer } from "./summarize.ts";
+export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
 export { renderText } from "./render.ts";
 export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
 export type { Judge, JudgeResult } from "./judge/index.ts";
@@ -31,7 +33,7 @@ export interface Driftnet {
 
 /** Wires everything from environment variables. See .env.example. */
 export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
-  const store = new Store(env.DRIFTNET_DB ?? "./data/driftnet.db");
+  const store = new Store(env.DRIFTNET_DB ?? defaultDbPath(env));
   const categories = loadCategories();
 
   const jevKey = env.TYPESAFE_API_KEY ?? readKeyFile(join(homedir(), ".typesafe", "api_key"));

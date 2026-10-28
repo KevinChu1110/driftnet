@@ -75,3 +75,28 @@ test("login walls are recognised", () => {
   assert.ok(isLoginWall("https://x.com/i/flow/login"));
   assert.ok(!isLoginWall("https://example.com/blog/login-flows-explained"));
 });
+
+test("~/.driftnet/.env is loaded without overriding variables already set", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { loadHomeEnv, defaultDbPath } = await import("../src/home.ts");
+  const home = mkdtempSync(join(tmpdir(), "driftnet-home-"));
+  writeFileSync(join(home, ".env"), "DRIFTNET_LANGUAGE=Japanese\nPORT=9999\n# comment\nDRIFTNET_TOKEN=\"quoted\"\n");
+  const env: NodeJS.ProcessEnv = { DRIFTNET_HOME: home, PORT: "8787" };
+  assert.equal(loadHomeEnv(env), join(home, ".env"));
+  assert.equal(env.DRIFTNET_LANGUAGE, "Japanese");
+  assert.equal(env.PORT, "8787"); // already set wins
+  assert.equal(env.DRIFTNET_TOKEN, "quoted");
+  assert.equal(defaultDbPath(env), join(home, "driftnet.db"));
+});
+
+test("state keys by prefix", () => {
+  const store = new Store(":memory:");
+  store.setState("discord:last:1", "100");
+  store.setState("discord:last:2", "200");
+  store.setState("discord:last:1", "150");
+  store.setState("other_key", "x");
+  assert.deepEqual(store.stateWithPrefix("discord:last:").map((r) => [r.key, r.value]), [["discord:last:1", "150"], ["discord:last:2", "200"]]);
+  assert.equal(store.getState("missing"), undefined);
+});

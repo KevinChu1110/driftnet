@@ -41,7 +41,7 @@ bot ▸ 📌 This week in AI (3/11)｜news
 
 **Contents** · [Features](#features) · [Quick start](#quick-start) · [Chat platforms](#chat-platforms) ·
 [Models](#bring-any-model) · [Agents](#for-agents) · [Configuration](#configuration) ·
-[Your data](#where-your-data-goes) · [Contributing](#contributing)
+[Online](#putting-it-online-optional) · [Your data](#where-your-data-goes) · [Contributing](#contributing)
 
 ## Features
 
@@ -101,15 +101,22 @@ as-is.
 
 ## Quick start
 
+driftnet runs on your own computer. No server, no cloud account.
+
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-cp .env.example .env   # pick a model provider (optional) and your chat platforms
-pnpm dev               # http://localhost:8787
+mkdir -p ~/.driftnet && cp .env.example ~/.driftnet/.env   # optional: model, chat platforms
+pnpm start                                                 # http://localhost:8787
+pnpm service:install                                       # optional: start at login (macOS / Linux)
 ```
 
-Requires Node.js 22.13+ (driftnet uses the built-in `node:sqlite`). Try it without any chat
-platform:
+Requires Node.js 22.13+ (driftnet uses the built-in `node:sqlite`). Settings live in
+`~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`, wherever you start it from
+(`DRIFTNET_HOME` moves both). With a local [Ollama](https://ollama.com) model and Jev off, nothing
+leaves your machine; driftnet prints the settings to use when it finds Ollama running.
+
+Try it without any chat platform:
 
 ```bash
 curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
@@ -118,15 +125,19 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ## Chat platforms
 
-| Platform | Set | Public URL? |
-|---|---|---|
-| Telegram | `TELEGRAM_BOT_TOKEN` (from @BotFather). For groups, turn privacy mode off with `/setprivacy` | No (long polling) |
-| Discord | `DISCORD_BOT_TOKEN`. Enable the **Message Content** intent | No (gateway) |
-| LINE | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`. Webhook URL: `/webhooks/line` | Yes |
-| Slack | `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN` (`channels:history`, `groups:history`, `chat:write`). Events URL: `/webhooks/slack` | Yes |
-| Anything else | `POST /api/chat {"text": "…"}` returns the reply text | — |
+| Platform | Set | Works on a laptop? | Messages sent while it was off |
+|---|---|---|---|
+| Chrome extension | nothing: it talks to `localhost:8787` | ✅ | — |
+| Telegram | `TELEGRAM_BOT_TOKEN` (from @BotFather). For groups, turn privacy mode off with `/setprivacy` | ✅ long polling | picked up on start (Telegram keeps them 24 h) |
+| Discord | `DISCORD_BOT_TOKEN`. Enable the **Message Content** intent | ✅ gateway | read back on start, per channel, without replying |
+| Slack | `SLACK_APP_TOKEN` (xapp-, Socket Mode on) + `SLACK_BOT_TOKEN` (`channels:history`, `groups:history`, `chat:write`) | ✅ Socket Mode | missed |
+| Slack, webhook | `SLACK_SIGNING_SECRET` + `SLACK_BOT_TOKEN`. Events URL: `/webhooks/slack` | needs a public URL | Slack retries briefly |
+| LINE | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`. Webhook URL: `/webhooks/line` | needs a public URL | missed |
+| Anything else | `POST /api/chat {"text": "…"}` returns the reply text | ✅ | — |
 
-For local development, expose the webhooks with `cloudflared tunnel` or `ngrok`.
+LINE only delivers to a public HTTPS URL. From a laptop, `cloudflared tunnel --url http://localhost:8787`
+gives you one (it changes on every run unless you set up a named tunnel); otherwise run driftnet on
+a small server, see [Putting it online](#putting-it-online).
 
 ### Chrome extension: what you see while logged in
 
@@ -140,8 +151,9 @@ what **you** see instead:
 - **Right-click a selection**: sends just the selected text.
 
 It reads a tab only when you click (`activeTab`), and sends only to your own server. Install with
-`chrome://extensions` → Developer mode → **Load unpacked** → `apps/chrome-extension`, then set
-the server URL and `DRIFTNET_TOKEN` in its settings.
+`chrome://extensions` → Developer mode → **Load unpacked** → `apps/chrome-extension`. It talks to
+`http://localhost:8787` out of the box; for a remote server, set its URL and `DRIFTNET_TOKEN` in
+the extension's settings.
 
 Tested on real posts: a photo post went from 0 characters (anonymous) to the full text plus
 comments, and a reel saying "link in the comments" yielded the GitHub repo from its comments.
@@ -257,18 +269,21 @@ All settings are environment variables. See [`.env.example`](.env.example).
 | `DRIFTNET_ACCESS` | `public` | `public`: anyone can read, writes need the token. `private`: every read needs the token too; the web page asks for it once |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget for the page outline sent to the judge and the model |
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
-| `DRIFTNET_DB` | `./data/driftnet.db` | SQLite file |
+| `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite file |
 | `PORT` | `8787` | HTTP port |
+| `DRIFTNET_HOME` | `~/.driftnet` | Folder for `.env`, the database and the service log |
+| `SLACK_APP_TOKEN` | — | Slack Socket Mode (no public URL). Takes precedence over the webhook |
 | `DRIFTNET_HOST` | `127.0.0.1` | Listen address. Put a reverse proxy in front to expose it, or use `0.0.0.0` in a container |
 
 **HTTP endpoints:** `GET /` web page · `GET /api/items` · `GET /api/items/:id` ·
 `POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
-## Putting it online
+## Putting it online (optional)
 
-By default the server listens on `127.0.0.1` only. To reach it from a phone or another computer,
-put a reverse proxy with HTTPS in front and choose who may read:
+You don't need this to use driftnet. It's for reaching your catalogue from a phone, receiving LINE
+messages around the clock, or sharing it. By default the server listens on `127.0.0.1` only; put a
+reverse proxy with HTTPS in front and choose who may read:
 
 ```bash
 DRIFTNET_TOKEN=$(openssl rand -hex 24)

@@ -73,6 +73,10 @@ export class Store {
         at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         UNIQUE (item_id, voter)
       );
+      CREATE TABLE IF NOT EXISTS state (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
     `);
@@ -146,6 +150,21 @@ export class Store {
       )
       .get(source) as { up: number; down: number };
     return { source, up: r.up, down: r.down, score: (r.up + 1) / (r.up + r.down + 2) };
+  }
+
+  /** Small key/value memory for adapters, e.g. the last message seen per channel. */
+  getState(key: string): string | undefined {
+    return (this.db.prepare("SELECT value FROM state WHERE key = ?").get(key) as { value: string } | undefined)?.value;
+  }
+
+  stateWithPrefix(prefix: string): { key: string; value: string }[] {
+    return this.db.prepare("SELECT key, value FROM state WHERE key LIKE ? ESCAPE '\\'").all(
+      prefix.replace(/[\\%_]/g, (c) => `\\${c}`) + "%",
+    ) as { key: string; value: string }[];
+  }
+
+  setState(key: string, value: string): void {
+    this.db.prepare("INSERT INTO state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
   }
 
   /** Net votes per item, for hiding items the community voted down. */

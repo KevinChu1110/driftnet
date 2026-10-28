@@ -2,16 +2,17 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { canonicalize, categoryLabels, createDriftnet, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { canonicalize, categoryLabels, createDriftnet, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
-import { handleSlack } from "./adapters/slack.ts";
+import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
 import { startTelegram } from "./adapters/telegram.ts";
 import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
 import { llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
+const envFile = loadHomeEnv(env);
 const dn = createDriftnet();
 const PORT = Number(env.PORT ?? 8787);
 // Loopback by default: put a reverse proxy (Caddy, nginx, a tunnel) in front to expose it.
@@ -169,8 +170,27 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`driftnet on http://${HOST}:${PORT}  judge=${dn.engines.judge}  summarizer=${dn.engines.summarizer}`);
   for (const w of dn.warnings) console.warn(`⚠️  ${w}`);
+  console.log(`settings: ${envFile ?? `none (create ${driftnetHome(env)}/.env)`}  data: ${env.DRIFTNET_DB ?? defaultDbPath(env)}`);
+  void suggestLocalModel();
   if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);
   if (env.DISCORD_BOT_TOKEN) startDiscord(dn, env.DISCORD_BOT_TOKEN);
   if (env.LINE_CHANNEL_SECRET) console.log("[line] webhook at /webhooks/line");
-  if (env.SLACK_SIGNING_SECRET) console.log("[slack] webhook at /webhooks/slack");
+  if (env.SLACK_APP_TOKEN && env.SLACK_BOT_TOKEN) startSlackSocket(dn, env.SLACK_APP_TOKEN, env.SLACK_BOT_TOKEN);
+  else if (env.SLACK_SIGNING_SECRET) console.log("[slack] webhook at /webhooks/slack");
 });
+
+/** Running with no model while Ollama sits right there: say how to use it. */
+async function suggestLocalModel(): Promise<void> {
+  if (env.DRIFTNET_LLM_PROVIDER) return;
+  try {
+    const res = await fetch("http://127.0.0.1:11434/api/tags", { signal: AbortSignal.timeout(1000) });
+    const { models } = (await res.json()) as { models?: { name: string }[] };
+    if (!models?.length) return;
+    console.log(
+      `tip: Ollama is running locally. To summarise without any cloud model, add to ${driftnetHome(env)}/.env:\n` +
+        `  DRIFTNET_LLM_PROVIDER=openai\n  DRIFTNET_LLM_BASE_URL=http://127.0.0.1:11434/v1\n  DRIFTNET_LLM_MODEL=${models[0]!.name}`,
+    );
+  } catch {
+    // no Ollama — nothing to suggest
+  }
+}
