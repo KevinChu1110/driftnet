@@ -262,7 +262,7 @@ function cleanText(value: unknown, maxChars: number): string {
 
 /** Non-strings, blanks, over-long entries (sentences, not items) and duplicates are dropped. */
 export function cleanList(value: unknown, limit: number, maxChars: number): string[] {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value) || limit <= 0) return [];
   const out: string[] = [];
   for (const v of value) {
     if (typeof v !== "string") continue;
