@@ -18,7 +18,8 @@
     "service:status": "scripts/service.sh status",
     "e2e:extension": "node apps/chrome-extension/e2e.mjs",
     "e2e:web": "node apps/server/e2e/web.mjs",
-    "build:npm": "node scripts/build-npm.mjs"
+    "build:npm": "node scripts/build-npm.mjs",
+    "demo": "node apps/server/e2e/demo-server.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
