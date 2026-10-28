@@ -161,6 +161,14 @@ export class Store {
         last_used_at TEXT,
         revoked_at TEXT
       );
+      -- One-time codes that turn a QR scan into a device token. Only the hash is kept.
+      CREATE TABLE IF NOT EXISTS pair_codes (
+        hash TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        scope TEXT NOT NULL CHECK (scope IN ('read', 'write')),
+        expires_at TEXT NOT NULL,
+        used_at TEXT
+      );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
@@ -580,6 +588,30 @@ export class Store {
     this.db
       .prepare("UPDATE agent_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND (last_used_at IS NULL OR last_used_at <= strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 minute'))")
       .run(id);
+  }
+
+  /** A one-time code (192 bits, 5 minutes) to pair a device. The plain value exists only in this return. */
+  createPairCode(input: { name: string; scope: "read" | "write" }, now = Date.now()): { code: string; expiresAt: string } {
+    const name = input.name.trim().slice(0, 56);
+    if (!name) throw new Error("name is required");
+    if (input.scope !== "read" && input.scope !== "write") throw new Error("scope must be read or write");
+    const iso = new Date(now).toISOString();
+    this.db.prepare("DELETE FROM pair_codes WHERE expires_at < ? OR used_at IS NOT NULL").run(iso);
+    const code = randomBytes(24).toString("base64url");
+    const expiresAt = new Date(now + 5 * 60_000).toISOString();
+    this.db.prepare("INSERT INTO pair_codes (hash, name, scope, expires_at) VALUES (?, ?, ?, ?)").run(hashToken(code), name, input.scope, expiresAt);
+    return { code, expiresAt };
+  }
+
+  /** Swap a live code for a device token, once. Null for unknown, used and expired alike. */
+  claimPairCode(code: string, now = Date.now()): { id: string; name: string; scope: "read" | "write"; token: string } | null {
+    const hash = hashToken(code);
+    const iso = new Date(now).toISOString();
+    const row = this.db.prepare("SELECT name, scope FROM pair_codes WHERE hash = ? AND used_at IS NULL AND expires_at >= ?").get(hash, iso) as { name: string; scope: "read" | "write" } | undefined;
+    if (!row) return null;
+    // The conditional update is the lock: of two racing claims only one changes a row.
+    if (this.db.prepare("UPDATE pair_codes SET used_at = ? WHERE hash = ? AND used_at IS NULL").run(iso, hash).changes !== 1) return null;
+    return this.createAgentToken({ name: `📱 ${row.name}`, scope: row.scope });
   }
 
   /** Small key/value memory for adapters, e.g. the last message seen per channel. */

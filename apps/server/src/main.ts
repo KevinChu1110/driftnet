@@ -5,6 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
 import { tokenRoute } from "./tokens.ts";
+import { pairRoute } from "./pair.ts";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
@@ -41,6 +42,7 @@ const STATIC: Record<string, [Buffer, string]> = {
   "/favicon.svg": [readFileSync(new URL("../public/favicon.svg", import.meta.url)), "image/svg+xml"],
   "/apple-touch-icon.png": [readFileSync(new URL("../public/apple-touch-icon.png", import.meta.url)), "image/png"],
   "/icon-512.png": [readFileSync(new URL("../public/icon-512.png", import.meta.url)), "image/png"],
+  "/qr.js": [readFileSync(new URL("../public/qr.js", import.meta.url)), "text/javascript; charset=utf-8"],
   "/manifest.webmanifest": [readFileSync(new URL("../public/manifest.webmanifest", import.meta.url)), "application/manifest+json"],
 };
 
@@ -126,14 +128,16 @@ function throttled(req: IncomingMessage): boolean {
   return m.n >= 20;
 }
 
+function miss(req: IncomingMessage) {
+  const ip = clientIp(req);
+  const m = misses.get(ip) ?? { n: 0, since: Date.now() };
+  m.n++;
+  misses.set(ip, m);
+}
+
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
   const req = res.req;
-  if ((status === 401 || status === 403) && req && triedCredentials(req)) {
-    const ip = clientIp(req);
-    const m = misses.get(ip) ?? { n: 0, since: Date.now() };
-    m.n++;
-    misses.set(ip, m);
-  }
+  if ((status === 401 || status === 403) && req && triedCredentials(req)) miss(req);
   // No CORS headers: the page is same-origin, and agents, the extension and chat platforms aren't browsers' pages.
   res.writeHead(status, { "content-type": type });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
@@ -300,6 +304,16 @@ const server = createServer(async (req, res) => {
       const id = tokenMatch[1] ? decodeURIComponent(tokenMatch[1]) : null;
       const body = req.method === "POST" && !id ? await readJson<unknown>(req) : undefined;
       const r = tokenRoute(dn.store, env, req, id, body);
+      return send(res, r.status, r.body);
+    }
+    // Unlock a phone: the password makes a one-time code, the phone swaps it for its own token.
+    if (path === "/api/pair" || path === "/api/pair/claim") {
+      const claiming = path === "/api/pair/claim";
+      // The code is the credential here and carries no header, so a wrong guess is counted by hand.
+      if (claiming && throttled(req)) return send(res, 429, { error: "too many wrong codes; try again in 15 minutes" });
+      const body = req.method === "POST" ? await readJson<unknown>(req) : undefined;
+      const r = pairRoute(dn.store, env, req, claiming ? "claim" : "create", body);
+      if (claiming && r.status === 404) miss(req);
       return send(res, r.status, r.body);
     }
     // A fresh read-only key; the old one stops working at once.
