@@ -35,3 +35,23 @@ test("agents can read the folder tree, add a folder and file an item into it", a
   assert.equal((await client.callTool({ name: "driftnet_move", arguments: { id: 999, folder: "games" } })).isError, true);
   await client.close();
 });
+
+test("every tool explains itself: descriptions, a description on every parameter, annotations", async () => {
+  const client = await connect();
+  const { tools } = await client.listTools();
+  assert.equal(tools.length, 10);
+  for (const t of tools) {
+    assert.ok((t.description ?? "").length > 150, `${t.name}: description too thin`);
+    assert.ok(t.annotations && t.annotations.readOnlyHint !== undefined && t.annotations.destructiveHint !== undefined, `${t.name}: annotations`);
+    for (const [name, prop] of Object.entries((t.inputSchema.properties ?? {}) as Record<string, { description?: string }>)) {
+      assert.ok(prop.description, `${t.name}.${name} has no description`);
+    }
+  }
+  // Read tools answer with structured content that matches their output schema.
+  const search = await client.callTool({ name: "driftnet_search", arguments: { min_worth: "skip" } });
+  assert.ok(Array.isArray((search.structuredContent as { items: unknown[] }).items));
+  const got = await client.callTool({ name: "driftnet_get", arguments: { id: item.id } });
+  assert.match((got.content as { text: string }[])[0]!.text, /"shared_with"/);
+  assert.equal((await client.callTool({ name: "driftnet_get", arguments: { id: 9999 } })).isError, true);
+  await client.close();
+});

@@ -10,7 +10,7 @@
       "name": "driftnet",
       "source": "./",
       "description": "Look up, save and rate AI tools people shared in group chats.",
-      "version": "0.1.1"
+      "version": "0.1.2"
     }
   ]
 }
