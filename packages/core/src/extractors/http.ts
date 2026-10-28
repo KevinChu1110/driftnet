@@ -1,5 +1,16 @@
 import { BlockedUrl, safeFetch } from "./net.ts";
 
+export interface FetchResult {
+  status: number;
+  url: string;
+  /** Lower-cased media type without parameters, e.g. "text/html". */
+  contentType: string;
+  /** Empty for non-text responses (PDF, video, images): never parsed as text. */
+  body: string;
+}
+
+const TEXTUAL = /^(text\/|application\/(xhtml\+xml|xml|json|ld\+json|rss\+xml|atom\+xml))/;
+
 const UA =
   "Mozilla/5.0 (compatible; driftnet/0.1; +https://github.com/KevinChu1110/driftnet)";
 const MAX_BYTES = 1_500_000;
@@ -7,7 +18,7 @@ const MAX_BYTES = 1_500_000;
 export async function fetchText(
   url: string,
   init: { headers?: Record<string, string>; timeoutMs?: number } = {},
-): Promise<{ status: number; url: string; body: string }> {
+): Promise<FetchResult> {
   try {
     return await fetchOnce(url, init);
   } catch (err) {
@@ -20,11 +31,17 @@ export async function fetchText(
 async function fetchOnce(
   url: string,
   init: { headers?: Record<string, string>; timeoutMs?: number },
-): Promise<{ status: number; url: string; body: string }> {
+): Promise<FetchResult> {
   const res = await safeFetch(url, {
     headers: { "user-agent": UA, "accept-language": "zh-TW,en;q=0.8", ...init.headers },
     signal: AbortSignal.timeout(init.timeoutMs ?? 10_000),
   });
+  const contentType = (res.headers.get("content-type") ?? "text/html").split(";")[0]!.trim().toLowerCase();
+  // A PDF or a video is not text: reading it would feed binary to the model.
+  if (!TEXTUAL.test(contentType)) {
+    await res.body?.cancel();
+    return { status: res.status, url: res.url, contentType, body: "" };
+  }
   // Read at most MAX_BYTES; some "articles" are 20 MB single-page apps.
   const reader = res.body?.getReader();
   const chunks: Uint8Array[] = [];
@@ -39,7 +56,7 @@ async function fetchOnce(
       break;
     }
   }
-  return { status: res.status, url: res.url, body: Buffer.concat(chunks).toString("utf8") };
+  return { status: res.status, url: res.url, contentType, body: Buffer.concat(chunks).toString("utf8") };
 }
 
 export function metaTags(html: string): Record<string, string> {

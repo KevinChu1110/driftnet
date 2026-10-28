@@ -69,15 +69,37 @@ export function cleanReadme(md: string): string {
  * GitHub search is free and good enough when the name is distinctive; we only
  * accept a hit whose repo name actually matches, to avoid confident wrong links.
  */
+/**
+ * Name → repo answers, kept for a day. Unauthenticated search allows only 10
+ * requests a minute, and roundups name the same tools again and again.
+ */
+const repoByName = new Map<string, { at: number; repo: string | null }>();
+const DAY = 86_400_000;
+
 export async function findGithubRepo(name: string): Promise<string | null> {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const want = norm(name);
   if (want.length < 3) return null;
+  const hit = repoByName.get(want);
+  if (hit && Date.now() - hit.at < DAY) return hit.repo;
+  const repo = await searchGithubRepo(name, want, norm);
+  // Remember misses too, but not failures (rate limit, network): those may work later.
+  if (repo !== undefined) {
+    if (repoByName.size > 5000) repoByName.clear();
+    repoByName.set(want, { at: Date.now(), repo });
+  }
+  return repo ?? null;
+}
+
+async function searchGithubRepo(name: string, want: string, norm: (s: string) => string): Promise<string | null | undefined> {
   const headers: Record<string, string> = { accept: "application/vnd.github+json" };
   if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const q = encodeURIComponent(`${name} in:name`);
   const res = await fetchText(`https://api.github.com/search/repositories?q=${q}&sort=stars&per_page=5`, { headers });
-  if (res.status !== 200) return null;
+  if (res.status !== 200) {
+    if (res.status === 403 || res.status === 429) console.warn("[driftnet] GitHub search rate-limited; set GITHUB_TOKEN to raise the limit");
+    return undefined;
+  }
   const { items } = JSON.parse(res.body) as { items: { full_name: string; name: string; stargazers_count: number }[] };
   const hit = items.find((r) => norm(r.name) === want && r.stargazers_count >= 5);
   return hit ? `https://github.com/${hit.full_name}`.toLowerCase() : null;

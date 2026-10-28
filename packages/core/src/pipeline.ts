@@ -30,25 +30,54 @@ export interface PipelineOptions {
  *   6. summarize  — the only LLM call, and only for items worth reading
  */
 export class Pipeline {
+  /** Links being processed right now, so simultaneous shares pay once. */
+  private readonly inflight = new Map<string, Promise<IngestResult>>();
+
   constructor(private readonly opts: PipelineOptions) {}
 
   /** Ingest every link in a chat message. The rest of the message becomes the note. */
   async ingestMessage(text: string, ctx: Omit<ShareContext, "note">): Promise<IngestResult[]> {
     const urls = extractUrls(text);
     const note = urls.reduce((t, u) => t.replace(u, ""), text).replace(/https?:\/\/\S+/g, "").trim() || undefined;
-    const results: IngestResult[] = [];
-    for (const url of urls) {
-      try {
-        results.push(await this.ingest(url, { ...ctx, ...(note ? { note } : {}) }));
-      } catch (err) {
-        if (!(err instanceof BlockedUrl)) throw err;
-        console.warn(`[driftnet] refused ${url}: ${err.message}`);
+    // A few links at a time: five links in one message shouldn't take five times
+    // as long (LINE reply tokens expire), nor hit every API at once. Order is kept.
+    const results: (IngestResult | null)[] = new Array(urls.length).fill(null);
+    let next = 0;
+    const worker = async () => {
+      while (next < urls.length) {
+        const i = next++;
+        try {
+          results[i] = await this.ingest(urls[i]!, { ...ctx, ...(note ? { note } : {}) });
+        } catch (err) {
+          if (!(err instanceof BlockedUrl)) throw err;
+          console.warn(`[driftnet] refused ${urls[i]}: ${err.message}`);
+        }
       }
-    }
-    return results;
+    };
+    await Promise.all(Array.from({ length: Math.min(3, urls.length) }, worker));
+    return results.filter((r): r is IngestResult => r !== null);
   }
 
   async ingest(url: string, ctx: ShareContext, depth = 0, page?: PageContent): Promise<IngestResult> {
+    const running = this.inflight.get(url);
+    if (running && !page) {
+      // Same link shared while it is being processed: wait, then count this share.
+      const first = await running.catch(() => null);
+      if (first) {
+        this.opts.store.recordShare(first.item.id, ctx);
+        return { item: this.opts.store.get(first.item.id)!, cached: true };
+      }
+    }
+    const work = this.ingestOnce(url, ctx, depth, page);
+    this.inflight.set(url, work);
+    try {
+      return await work;
+    } finally {
+      if (this.inflight.get(url) === work) this.inflight.delete(url);
+    }
+  }
+
+  private async ingestOnce(url: string, ctx: ShareContext, depth: number, page?: PageContent): Promise<IngestResult> {
     const { store } = this.opts;
 
     const hit = store.findByUrl(url);
@@ -88,7 +117,9 @@ export class Pipeline {
     if (distrusted) flags.push("low-reputation");
 
     let judgement: Judgement | null = null;
-    const judged = await this.opts.judge?.judge(digest, cleanedNote.text, this.opts.categories);
+    // Distrusted or injected items are never summarised: don't pay to judge them either.
+    const blocked = distrusted || flags.includes("injection");
+    const judged = blocked ? null : await this.opts.judge?.judge(digest, cleanedNote.text, this.opts.categories);
     if (judged?.flags) flags.push(...judged.flags.filter((f) => !flags.includes(f)));
     // Low confidence → let the LLM classify instead, unless there is no LLM to ask.
     const trusted = judged && (judged.judgement.confidence >= (this.opts.minConfidence ?? 0.4) || !this.opts.summarizer);

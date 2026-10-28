@@ -28,6 +28,12 @@ export async function extractWeb(url: string): Promise<Digest | null> {
   if (isLoginWall(page.url)) {
     return { url, kind: isSocial(url) ? "post" : "other", title: hostOf(url), text: "", outlinks: [], meta: { site: hostOf(url) } };
   }
+  if (!page.body) {
+    // Not a web page: a PDF, a video file, an image. Name it after the file.
+    const file = decodeURIComponent(new URL(page.url).pathname.split("/").filter(Boolean).pop() ?? "") || hostOf(url);
+    const kind: Kind = page.contentType.startsWith("video/") ? "video" : page.contentType === "application/pdf" ? "article" : "other";
+    return { url: canonicalize(page.url) ?? url, kind, title: file, text: "", outlinks: [], meta: { site: hostOf(url), type: page.contentType } };
+  }
   const meta = metaTags(page.body);
   const social = isSocial(url);
   // Facebook/Instagram put the full caption in og:title (prefixed with view counts)

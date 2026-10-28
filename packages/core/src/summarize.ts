@@ -92,6 +92,8 @@ export class Summarizer {
       } catch (err) {
         error = (err as Error).message;
         if (!(err instanceof IncompleteOutput)) break;
+        // Rate limits and overloads need a moment; an immediate retry just fails again.
+        if (attempt === 1 && /\b(429|5\d\d)\b/.test(error)) await new Promise((r) => setTimeout(r, 2000));
       }
     }
     console.warn(`[driftnet] summary failed for ${digest.url}: ${error}`);

@@ -84,6 +84,7 @@ export class Store {
         value TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
+      CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
     `);
     // Columns added after the first release.
