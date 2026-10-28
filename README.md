@@ -56,12 +56,17 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 ## Quick start
 
-No server, no cloud account.
+No server, no cloud account. One command:
+
+```bash
+npx driftnet        # opens http://localhost:8787 — ⚙ Settings walks you through picking a model
+```
+
+Or from source, to hack on it or run it as a login service:
 
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-mkdir -p ~/.driftnet && cp .env.example ~/.driftnet/.env   # optional: model, language, chat platforms
 pnpm start                                                 # http://localhost:8787
 pnpm service:install                                       # optional: start at login (macOS / Linux)
 ```
@@ -108,7 +113,17 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.
 - **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
   agents and `/llms.txt` too; if someone shares one again, it comes back.
+- **Notes.** 📝 on any card for your own note (tried it? needs a GPU?). What people wrote with the link
+  in chat shows on the card too (💬), and both are searchable. **📝 Notes** in the sidebar holds
+  free-standing Markdown notes; `#12` links card 12.
+- **⚙ Settings** on the page: model, Jev, summary language, chat replies, your own summary rules and
+  blocked domains, saved to `~/.driftnet/.env` and applied without a restart. Per browser: order (best,
+  newest, most shared), compact cards, tags, chat text, light or dark.
+- **Export** everything as one Markdown file, or as a zip of Markdown files with front matter that
+  Obsidian opens as a vault and Notion imports (Import → Markdown & CSV).
 - **Add to Home Screen** to open it like an app.
+
+<p align="center"><img src="assets/notes-settings-en.jpg" alt="The notes page with links to cards, and the settings dialog" width="100%"></p>
 
 ### Chrome extension
 
@@ -257,7 +272,8 @@ without running one: on real links, a Chinese article went from 831 to 404 token
 ## Settings
 
 All settings are environment variables, usually in `~/.driftnet/.env`. See
-[`.env.example`](.env.example).
+[`.env.example`](.env.example). The common ones are also on the page under **⚙ Settings**; a variable
+set by the environment itself (systemd, Docker, your shell) wins and shows there read-only.
 
 <details>
 <summary><b>All settings</b></summary>
@@ -279,6 +295,9 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
 | `DRIFTNET_CATEGORIES` | built-in | JSON file of starting folders, `{ "id": "description" }`, used once on a new database; after that, edit folders on the page |
 | `GITHUB_TOKEN` | — | GitHub API limit from 60 to 5,000 requests per hour |
+| `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
+| `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
+| `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of extractor plugins (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | Required for writes, MCP and the agent queue once others can reach the server |
 | `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the token too |
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
@@ -296,7 +315,8 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
+`GET|PUT /api/settings` (this machine, or with the token) · `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -324,7 +344,8 @@ From a laptop, `cloudflared tunnel --url http://localhost:8787` gives a temporar
 > The catalogue stays on your machine. To judge and summarise a link, driftnet sends a **digest**
 > (title, outline, the chat text it was shared with) to **TypeSafe** if Jev is on and to **your
 > model provider** if one is set. Chat messages without a link are never processed or stored. With
-> Ollama and `DRIFTNET_JUDGE=off`, nothing leaves your machine.
+> Ollama and `DRIFTNET_JUDGE=off`, nothing leaves your machine. Take it all with you any time: export
+> to Markdown or an Obsidian / Notion vault from the sidebar, or `GET /api/export`.
 
 ## Contributing
 
@@ -340,9 +361,11 @@ assets · scripts       logo, banners, service installer
 pnpm typecheck && pnpm test
 CHROME=/path/to/chromium pnpm e2e:extension   # the extension in a real browser (Chrome for Testing or Chromium)
 CHROME=/path/to/chrome pnpm e2e:web             # the web page on a phone-sized screen, with real touch swipes
+pnpm build:npm                                  # the npm package in dist/npm (try: cd dist/npm && npm pack)
 ```
 
-Extend it: a site (`registerExtractor()`), a model (`LlmProvider`), a judge (`Judge`), a chat
+Extend it: a site (a plugin file in `~/.driftnet/plugins`, like
+[`examples/plugins/hackernews.mjs`](examples/plugins/hackernews.mjs), or `registerExtractor()`), a model (`LlmProvider`), a judge (`Judge`), a chat
 platform (`handleChatText()`), browser capture (`collect.js`), or a bot language (`i18n.ts`).
 
 **Good first issues**, found by running driftnet on links people actually share:

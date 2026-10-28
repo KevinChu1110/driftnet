@@ -86,3 +86,21 @@ test("a repo seen only by the browser is catalogued even when the post is alread
   assert.equal(again.cached, true);
   assert.equal(again.related?.[0]?.item.url, "https://github.com/acme/skills");
 });
+
+test("blocked domains are refused, and rules reach the model's instructions", async () => {
+  const { createDriftnet, BlockedUrl } = await import("../src/index.ts");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const env: NodeJS.ProcessEnv = { DRIFTNET_HOME: mkdtempSync(join(tmpdir(), "driftnet-rules-")), DRIFTNET_JUDGE: "off", DRIFTNET_BLOCK_DOMAINS: "*.spam.test, Bad.test" };
+  const dn = createDriftnet(env);
+  await assert.rejects(dn.pipeline.ingest("https://bad.test/x", { platform: "http", chatId: "t" }), BlockedUrl);
+  await assert.rejects(dn.pipeline.ingest("https://www.spam.test/x", { platform: "http", chatId: "t" }), BlockedUrl);
+  assert.deepEqual(await dn.pipeline.ingestMessage("see https://bad.test/y", { platform: "http", chatId: "t" }), [], "a chat message just skips it");
+  // Settings change at runtime: the block list goes away without a restart.
+  env.DRIFTNET_BLOCK_DOMAINS = "";
+  dn.reconfigure(env);
+  await assert.doesNotReject(dn.pipeline.ingest("https://bad.test/x", { platform: "http", chatId: "t" }).catch((e) => {
+    if (e instanceof BlockedUrl && /settings/.test(e.message)) throw e;
+  }));
+});

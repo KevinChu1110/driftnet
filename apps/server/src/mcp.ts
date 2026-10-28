@@ -78,8 +78,6 @@ export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
     },
   );
 
-  const language = process.env.DRIFTNET_LANGUAGE ?? "English";
-
   server.registerTool(
     "driftnet_pending",
     {
@@ -91,6 +89,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
       inputSchema: { limit: z.number().int().min(1).max(10).optional().describe("Defaults to 5") },
     },
     async ({ limit }) => {
+      const language = process.env.DRIFTNET_LANGUAGE || "English";
+      const rules = process.env.DRIFTNET_SUMMARY_RULES?.trim();
       const items = dn.store.claimPending(`agent:${agentName}`, limit ?? 5);
       const rows = items.map((i) => ({
         id: i.id,
@@ -108,7 +108,10 @@ export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
         "primary_url: the tool's repo or official site, only if you saw it; driftnet checks that it exists.",
         "mentions: other tools the content recommends (not ones it compares against), with open_source true/false.",
         "Not about a usable tool, or nothing to read? Send worth \"skip\" with a one-line reason as one_liner.",
-        `category must be one of: ${Object.keys(dn.categories).join(", ")}.`,
+        // The reader's folders, with their notes: that is what decides where an item goes.
+        "category — one of the reader's folders (id: path — what belongs there):",
+        ...Object.entries(dn.categories).map(([id, about]) => `- ${id}: ${about}`),
+        ...(rules ? [`The reader's own rules: ${rules}`] : []),
       ].join("\n");
       return { content: [{ type: "text" as const, text: `${brief}\n\n${JSON.stringify(rows, null, 1)}` }] };
     },

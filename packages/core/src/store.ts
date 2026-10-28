@@ -6,7 +6,7 @@ import type { Item, Judgement, Kind, ShareContext, Summary, Worth } from "./type
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
   is_ai_tool: number; summary: string | null; judge_engine: string; enriched_by: string | null;
-  trashed_at: string | null; favorite: number;
+  trashed_at: string | null; favorite: number; note: string | null;
   flags: string; source: string; share_count: number; created_at: string; updated_at: string;
 }
 
@@ -31,6 +31,15 @@ export interface Folder {
 
 export class FolderError extends Error {}
 
+/** A free-standing note: Markdown, may point at items as #12. */
+export interface Note {
+  id: number;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListQuery {
   /** all (default, trash excluded), favorites, or trash. */
   view?: "all" | "favorites" | "trash";
@@ -41,6 +50,8 @@ export interface ListQuery {
   /** Hide items flagged by the pollution guard or down-voted away. Default true. */
   clean?: boolean;
   since?: string;
+  /** best (worth, then recent; the default) | newest | shared (most shared first). */
+  sort?: "best" | "newest" | "shared";
   limit?: number;
 }
 
@@ -114,6 +125,13 @@ export class Store {
         child_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
         PRIMARY KEY (parent_id, child_id)
       );
+      CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL DEFAULT '',
+        body TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+      );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
@@ -131,6 +149,8 @@ export class Store {
       ["trashed_at", "TEXT"], ["favorite", "INTEGER NOT NULL DEFAULT 0"],
       // 1 once the reader moved the item: nobody re-classifies it after that.
       ["user_placed", "INTEGER NOT NULL DEFAULT 0"],
+      // The reader's own words about the item.
+      ["note", "TEXT"],
     ] as const) {
       if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
     }
@@ -296,6 +316,65 @@ export class Store {
       .map(({ parent, child }) => ({ parent, child }));
   }
 
+  // ── Notes ────────────────────────────────────────────────────────────────
+
+  /** The reader's note on an item; empty text clears it. */
+  setNote(id: number, note: string): boolean {
+    const text = note.trim().slice(0, 5000);
+    return this.db.prepare("UPDATE items SET note = ? WHERE id = ?").run(text || null, id).changes > 0;
+  }
+
+  /**
+   * What people said when they shared each item (the chat message around the
+   * link), newest first, without driftnet's own "Mentioned in …" bookkeeping.
+   */
+  chatNotes(ids: number[]): Map<number, string[]> {
+    const out = new Map<number, string[]>();
+    if (!ids.length) return out;
+    const rows = this.db
+      .prepare(
+        `SELECT item_id AS id, note FROM shares
+         WHERE item_id IN (${ids.map(() => "?").join(",")}) AND note IS NOT NULL AND note <> ''
+           AND note NOT LIKE 'Mentioned in %' AND note NOT LIKE 'Linked from %'
+         GROUP BY item_id, note ORDER BY MAX(at) DESC`,
+      )
+      .all(...ids) as { id: number; note: string }[];
+    for (const { id, note } of rows) out.set(id, [...(out.get(id) ?? []), note]);
+    return out;
+  }
+
+  listNotes(q?: string): Note[] {
+    const like = q ? `%${q}%` : null;
+    return (this.db
+      .prepare(`SELECT * FROM notes ${like ? "WHERE title LIKE ? OR body LIKE ?" : ""} ORDER BY updated_at DESC, id DESC`)
+      .all(...(like ? [like, like] : [])) as unknown as NoteRow[]).map(toNote);
+  }
+
+  getNote(id: number): Note | null {
+    const row = this.db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as NoteRow | undefined;
+    return row ? toNote(row) : null;
+  }
+
+  /** Every item worth keeping in an export: not trashed, not flagged for prompt injection. */
+  exportable(): Item[] {
+    return (this.db.prepare(`SELECT * FROM items WHERE trashed_at IS NULL AND flags NOT LIKE '%injection%' ORDER BY ${WORTH_ORDER} DESC, id`)
+      .all() as unknown as ItemRow[]).map(toItem);
+  }
+
+  /** New note without an id; null when updating a note that doesn't exist. */
+  saveNote(input: { id?: number; title: string; body: string }): Note | null {
+    const title = input.title.trim().slice(0, 200);
+    const body = input.body.slice(0, 100_000);
+    const row = input.id
+      ? this.db.prepare("UPDATE notes SET title = ?, body = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? RETURNING *").get(title, body, input.id)
+      : this.db.prepare("INSERT INTO notes (title, body) VALUES (?, ?) RETURNING *").get(title, body);
+    return row ? toNote(row as unknown as NoteRow) : null;
+  }
+
+  deleteNote(id: number): boolean {
+    return this.db.prepare("DELETE FROM notes WHERE id = ?").run(id).changes > 0;
+  }
+
   /** Soft delete: hidden everywhere, restorable from the trash. Returns false if there is no such item. */
   setTrashed(id: number, trashed: boolean): boolean {
     return (
@@ -417,12 +496,17 @@ export class Store {
       where.push("flags NOT LIKE '%injection%'", `${Store.NET_VOTES} > -2`);
     }
     if (query.q) {
-      where.push("(title LIKE ? OR summary LIKE ? OR url LIKE ?)");
+      // The reader's note and what people said in chat are searchable too.
+      where.push(`(title LIKE ? OR summary LIKE ? OR url LIKE ? OR note LIKE ?
+                   OR EXISTS (SELECT 1 FROM shares s WHERE s.item_id = items.id AND s.note LIKE ?))`);
       const like = `%${query.q}%`;
-      args.push(like, like, like);
+      args.push(like, like, like, like, like);
     }
     // The trash lists what was removed last first; elsewhere the best comes first.
-    const order = query.view === "trash" ? "trashed_at DESC" : `${WORTH_ORDER} DESC, updated_at DESC`;
+    const order = query.view === "trash" ? "trashed_at DESC"
+      : query.sort === "newest" ? "created_at DESC, id DESC"
+      : query.sort === "shared" ? `share_count DESC, ${WORTH_ORDER} DESC, updated_at DESC`
+      : `${WORTH_ORDER} DESC, updated_at DESC`;
     const sql = `SELECT * FROM items WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`;
     args.push(clampInt(query.limit, 1, 500, 50));
     return (this.db.prepare(sql).all(...args) as unknown as ItemRow[]).map(toItem);
@@ -478,7 +562,14 @@ function toItem(r: ItemRow): Item {
     favorite: r.favorite === 1,
     ...(r.trashed_at ? { trashedAt: r.trashed_at } : {}),
     ...(r.enriched_by ? { enrichedBy: r.enriched_by } : {}),
+    ...(r.note ? { note: r.note } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+interface NoteRow { id: number; title: string; body: string; created_at: string; updated_at: string }
+
+function toNote(r: NoteRow): Note {
+  return { id: r.id, title: r.title, body: r.body, createdAt: r.created_at, updatedAt: r.updated_at };
 }

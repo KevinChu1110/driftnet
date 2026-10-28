@@ -102,3 +102,12 @@ test("cleanList drops non-strings, blanks, long entries and duplicates", () => {
   assert.deepEqual(cleanList(["a", 1, "", "a", "x".repeat(50), "b", "c"], 2, 10), ["a", "b"]);
   assert.deepEqual(cleanList("nope", 3, 10), []);
 });
+
+test("the reader's rules are appended to the instructions", async () => {
+  let system = "";
+  const llm: LlmProvider = { label: "t", async complete(req) { system = req.system; return good as any; } };
+  await new Summarizer(llm, "English", "Say whether it is free.").summarize(digest, undefined);
+  assert.match(system, /The reader's own rules[^\n]*\nSay whether it is free\.$/);
+  await new Summarizer(llm, "English").summarize(digest, undefined);
+  assert.doesNotMatch(system, /reader's own rules/);
+});

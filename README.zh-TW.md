@@ -49,12 +49,17 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 
 ## 開始使用
 
-不需要伺服器，也不需要雲端帳號。
+不需要伺服器，也不需要雲端帳號。一行就好：
+
+```bash
+npx driftnet        # 自動打開 http://localhost:8787，⚙ 設定會帶你選模型
+```
+
+想改程式，或設成開機自動執行，就從原始碼跑：
 
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-mkdir -p ~/.driftnet && cp .env.example ~/.driftnet/.env   # 選填：模型、語言、聊天平台
 pnpm start                                                 # http://localhost:8787
 pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
 ```
@@ -97,7 +102,15 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   自己放好的卡片不會再被 AI 搬走。刪掉資料夾時，裡面的連結會移到上一層。
 - **往右滑**加入最愛，**往左滑**移到垃圾桶；滑太短不會觸發，上下捲動也不會被當成滑動。電腦上可以按 ☆ 和 🗑，或用滑鼠拖曳。
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
+- **筆記。**每張卡片都能按 📝 寫自己的筆記（試過了嗎？要 GPU 嗎？）。大家丟連結時在聊天室說的話也會顯示在卡片上（💬），
+  兩者都搜尋得到。側邊欄的 **📝 筆記** 可以寫不綁卡片的 Markdown 筆記，寫 `#12` 就會連到第 12 張卡片。
+- 網頁上的 **⚙ 設定**：模型、Jev、摘要語言、聊天室回覆方式、自訂摘要規則、不收錄的網域，存進 `~/.driftnet/.env`，
+  不用重新啟動就生效。每個瀏覽器各自的顯示：排序（值得看／最新／最多人分享）、精簡卡片、標籤、聊天原文、深淺色。
+- **匯出**全部內容：一個 Markdown 檔，或一包附 front matter 的 Markdown（zip），Obsidian 可以直接當 vault 開，
+  Notion 可以匯入（匯入 → Markdown & CSV）。
 - 用瀏覽器的**加入主畫面**，就能像 App 一樣打開。
+
+<p align="center"><img src="assets/notes-settings-zh-TW.jpg" alt="筆記頁（可以連到卡片）和設定視窗" width="100%"></p>
 
 ### Chrome 擴充
 
@@ -236,6 +249,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 ## 設定
 
 所有設定都是環境變數，通常寫在 `~/.driftnet/.env`，範例見 [`.env.example`](.env.example)。
+常用的也可以在網頁的 **⚙ 設定** 改；由執行環境本身（systemd、Docker、shell）設定的變數優先，在網頁上只能看不能改。
 
 <details>
 <summary><b>全部設定</b></summary>
@@ -257,6 +271,9 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
 | `DRIFTNET_CATEGORIES` | 內建 | 起始資料夾的 JSON 檔：`{ "id": "說明" }`，只在新資料庫用一次，之後直接在網頁上改 |
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
+| `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
+| `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
+| `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 擷取器外掛（`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | 別人連得到伺服器時，寫入、MCP 和 agent 佇列都需要它 |
 | `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取也要 token |
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
@@ -274,7 +291,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）·
+`GET|PUT /api/settings`（限本機，或帶 token）· `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -301,7 +319,8 @@ driftnet.example.com {
 > [!IMPORTANT]
 > 清單留在你的電腦上。判斷和摘要時，driftnet 會把連結的**摘錄**（標題、大綱、分享時附的聊天文字）送到
 > **TypeSafe**（有開 Jev 時）和**你設定的模型供應商**。沒有連結的聊天訊息不會被處理或儲存。
-> 用 Ollama 並設 `DRIFTNET_JUDGE=off`，就完全不會有資料離開你的電腦。
+> 用 Ollama 並設 `DRIFTNET_JUDGE=off`，就完全不會有資料離開你的電腦。隨時都能整包帶走：側邊欄可以匯出成
+> Markdown 或 Obsidian／Notion 的 vault，也可以用 `GET /api/export`。
 
 ## 參與開發
 
@@ -317,9 +336,11 @@ assets · scripts       logo、主視覺、服務安裝
 pnpm typecheck && pnpm test
 CHROME=/path/to/chromium pnpm e2e:extension   # 在真的瀏覽器裡測擴充（Chrome for Testing 或 Chromium）
 CHROME=/path/to/chrome pnpm e2e:web             # 用手機尺寸和真的觸控滑動測網頁
+pnpm build:npm                                  # 打包 npm 套件到 dist/npm（試用：cd dist/npm && npm pack）
 ```
 
-可以擴充：網站（`registerExtractor()`）、模型（`LlmProvider`）、判斷器（`Judge`）、聊天平台（`handleChatText()`）、
+可以擴充：網站（放一個外掛檔到 `~/.driftnet/plugins`，像
+[`examples/plugins/hackernews.mjs`](examples/plugins/hackernews.mjs)，或用 `registerExtractor()`）、模型（`LlmProvider`）、判斷器（`Judge`）、聊天平台（`handleChatText()`）、
 瀏覽器擷取（`collect.js`）、bot 介面語言（`i18n.ts`）。
 
 **適合第一次貢獻**，都是拿大家真正會分享的連結實測後發現的：

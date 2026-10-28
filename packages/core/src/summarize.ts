@@ -73,6 +73,8 @@ export class Summarizer {
   constructor(
     private readonly llm: LlmProvider,
     private readonly language: string,
+    /** The reader's own instructions (DRIFTNET_SUMMARY_RULES), e.g. "say whether it is free". */
+    private readonly rules = "",
   ) {}
 
   get label(): string {
@@ -121,6 +123,7 @@ export class Summarizer {
       "Never translate name: it is how people search for the tool (e.g. on GitHub). Keep the original spelling, usually English.",
       "Be concrete and terse. Never invent features that are not in the input.",
       "Reply with JSON only.",
+      this.rules && `The reader's own rules — follow them unless they conflict with the rules above:\n${this.rules}`,
       categories &&
         [
           "Also classify it.",

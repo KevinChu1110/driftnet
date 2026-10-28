@@ -1,19 +1,26 @@
 import { readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
 import { startTelegram } from "./adapters/telegram.ts";
 import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
+import { collect, toMarkdown, toVault, zip } from "./export.ts";
+import { Settings, SettingsError } from "./settings.ts";
 import { llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
+// Settings the environment itself provides (systemd, Docker, the shell) win over the file; the page shows them read-only.
+const fromEnvironment = new Set(Object.keys(env).filter((k) => env[k] !== undefined));
 const envFile = loadHomeEnv(env);
+const plugins = await loadPlugins(env);
 const dn = createDriftnet();
+const settings = new Settings(env, fromEnvironment);
 const PORT = Number(env.PORT ?? 8787);
 // Loopback by default: put a reverse proxy (Caddy, nginx, a tunnel) in front to expose it.
 const HOST = env.DRIFTNET_HOST ?? "127.0.0.1";
@@ -42,6 +49,22 @@ function authorized(req: IncomingMessage): boolean {
   const given = Buffer.from((req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""));
   const want = Buffer.from(TOKEN);
   return given.length === want.length && timingSafeEqual(given, want);
+}
+
+/**
+ * The settings page can point the model at another URL with your key, so it
+ * needs more than a write: the token when one is set, and without a token only
+ * this machine (by Host, which also stops DNS rebinding). The JSON content type
+ * forces a CORS preflight, which this server never grants, and a foreign
+ * Origin is refused outright.
+ */
+function settingsAllowed(req: IncomingMessage): boolean {
+  if (!authorized(req)) return false;
+  const host = req.headers.host ?? "";
+  if (!TOKEN && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host)) return false;
+  const origin = req.headers.origin;
+  if (origin && origin !== `http://${host}` && origin !== `https://${host}`) return false;
+  return req.method === "GET" || /^application\/json\b/.test(req.headers["content-type"] ?? "");
 }
 
 class BadRequest extends Error {}
@@ -92,7 +115,9 @@ const server = createServer(async (req, res) => {
       const categories = Object.fromEntries(
         dn.store.folders().map((f) => [f.id, Object.fromEntries(LOCALES.map((l) => [l, dn.folderLabel(f.id, l)]))]),
       );
-      return send(res, 200, { locale: resolveLocale(), categories });
+      // First run: nothing configured yet, so the page opens the settings to get started.
+      const setup = !envFile && dn.engines.summarizer === "off" && dn.engines.judge === "heuristic" && !dn.store.stats().items;
+      return send(res, 200, { locale: resolveLocale(), categories, setup });
     }
 
     // ── The reader's folder tree ──────────────────────────────────────────
@@ -147,6 +172,7 @@ const server = createServer(async (req, res) => {
         ...(minWorth && (WORTH as readonly string[]).includes(minWorth) ? { minWorth: minWorth as Worth } : {}),
         ...(p.get("since") ? { since: p.get("since")! } : {}),
         ...(p.get("view") === "favorites" || p.get("view") === "trash" ? { view: p.get("view") as "favorites" | "trash" } : {}),
+        ...(["best", "newest", "shared"].includes(p.get("sort") ?? "") ? { sort: p.get("sort") as "best" | "newest" | "shared" } : {}),
         clean: p.get("all") !== "1",
         limit: Number(p.get("limit") ?? 200),
       });
@@ -158,7 +184,62 @@ const server = createServer(async (req, res) => {
         const name = names.get(child) ?? dn.store.get(child)?.summary?.name ?? dn.store.get(child)?.title;
         if (name && !dn.store.get(child)?.trashedAt) found.set(parent, [...(found.get(parent) ?? []), { id: child, name }]);
       }
-      return send(res, 200, list.map((i) => ({ ...i, found: found.get(i.id) ?? [] })));
+      // What people wrote around the link when they shared it.
+      const said = dn.store.chatNotes(list.map((i) => i.id));
+      return send(res, 200, list.map((i) => ({ ...i, found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })));
+    }
+    const noteMatch = /^\/api\/items\/(\d+)\/note$/.exec(path);
+    if (req.method === "PUT" && noteMatch) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const { note } = await readJson<{ note?: string }>(req);
+      const id = Number(noteMatch[1]);
+      return dn.store.setNote(id, String(note ?? "")) ? send(res, 200, dn.store.get(id)) : send(res, 404, { error: "not found" });
+    }
+
+    // ── Free-standing notes ───────────────────────────────────────────────
+    if (req.method === "GET" && path === "/api/notes") return send(res, 200, dn.store.listNotes(url.searchParams.get("q") ?? undefined));
+    const notesMatch = /^\/api\/notes(?:\/(\d+))?$/.exec(path);
+    if (notesMatch && req.method !== "GET") {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const id = notesMatch[1] ? Number(notesMatch[1]) : undefined;
+      if (req.method === "DELETE" && id) return dn.store.deleteNote(id) ? send(res, 200, { ok: true }) : send(res, 404, { error: "not found" });
+      if ((req.method === "POST" && !id) || (req.method === "PUT" && id)) {
+        const body = await readJson<{ title?: string; body?: string }>(req);
+        const note = dn.store.saveNote({ ...(id ? { id } : {}), title: String(body.title ?? ""), body: String(body.body ?? "") });
+        return note ? send(res, 200, note) : send(res, 404, { error: "not found" });
+      }
+      return send(res, 405, { error: "method not allowed" });
+    }
+
+    // ── Settings page ─────────────────────────────────────────────────────
+    if (path === "/api/settings" && (req.method === "GET" || req.method === "PUT")) {
+      if (!settingsAllowed(req)) {
+        return send(res, 403, { error: TOKEN ? "unauthorized" : "settings can only be changed from this machine; set DRIFTNET_TOKEN to change them remotely" });
+      }
+      if (req.method === "PUT") {
+        try {
+          const changed = settings.update((await readJson<{ values?: Record<string, unknown> }>(req)).values ?? {});
+          if (changed.length) dn.reconfigure(env);
+          return send(res, 200, { ...settings.view(), changed, engines: dn.engines });
+        } catch (err) {
+          if (err instanceof SettingsError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      return send(res, 200, { ...settings.view(), engines: dn.engines, plugins });
+    }
+
+    // ── Export: one Markdown file, or a zip vault for Obsidian / Notion ───
+    if (req.method === "GET" && path === "/api/export") {
+      const lang = url.searchParams.get("lang");
+      const data = collect(dn, (LOCALES as readonly string[]).includes(lang ?? "") ? (lang as Locale) : resolveLocale());
+      const day = new Date().toISOString().slice(0, 10);
+      if (url.searchParams.get("format") === "vault") {
+        res.writeHead(200, { "content-type": "application/zip", "content-disposition": `attachment; filename="driftnet-${day}.zip"` });
+        return res.end(zip(toVault(data)));
+      }
+      res.writeHead(200, { "content-type": "text/markdown; charset=utf-8", "content-disposition": `attachment; filename="driftnet-${day}.md"` });
+      return res.end(toMarkdown(data));
     }
     const itemMatch = /^\/api\/items\/(\d+)(\/feedback)?$/.exec(path);
     if (req.method === "GET" && itemMatch && !itemMatch[2]) {
@@ -242,8 +323,10 @@ const server = createServer(async (req, res) => {
       const items = dn.store.claimPending(agent, Number(body.limit ?? 5));
       return send(res, 200, {
         pending: dn.store.pendingCount(),
-        language: env.DRIFTNET_LANGUAGE ?? "English",
+        language: env.DRIFTNET_LANGUAGE || "English",
         categories: Object.keys(dn.categories),
+        folders: dn.categories,
+        ...(env.DRIFTNET_SUMMARY_RULES?.trim() ? { rules: env.DRIFTNET_SUMMARY_RULES.trim() } : {}),
         items: items.map((i) => ({ id: i.id, url: i.url, title: i.title, kind: i.kind, category_guess: i.category, shared_with: dn.store.notes(i.id) })),
       });
     }
@@ -301,14 +384,26 @@ server.on("error", (err: NodeJS.ErrnoException) => {
 server.listen(PORT, HOST, () => {
   console.log(`driftnet on http://${HOST}:${PORT}  judge=${dn.engines.judge}  summarizer=${dn.engines.summarizer}`);
   for (const w of dn.warnings) console.warn(`⚠️  ${w}`);
-  console.log(`settings: ${envFile ?? `none (create ${driftnetHome(env)}/.env)`}  data: ${env.DRIFTNET_DB ?? defaultDbPath(env)}`);
+  console.log(`settings: ${envFile ?? `none (create ${driftnetHome(env)}/.env, or open the page's ⚙ Settings)`}  data: ${env.DRIFTNET_DB ?? defaultDbPath(env)}`);
+  if (plugins.length) console.log(`plugins: ${plugins.join(", ")}`);
   void suggestLocalModel();
+  // First run in a terminal: open the page, where ⚙ Settings walks through the rest.
+  if (!envFile && process.stdout.isTTY && env.DRIFTNET_OPEN !== "0" && !env.CI) openBrowser(`http://localhost:${PORT}/`);
   if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);
   if (env.DISCORD_BOT_TOKEN) startDiscord(dn, env.DISCORD_BOT_TOKEN);
   if (env.LINE_CHANNEL_SECRET) console.log("[line] webhook at /webhooks/line");
   if (env.SLACK_APP_TOKEN && env.SLACK_BOT_TOKEN) startSlackSocket(dn, env.SLACK_APP_TOKEN, env.SLACK_BOT_TOKEN);
   else if (env.SLACK_SIGNING_SECRET) console.log("[slack] webhook at /webhooks/slack");
 });
+
+function openBrowser(url: string): void {
+  const [command, args] = process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
+  try {
+    spawn(command, args as string[], { stdio: "ignore", detached: true }).on("error", () => {}).unref();
+  } catch {
+    // no browser here (a server); the URL is printed above
+  }
+}
 
 /** Running with no model while Ollama sits right there: say how to use it. */
 async function suggestLocalModel(): Promise<void> {

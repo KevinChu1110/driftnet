@@ -19,10 +19,14 @@
     font-family: ui-sans-serif, system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #121211; --panel: #1b1b1a; --text: #ececea; --muted: #9a9a94; --line: #2d2d2b;
+    :root:not([data-theme="light"]) { --bg: #121211; --panel: #1b1b1a; --text: #ececea; --muted: #9a9a94; --line: #2d2d2b;
             --accent: #7aa7ff; --accent-soft: #1e2a40; --warn: #f0a050; --star: #f2c14e; --star-soft: #3a3016;
             --danger: #ef9a9a; --danger-soft: #3b1d1d; --ok: #81c784; --ok-soft: #1d3322; }
   }
+  :root[data-theme="dark"] { --bg: #121211; --panel: #1b1b1a; --text: #ececea; --muted: #9a9a94; --line: #2d2d2b;
+            --accent: #7aa7ff; --accent-soft: #1e2a40; --warn: #f0a050; --star: #f2c14e; --star-soft: #3a3016;
+            --danger: #ef9a9a; --danger-soft: #3b1d1d; --ok: #81c784; --ok-soft: #1d3322; color-scheme: dark; }
+  :root[data-theme="light"] { color-scheme: light; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; -webkit-tap-highlight-color: transparent; }
   button { font: inherit; color: inherit; }
@@ -89,6 +93,43 @@
   .found { font-size: 13px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
   .found a { color: var(--accent); text-decoration: none; background: var(--accent-soft); border-radius: 99px; padding: 1px 9px; }
   .found a:hover { text-decoration: underline; }
+  .said { margin: 8px 0 2px; padding: 6px 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 14px; white-space: pre-wrap; }
+  .said::before { content: "💬 "; }
+  .mynote { margin: 8px 0 2px; padding: 8px 10px; border-radius: 8px; background: var(--star-soft); font-size: 14px; white-space: pre-wrap; }
+  .mynote::before { content: "📝 "; }
+  .link-btn { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; padding: 0; cursor: pointer; }
+  .link-btn:hover { text-decoration: underline; }
+  nav .foot { display: grid; gap: 2px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+  nav .foot button { color: var(--muted); font-size: 14px; }
+  .note-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; text-align: left;
+               font: inherit; color: inherit; width: 100%; }
+  .note-card:hover { border-color: var(--accent); }
+  .note-card h3 { margin: 0 0 4px; font-size: 16px; }
+  .note-card .md { max-height: 9.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+  .md h1, .md h2, .md h3 { font-size: 15px; margin: 8px 0 4px; }
+  .md p { margin: 4px 0; }
+  .md ul { margin: 4px 0; padding-left: 20px; }
+  .md blockquote { margin: 4px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+  .md code { background: var(--bg); border-radius: 4px; padding: 0 4px; font-size: 13px; }
+  .md pre { background: var(--bg); border-radius: 8px; padding: 8px 10px; overflow: auto; font-size: 13px; }
+  .md a { color: var(--accent); }
+  .bar { display: flex; gap: 8px; align-items: center; }
+  .bar .spacer { flex: 1; }
+  dialog.wide { width: min(720px, calc(100vw - 32px)); }
+  #nd-body { min-height: 40vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+  body.compact .card ul, body.compact .said, body.compact .card .found { display: none; }
+  body.compact .card { padding-top: 10px; padding-bottom: 10px; }
+  body.compact .card p { margin: 2px 0; }
+  body.hide-tags .meta .tags, body.hide-said .said { display: none; }
+  .set-group { border: 0; padding: 0; margin: 0 0 16px; }
+  .set-group legend { font-weight: 650; font-size: 14px; margin-bottom: 8px; padding: 0; }
+  .set-row { display: grid; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+  .set-row.check { grid-template-columns: auto 1fr; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
+  .set-row.check input { width: 18px; height: 18px; }
+  .set-row small { color: var(--muted); }
+  .set-status { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; }
+  .set-scroll { max-height: min(70vh, 640px); overflow: auto; margin: 0 -18px; padding: 0 18px; }
+  .welcome { background: var(--accent-soft); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
   .tool.grip { cursor: grab; display: none; }
   @media (hover: hover) and (pointer: fine) { .tool.grip { display: grid; } }
 
@@ -143,7 +184,8 @@
   .toast.show { transform: translate(-50%, 0); }
   .toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 650; padding: 8px 10px; border-radius: 8px; cursor: pointer;
                   min-height: 40px; white-space: nowrap; flex-shrink: 0; }
-  @media (prefers-color-scheme: dark) { .toast button { color: var(--accent); } }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .toast button { color: var(--accent); } }
+  :root[data-theme="dark"] .toast button { color: var(--accent); }
 
   @media (max-width: 720px) {
     header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); gap: 8px 10px; }
@@ -207,6 +249,34 @@
   <div class="pick" id="mv-list"></div>
   <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="mv-cancel" type="button"></button></div>
 </dialog>
+<dialog id="settings-dlg" class="wide">
+  <form id="settings-form" method="dialog">
+    <h3 id="st-title"></h3>
+    <p class="dlg-error" id="st-error"></p>
+    <div class="set-scroll" id="st-body"></div>
+    <div class="dlg-actions"><span class="spacer"></span>
+      <button class="btn" id="st-cancel" type="button"></button><button class="btn primary" id="st-save" type="submit"></button></div>
+  </form>
+</dialog>
+<dialog id="note-dlg">
+  <form id="note-form" method="dialog">
+    <h3 id="in-title"></h3>
+    <label><span id="in-help"></span><textarea id="in-text" rows="5" maxlength="5000"></textarea></label>
+    <div class="dlg-actions"><span class="spacer"></span>
+      <button class="btn" id="in-cancel" type="button"></button><button class="btn primary" id="in-save" type="submit"></button></div>
+  </form>
+</dialog>
+<dialog id="notes-dlg" class="wide">
+  <form id="nd-form" method="dialog">
+    <p class="dlg-error" id="nd-error"></p>
+    <label><span id="nd-title-l"></span><input id="nd-title" maxlength="200" autocomplete="off"></label>
+    <label><span id="nd-body-l"></span><textarea id="nd-body" maxlength="100000"></textarea></label>
+    <div class="dlg-actions">
+      <button class="btn danger" id="nd-delete" type="button"></button><span class="spacer"></span>
+      <button class="btn" id="nd-cancel" type="button"></button><button class="btn primary" id="nd-save" type="submit"></button>
+    </div>
+  </form>
+</dialog>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
   const STRINGS = {
@@ -231,6 +301,45 @@
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
+      notes: "Notes", note: "Note", addNote: "📝 Add a note", editNote: "📝 Edit note", noteFor: (n) => `Note on “${n}”`,
+      noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "＋ New note", noteTitle: "Title",
+      noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
+      emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "⬇ Export Markdown", exportVault: "⬇ Export for Obsidian / Notion",
+      saved: "Saved", settings: "⚙ Settings",
+      st: {
+        title: "Settings", save: "Save", welcome: "Welcome! Pick a model below (or none: Jev and the built-in rules still sort links), then drop a link in.",
+        display: "This browser", sort: "Order", sorts: { best: "Best first", newest: "Newest first", shared: "Most shared first" },
+        compact: "Compact cards (one line each)", tags: "Show tags", said: "Show what people said in chat",
+        theme: "Theme", themes: { auto: "Follow the system", light: "Light", dark: "Dark" },
+        model: "Model & classifier", language: "Language & chat replies", rules: "Your rules",
+        plugins: "Plugins", pluginsNone: (dir) => `No plugins. Put .js files in ${dir} — see examples/plugins in the repo.`,
+        status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries by ${e.summarizer === "off" ? "nobody (off)" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
+        locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
+        savedServer: "Saved — already in effect",
+        labels: {
+          DRIFTNET_LLM_PROVIDER: ["Model provider", "Summaries. None: links are still sorted, only without a summary."],
+          DRIFTNET_LLM_MODEL: ["Model", "e.g. claude-haiku-5-5, gpt-5-mini, gemini-3.8-flash, qwen3"],
+          DRIFTNET_LLM_BASE_URL: ["API URL", "For OpenAI-compatible APIs: Gemini, Grok, OpenRouter, Ollama (http://127.0.0.1:11434/v1)…"],
+          DRIFTNET_LLM_API_KEY: ["API key", ""],
+          DRIFTNET_LLM_EFFORT: ["Reasoning effort", ""],
+          TYPESAFE_API_KEY: ["Jev key", "Optional: a ~100 ms classifier that saves model calls (console.typesafe.ai)"],
+          DRIFTNET_JUDGE: ["Jev", ""],
+          GITHUB_TOKEN: ["GitHub token", "Optional: GitHub lookups go from 60 to 5000 an hour"],
+          DRIFTNET_LANGUAGE: ["Summary language", "English, Traditional Chinese (Taiwan), Japanese…"],
+          DRIFTNET_LOCALE: ["Bot language", ""],
+          DRIFTNET_REPLY: ["Chat replies", ""],
+          DRIFTNET_PUBLIC_URL: ["This page's public URL", "Replies link here, e.g. https://driftnet.example.com"],
+          DRIFTNET_SUMMARY_RULES: ["Extra rules for summaries", "e.g. Say whether it's free. Mention if it needs a GPU."],
+          DRIFTNET_BLOCK_DOMAINS: ["Never catalogue these domains", "Comma or space separated, e.g. example.com, spam.io"],
+        },
+        choices: {
+          DRIFTNET_LLM_PROVIDER: { "": "None", anthropic: "Anthropic (API key)", openai: "OpenAI-compatible (OpenAI, Gemini, Grok, Ollama…)", "claude-cli": "Claude subscription (Claude Code CLI)", "gemini-cli": "Google account (Gemini CLI)" },
+          DRIFTNET_LLM_EFFORT: { "": "Default", low: "Low", medium: "Medium", high: "High" },
+          DRIFTNET_JUDGE: { "": "On when a key is set", off: "Off" },
+          DRIFTNET_LOCALE: { "": "Same as the summaries", en: "English", "zh-TW": "繁體中文" },
+          DRIFTNET_REPLY: { "": "One line + link (default)", link: "One line + link", full: "Full summary", off: "Don't reply" },
+        },
+      },
     },
     "zh-TW": {
       search: "搜尋工具、標籤、連結…", all: "全部", favorites: "最愛", trash: "垃圾桶", any: "不限",
@@ -253,6 +362,45 @@
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
+      notes: "筆記", note: "筆記", addNote: "📝 加筆記", editNote: "📝 改筆記", noteFor: (n) => `「${n}」的筆記`,
+      noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "＋ 新筆記", noteTitle: "標題",
+      noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
+      emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "⬇ 匯出 Markdown", exportVault: "⬇ 匯出到 Obsidian／Notion",
+      saved: "已儲存", settings: "⚙ 設定",
+      st: {
+        title: "設定", save: "儲存", welcome: "歡迎！先在下面選一個模型（不選也可以：Jev 和內建規則一樣會分類），然後丟一個連結進來試試。",
+        display: "這個瀏覽器", sort: "排序", sorts: { best: "值得看的在前", newest: "最新的在前", shared: "最多人分享的在前" },
+        compact: "精簡卡片（每張一行）", tags: "顯示標籤", said: "顯示大家在聊天室說的話",
+        theme: "外觀", themes: { auto: "跟系統一樣", light: "淺色", dark: "深色" },
+        model: "模型與分類", language: "語言與聊天回覆", rules: "自訂規則",
+        plugins: "外掛", pluginsNone: (dir) => `沒有外掛。把 .js 檔放進 ${dir}，範例在 repo 的 examples/plugins。`,
+        status: (e) => `目前：分類用 ${({ jev: "Jev", llm: "模型", heuristic: "內建規則" })[e.judge] ?? e.judge}，摘要用 ${e.summarizer === "off" ? "（未開啟）" : e.summarizer}`, keep: "已設定，留空就不變", unset: "未設定",
+        locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
+        savedServer: "已儲存，馬上生效",
+        labels: {
+          DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要。選「不使用」也會分類，只是沒有摘要。"],
+          DRIFTNET_LLM_MODEL: ["模型", "例如 claude-haiku-5-5、gpt-5-mini、gemini-3.8-flash、qwen3"],
+          DRIFTNET_LLM_BASE_URL: ["API 網址", "OpenAI 相容 API 用：Gemini、Grok、OpenRouter、Ollama（http://127.0.0.1:11434/v1）…"],
+          DRIFTNET_LLM_API_KEY: ["API 金鑰", ""],
+          DRIFTNET_LLM_EFFORT: ["推理強度", ""],
+          TYPESAFE_API_KEY: ["Jev 金鑰", "選填：約 100ms 的分類器，可以省下模型呼叫（console.typesafe.ai）"],
+          DRIFTNET_JUDGE: ["Jev", ""],
+          GITHUB_TOKEN: ["GitHub token", "選填：GitHub 查詢上限從每小時 60 次變 5000 次"],
+          DRIFTNET_LANGUAGE: ["摘要語言", "English、Traditional Chinese (Taiwan)、Japanese…"],
+          DRIFTNET_LOCALE: ["機器人語言", ""],
+          DRIFTNET_REPLY: ["聊天室回覆", ""],
+          DRIFTNET_PUBLIC_URL: ["這個網頁的公開網址", "回覆裡的連結會指到這裡，例如 https://driftnet.example.com"],
+          DRIFTNET_SUMMARY_RULES: ["摘要的額外規則", "例如：說明是否免費。需要 GPU 的話要提到。"],
+          DRIFTNET_BLOCK_DOMAINS: ["不要收錄的網域", "用逗號或空白分隔，例如 example.com, spam.io"],
+        },
+        choices: {
+          DRIFTNET_LLM_PROVIDER: { "": "不使用", anthropic: "Anthropic（API 金鑰）", openai: "OpenAI 相容（OpenAI、Gemini、Grok、Ollama…）", "claude-cli": "Claude 訂閱（Claude Code CLI）", "gemini-cli": "Google 帳號（Gemini CLI）" },
+          DRIFTNET_LLM_EFFORT: { "": "預設", low: "低", medium: "中", high: "高" },
+          DRIFTNET_JUDGE: { "": "有金鑰就開", off: "關閉" },
+          DRIFTNET_LOCALE: { "": "跟摘要一樣", en: "English", "zh-TW": "繁體中文" },
+          DRIFTNET_REPLY: { "": "一行＋連結（預設）", link: "一行＋連結", full: "完整摘要", off: "不回覆" },
+        },
+      },
     },
   };
   const state = { view: "all", category: "", kind: "", q: "" };
@@ -265,6 +413,7 @@
   let locale = "en";
   let catLabels = {};
   let folders = [];
+  let notes = [];
   let items = [];
   // Folders the reader closed in the tree; remembered in this browser.
   const collapsed = new Set((() => { try { return JSON.parse(store.get("driftnet-collapsed") ?? "[]"); } catch { return []; } })());
@@ -324,7 +473,8 @@
   /** One line under the header saying what is shown, so a closed drawer hides nothing. */
   function updateCrumb() {
     const t = T();
-    const parts = [state.view === "favorites" ? `★ ${t.favorites}` : state.view === "trash" ? `🗑 ${t.trash}` : t.all];
+    const parts = [state.view === "favorites" ? `★ ${t.favorites}` : state.view === "trash" ? `🗑 ${t.trash}`
+      : state.view === "notes" ? `📝 ${t.notes}` : t.all];
     if (state.category) parts.push(catLabel(state.category));
     if (state.kind) parts.push(t.kinds[state.kind] ?? state.kind);
     $("crumb").innerHTML = `${esc(t.showing)} <b>${esc(parts.join(" · "))}</b>`;
@@ -336,12 +486,14 @@
     applyLocale();
     let stats, ui;
     try {
-      [stats, ui, folders] = await Promise.all([api("/api/stats"), api("/api/ui"), api("/api/folders")]);
+      [stats, ui, folders, notes] = await Promise.all([api("/api/stats"), api("/api/ui"), api("/api/folders"), api("/api/notes")]);
+      stats.notes = notes.length;
     } catch (err) {
       if (err.unauthorized) return askToken();
       throw err;
     }
     catLabels = ui.categories;
+    if (ui.setup && !store.get("driftnet-setup-seen")) { store.set("driftnet-setup-seen", "1"); setTimeout(() => openSettings(true), 300); }
     if (!STRINGS[saved] && STRINGS[ui.locale]) locale = ui.locale;
     applyLocale();
     $("stats").textContent = T().stats(stats.items, stats.shares);
@@ -354,10 +506,14 @@
       `<div class="row">` +
       btn("view", "all", T().all, stats.items) + btn("view", "favorites", `★ ${T().favorites}`, stats.favorites) +
       btn("view", "trash", `🗑 ${T().trash}`, stats.trash || "") +
+      btn("view", "notes", `📝 ${T().notes}`, stats.notes || "") +
       `</div><div class="folders-head" data-drop-root><h2>${esc(T().folders)}</h2>` +
       `<button type="button" class="icon" data-new="" title="${esc(T().newFolder)}" aria-label="${esc(T().newFolder)}">＋</button></div>` +
       `<div class="tree" role="list">${folderRows(null, 0)}</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
-      Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>`;
+      Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>` +
+      `<div class="foot"><button type="button" data-settings>${esc(T().settings)}</button>` +
+      `<button type="button" data-export="markdown">${esc(T().exportMd)}</button>` +
+      `<button type="button" data-export="vault">${esc(T().exportVault)}</button></div>`;
     $("nav").onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -369,6 +525,8 @@
         return load();
       }
       if (b.dataset.edit) return openFolderDialog(b.dataset.edit);
+      if (b.dataset.export) return download(b.dataset.export);
+      if (b.dataset.settings !== undefined) { if (isDrawer()) setMenu(false); return openSettings(); }
       if (b.dataset.new !== undefined) return openFolderDialog(null, b.dataset.new || null);
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
@@ -557,9 +715,228 @@
     }
   }
 
+  // ── Display preferences (this browser only) ──────────────────────────────
+  const prefs = Object.assign({ sort: "best", compact: false, tags: true, said: true, theme: "auto" },
+    (() => { try { return JSON.parse(store.get("driftnet-prefs") ?? "{}"); } catch { return {}; } })());
+  function applyPrefs() {
+    document.body.classList.toggle("compact", !!prefs.compact);
+    document.body.classList.toggle("hide-tags", !prefs.tags);
+    document.body.classList.toggle("hide-said", !prefs.said);
+    if (prefs.theme === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.dataset.theme = prefs.theme;
+  }
+  applyPrefs();
+
+  // ── Settings ─────────────────────────────────────────────────────────────
+  let serverSettings = null;
+  async function openSettings(welcome = false) {
+    const t = T(), st = t.st;
+    const token = store.get("driftnet-token");
+    const res = await fetch("/api/settings", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
+    serverSettings = res?.ok ? await res.json() : null;
+    const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label)}</option>`;
+    const local = `<fieldset class="set-group"><legend>${esc(st.display)}</legend>
+      <label class="set-row"><span>${esc(st.sort)}</span><select data-pref="sort">${Object.entries(st.sorts).map(([k, v]) => opt(k, v, prefs.sort)).join("")}</select></label>
+      <label class="set-row"><span>${esc(st.theme)}</span><select data-pref="theme">${Object.entries(st.themes).map(([k, v]) => opt(k, v, prefs.theme)).join("")}</select></label>
+      <label class="set-row check"><input type="checkbox" data-pref="compact" ${prefs.compact ? "checked" : ""}><span>${esc(st.compact)}</span></label>
+      <label class="set-row check"><input type="checkbox" data-pref="tags" ${prefs.tags ? "checked" : ""}><span>${esc(st.tags)}</span></label>
+      <label class="set-row check"><input type="checkbox" data-pref="said" ${prefs.said ? "checked" : ""}><span>${esc(st.said)}</span></label></fieldset>`;
+    let server = `<p class="set-status">${esc(st.forbidden)}</p>`;
+    if (serverSettings) {
+      const field = (s) => {
+        const [label, help] = st.labels[s.key] ?? [s.key, ""];
+        const dis = s.locked ? "disabled" : "";
+        const hint = s.locked ? st.locked : help;
+        let input;
+        if (s.choices) input = `<select data-key="${s.key}" ${dis}>${s.choices.map((c) => opt(c, st.choices[s.key]?.[c] ?? c, s.value ?? "")).join("")}</select>`;
+        else if (s.multiline) input = `<textarea data-key="${s.key}" rows="3" ${dis}>${esc(s.value)}</textarea>`;
+        else if (s.secret) input = `<input data-key="${s.key}" type="password" autocomplete="off" placeholder="${esc(s.set ? st.keep : st.unset)}" ${dis}>`;
+        else input = `<input data-key="${s.key}" value="${esc(s.value)}" autocomplete="off" ${dis}>`;
+        return `<label class="set-row"><span>${esc(label)}${s.key.startsWith("DRIFTNET") || s.secret ? ` <small>${esc(s.key)}</small>` : ""}</span>${input}${hint ? `<small>${esc(hint)}</small>` : ""}</label>`;
+      };
+      const group = (g) => `<fieldset class="set-group"><legend>${esc(st[g])}</legend>${serverSettings.settings.filter((s) => s.group === g).map(field).join("")}</fieldset>`;
+      const plugins = serverSettings.plugins?.length ? serverSettings.plugins.map((p) => `<div>🧩 ${esc(p)}</div>`).join("")
+        : esc(st.pluginsNone(serverSettings.file.replace(/\.env$/, "plugins/")));
+      server = `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` +
+        group("model") + group("language") + group("rules") +
+        `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`;
+    }
+    $("st-title").textContent = st.title;
+    $("st-error").textContent = "";
+    $("st-body").innerHTML = (welcome ? `<p class="welcome">${esc(st.welcome)}</p>` : "") + (welcome ? server + local : local + server);
+    $("st-cancel").textContent = t.cancel;
+    $("st-save").textContent = st.save;
+    $("settings-dlg").showModal();
+  }
+  $("st-cancel").onclick = () => $("settings-dlg").close();
+  $("settings-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const body = $("st-body");
+    for (const el of body.querySelectorAll("[data-pref]")) prefs[el.dataset.pref] = el.type === "checkbox" ? el.checked : el.value;
+    store.set("driftnet-prefs", JSON.stringify(prefs));
+    applyPrefs();
+    let serverSaved = false;
+    if (serverSettings) {
+      const values = {};
+      for (const el of body.querySelectorAll("[data-key]:not([disabled])")) {
+        const s = serverSettings.settings.find((x) => x.key === el.dataset.key);
+        if (s.secret ? el.value.trim() : el.value.trim() !== (s.value ?? "").trim()) values[s.key] = el.value.trim() === "" ? null : el.value;
+      }
+      if (Object.keys(values).length) {
+        const token = store.get("driftnet-token");
+        const res = await fetch("/api/settings", { method: "PUT", body: JSON.stringify({ values }),
+          headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
+        const data = await res?.json().catch(() => ({}));
+        if (!res?.ok) { $("st-error").textContent = data?.error ?? T().failed; return; }
+        serverSaved = true;
+      }
+    }
+    $("settings-dlg").close();
+    toast(serverSaved ? T().st.savedServer : T().saved);
+    load();
+  };
+
+  // ── Notes ────────────────────────────────────────────────────────────────
+  /** Write with the token; on a refusal show `errorEl` or a toast. */
+  async function write(path, method, body) {
+    const token = store.get("driftnet-token");
+    const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+                                    ...(body ? { body: JSON.stringify(body) } : {}) }).catch(() => null);
+    if (res?.status === 401) { document.querySelectorAll("dialog[open]").forEach((d) => d.close()); askToken(); return null; }
+    if (!res?.ok) { toast(T().failed); return null; }
+    return res.json();
+  }
+
+  let noting = null;
+  function openItemNote(id) {
+    const item = find(id);
+    if (!item) return;
+    noting = id;
+    const t = T();
+    $("in-title").textContent = t.noteFor(nameOf(item));
+    $("in-help").textContent = t.noteHelp;
+    $("in-text").value = item.note ?? "";
+    $("in-cancel").textContent = t.cancel;
+    $("in-save").textContent = t.save;
+    $("note-dlg").showModal();
+    $("in-text").focus();
+  }
+  $("in-cancel").onclick = () => $("note-dlg").close();
+  $("note-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const saved = await write(`/api/items/${noting}/note`, "PUT", { note: $("in-text").value });
+    if (!saved) return;
+    $("note-dlg").close();
+    const item = find(noting);
+    item.note = saved.note;
+    const el = document.getElementById(`item-${noting}`);
+    if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${noting}`)); }
+    toast(T().saved);
+  };
+
+  /** A small, escape-first Markdown: headings, lists, quotes, code, bold, italics, links, and #12 → card 12. */
+  function md(src) {
+    const inline = (s) => esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, text, href) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`)
+      .replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g, (m, pre, href) => `${pre}<a href="${href}" target="_blank" rel="noopener noreferrer">${href}</a>`)
+      .replace(/(^|[^\w&;/])#(\d+)\b/g, (m, pre, id) => `${pre}<a href="#item-${id}" data-card="${id}">#${id}</a>`);
+    const out = [];
+    let list = false, code = null;
+    for (const line of String(src ?? "").split("\n")) {
+      if (code !== null) {
+        if (/^```/.test(line)) { out.push(`<pre><code>${esc(code)}</code></pre>`); code = null; } else code += (code ? "\n" : "") + line;
+        continue;
+      }
+      if (/^```/.test(line)) { code = ""; continue; }
+      const item = /^\s*[-*]\s+(.*)/.exec(line);
+      if (item) { if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${inline(item[1])}</li>`); continue; }
+      if (list) { out.push("</ul>"); list = false; }
+      const h = /^(#{1,3})\s+(.*)/.exec(line);
+      if (h) out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`);
+      else if (/^>\s?/.test(line)) out.push(`<blockquote>${inline(line.replace(/^>\s?/, ""))}</blockquote>`);
+      else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+    }
+    if (list) out.push("</ul>");
+    if (code !== null) out.push(`<pre><code>${esc(code)}</code></pre>`);
+    return out.join("");
+  }
+
+  async function renderNotes() {
+    const t = T();
+    notes = await api(`/api/notes${state.q ? `?q=${encodeURIComponent(state.q)}` : ""}`);
+    $("list").innerHTML = `<div class="bar"><span class="hint">${esc(t.noteBody)}</span><span class="spacer"></span>
+        <button class="btn primary" type="button" id="new-note">${esc(t.newNote)}</button></div>` +
+      (notes.length
+        ? notes.map((n) => `<button type="button" class="note-card" data-note="${n.id}"><h3>${esc(n.title || t.untitled)}</h3>
+            <div class="md">${md(n.body)}</div><div class="meta"><span>${esc(n.updatedAt.slice(0, 10))}</span></div></button>`).join("")
+        : `<div class="empty">${esc(t.emptyNotes)}</div>`);
+  }
+  let editingNote = null;
+  function openNote(id) {
+    const t = T();
+    const n = notes.find((x) => x.id === id);
+    editingNote = n ? n.id : null;
+    $("nd-title-l").textContent = t.noteTitle;
+    $("nd-body-l").textContent = t.noteBody;
+    $("nd-title").value = n?.title ?? "";
+    $("nd-body").value = n?.body ?? "";
+    const del = $("nd-delete");
+    del.hidden = !n; del.textContent = t.delNote; del.classList.remove("armed");
+    $("nd-cancel").textContent = t.cancel;
+    $("nd-save").textContent = t.save;
+    $("nd-error").textContent = "";
+    $("notes-dlg").showModal();
+    (n ? $("nd-body") : $("nd-title")).focus();
+  }
+  $("list").addEventListener("click", (e) => {
+    if (e.target.closest("#new-note")) return openNote(null);
+    // A #12 link inside a note opens the card, not the note.
+    const cardLink = e.target.closest("a[data-card]");
+    if (cardLink) { e.preventDefault(); e.stopPropagation(); return jumpTo(Number(cardLink.dataset.card)); }
+    if (e.target.closest("a")) return;
+    const n = e.target.closest("[data-note]");
+    if (n) openNote(Number(n.dataset.note));
+  });
+  $("nd-cancel").onclick = () => $("notes-dlg").close();
+  $("nd-delete").onclick = async () => {
+    const del = $("nd-delete");
+    if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = T().delNoteSure; return; }
+    if (await write(`/api/notes/${editingNote}`, "DELETE")) { $("notes-dlg").close(); load(); }
+  };
+  $("nd-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const body = { title: $("nd-title").value, body: $("nd-body").value };
+    const saved = editingNote ? await write(`/api/notes/${editingNote}`, "PUT", body) : await write("/api/notes", "POST", body);
+    if (saved) { $("notes-dlg").close(); load(); }
+  };
+  /** Show every card, then scroll to this one. */
+  function jumpTo(id) {
+    Object.assign(state, { view: "all", category: "", kind: "", q: "" });
+    $("q").value = "";
+    history.replaceState(null, "", `#item-${id}`);
+    load();
+  }
+
+  /** Downloads go through fetch so a private instance's token comes along. */
+  async function download(format) {
+    const token = store.get("driftnet-token");
+    const res = await fetch(`/api/export?format=${format}&lang=${locale}`, { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
+    if (res?.status === 401) return askToken();
+    if (!res?.ok) return toast(T().failed);
+    const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "driftnet-export";
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(await res.blob()), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
   async function render() {
     updateCrumb();
+    if (state.view === "notes") return renderNotes();
     const p = new URLSearchParams({ limit: "300" });
+    if (prefs.sort !== "best") p.set("sort", prefs.sort);
     if (state.view !== "all") p.set("view", state.view);
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
     items = await api(`/api/items?${p}`);
@@ -597,13 +974,16 @@
         </div>
         ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
         ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+        ${(i.said ?? []).slice(0, 2).map((x) => `<div class="said">${esc(x)}</div>`).join("")}
+        ${i.note ? `<div class="mynote">${esc(i.note)}</div>` : ""}
         ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
         ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
         <div class="meta">
           <span>#${i.id}</span><span>${esc(t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
           <span>${esc(i.createdAt.slice(0, 10))}</span>
           ${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}
-          ${s?.tags?.length ? `<span>${s.tags.map((x) => "#" + esc(x)).join(" ")}</span>` : ""}
+          ${s?.tags?.length ? `<span class="tags">${s.tags.map((x) => "#" + esc(x)).join(" ")}</span>` : ""}
+          ${inTrash ? "" : `<button class="link-btn" type="button" data-act="note">${esc(i.note ? t.editNote : t.addNote)}</button>`}
         </div>
         <div class="tools">${tools}</div>
       </article>
@@ -666,6 +1046,8 @@
   }
 
   $("list").addEventListener("click", (e) => {
+    const n = e.target.closest('.link-btn[data-act="note"]');
+    if (n) return openItemNote(Number(n.closest(".swipe").dataset.id));
     const b = e.target.closest(".tool");
     if (!b || b.dataset.grip) return;
     if (b.dataset.act === "move") return openMovePicker(Number(b.closest(".swipe").dataset.id));

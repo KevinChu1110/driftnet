@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadCategories } from "./categories.ts";
 import { JevJudge } from "./judge/jev.ts";
-import { Pipeline } from "./pipeline.ts";
+import { Pipeline, type Engines } from "./pipeline.ts";
 import { Store } from "./store.ts";
 import { createProvider } from "./llm/index.ts";
 import { Summarizer } from "./summarize.ts";
@@ -16,7 +16,8 @@ export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/inde
 export { guard } from "./guard.ts";
 export { Pipeline } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, loadCategories } from "./categories.ts";
-export { FolderError, Store, type Folder, type ListQuery, type Reputation } from "./store.ts";
+export { loadPlugins, type PluginApi } from "./plugins.ts";
+export { FolderError, Store, type Folder, type Note, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
 export { Summarizer } from "./summarize.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
@@ -31,7 +32,9 @@ export interface Driftnet {
   readonly categories: Record<string, string>;
   /** A folder's display name: the reader's name, or the built-in label in `locale`. */
   folderLabel(id: string, locale?: Locale): string;
-  engines: { judge: string; summarizer: string };
+  readonly engines: { judge: string; summarizer: string };
+  /** Rebuild the judge, model and rules from (new) settings without restarting. */
+  reconfigure(env?: NodeJS.ProcessEnv): { judge: string; summarizer: string };
   /** Configuration problems worth printing at startup. */
   warnings: string[];
 }
@@ -45,21 +48,14 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
     store.folders().find((f) => f.id === id)?.name ?? categoryLabel(id, locale);
   const choices = () => store.folderChoices((f) => f.name ?? categoryLabel(f.id, "en"));
 
-  const jevKey = env.TYPESAFE_API_KEY ?? readKeyFile(join(homedir(), ".typesafe", "api_key"));
-  const judge = jevKey && env.DRIFTNET_JUDGE !== "off" ? new JevJudge(jevKey) : undefined;
-
-  const llm = createProvider(env);
-  const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE ?? "English") : undefined;
-
+  let built = buildEngines(env);
   const pipeline = new Pipeline({
     store,
     get categories() {
       return choices();
     },
-    ...(judge ? { judge } : {}),
-    ...(summarizer ? { summarizer } : {}),
-    ...(env.DRIFTNET_MIN_CONFIDENCE ? { minConfidence: Number(env.DRIFTNET_MIN_CONFIDENCE) } : {}),
   });
+  pipeline.configure(built.engines);
   return {
     pipeline,
     store,
@@ -67,16 +63,39 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
       return choices();
     },
     folderLabel,
-    engines: {
-      judge: judge ? "jev" : summarizer ? "llm" : "heuristic",
-      summarizer: summarizer?.label ?? "off",
+    get engines() {
+      return built.labels;
+    },
+    reconfigure(next = env) {
+      built = buildEngines(next);
+      pipeline.configure(built.engines);
+      return built.labels;
     },
     warnings: [
       // Vendor variables are ignored on purpose (see llm/index.ts); say so instead of failing silently.
-      ...(!summarizer && (env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
+      ...(!built.engines.summarizer && (env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
         ? ["A vendor API key variable is set, but driftnet only reads DRIFTNET_LLM_PROVIDER / DRIFTNET_LLM_MODEL / DRIFTNET_LLM_API_KEY — summaries are off"]
         : []),
     ],
+  };
+}
+
+/** Judge, model and rules from settings; rebuilt when the settings page saves. */
+function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { judge: string; summarizer: string } } {
+  const jevKey = env.TYPESAFE_API_KEY || readKeyFile(join(homedir(), ".typesafe", "api_key"));
+  const judge = jevKey && env.DRIFTNET_JUDGE !== "off" ? new JevJudge(jevKey) : undefined;
+  const llm = createProvider(env);
+  const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "") : undefined;
+  const blockedDomains = (env.DRIFTNET_BLOCK_DOMAINS ?? "").split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^\*?\./, "")).filter(Boolean);
+  const minConfidence = env.DRIFTNET_MIN_CONFIDENCE ? Number(env.DRIFTNET_MIN_CONFIDENCE) : undefined;
+  return {
+    engines: {
+      ...(judge ? { judge } : {}),
+      ...(summarizer ? { summarizer } : {}),
+      ...(minConfidence !== undefined && Number.isFinite(minConfidence) ? { minConfidence } : {}),
+      ...(blockedDomains.length ? { blockedDomains } : {}),
+    },
+    labels: { judge: judge ? "jev" : summarizer ? "llm" : "heuristic", summarizer: summarizer?.label ?? "off" },
   };
 }
 

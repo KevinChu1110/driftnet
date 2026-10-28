@@ -2,7 +2,7 @@
   "name": "driftnet",
   "private": true,
   "type": "module",
-  "description": "Drop links into any chat. Get them sorted, explained and searchable \u2014 for a fraction of a cent each.",
+  "description": "Drop links into any chat. Get them sorted, explained and searchable — for a fraction of a cent each.",
   "license": "MIT",
   "engines": {
     "node": ">=22.13"
@@ -17,11 +17,13 @@
     "service:uninstall": "scripts/service.sh uninstall",
     "service:status": "scripts/service.sh status",
     "e2e:extension": "node apps/chrome-extension/e2e.mjs",
-    "e2e:web": "node apps/server/e2e/web.mjs"
+    "e2e:web": "node apps/server/e2e/web.mjs",
+    "build:npm": "node scripts/build-npm.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^5.8.0",
     "ws": "^8.22.0"

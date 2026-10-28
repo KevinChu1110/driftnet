@@ -18,7 +18,12 @@ export interface PipelineOptions {
   minConfidence?: number;
   /** Sources whose reputation falls below this (with ≥ 3 votes) are stored but not summarized. */
   minReputation?: number;
+  /** Links on these domains (and their subdomains) are refused. */
+  blockedDomains?: string[];
 }
+
+/** The parts of a pipeline that settings can change while it runs. */
+export type Engines = Pick<PipelineOptions, "judge" | "summarizer" | "minConfidence" | "blockedDomains">;
 
 /**
  * Link in → item out, spending as little as possible:
@@ -37,6 +42,19 @@ export class Pipeline {
   private readonly inflight = new Map<string, Promise<IngestResult>>();
 
   constructor(private readonly opts: PipelineOptions) {}
+
+  /** Swap the judge, model and rules in place; work already running finishes with the old ones. */
+  configure(engines: Engines): void {
+    for (const key of ["judge", "summarizer", "minConfidence", "blockedDomains"] as const) {
+      if (engines[key] === undefined) delete this.opts[key];
+      else (this.opts as unknown as Record<string, unknown>)[key] = engines[key];
+    }
+  }
+
+  private refused(url: string): boolean {
+    const host = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : "";
+    return (this.opts.blockedDomains ?? []).some((d) => host === d || host.endsWith(`.${d}`));
+  }
 
   /** Ingest every link in a chat message. The rest of the message becomes the note. */
   async ingestMessage(text: string, ctx: Omit<ShareContext, "note">): Promise<IngestResult[]> {
@@ -62,6 +80,7 @@ export class Pipeline {
   }
 
   async ingest(url: string, ctx: ShareContext, depth = 0, page?: PageContent): Promise<IngestResult> {
+    if (this.refused(url)) throw new BlockedUrl(`${new URL(url).hostname} is blocked in your settings`);
     const running = this.inflight.get(url);
     if (running && !page) {
       // Same link shared while it is being processed: wait, then count this share.
@@ -181,7 +200,7 @@ export class Pipeline {
 
   private async newReposFrom(page: PageContent | undefined, from: string, ctx: ShareContext): Promise<IngestResult[]> {
     const repos = [...new Set((page?.links ?? []).map((l) => canonicalize(l)).filter((l): l is string => !!l && !!matchGithub(l)))]
-      .filter((repo) => repo !== from && !this.opts.store.findByUrl(repo))
+      .filter((repo) => repo !== from && !this.refused(repo) && !this.opts.store.findByUrl(repo))
       .slice(0, 3);
     const out: IngestResult[] = [];
     for (const repo of repos) out.push(await this.ingest(repo, { ...ctx, note: `Linked from ${from}` }, 1));
@@ -232,7 +251,7 @@ export class Pipeline {
     for (const m of mentions.filter((m) => m.openSource).slice(0, 4)) {
       const repo = await findGithubRepo(m.name).catch(() => null);
       if (!repo || repo === digest.url) continue;
-      out.push(await this.ingest(repo, { ...ctx, note: `Mentioned in ${digest.url}` }, depth + 1));
+      if (!this.refused(repo)) out.push(await this.ingest(repo, { ...ctx, note: `Mentioned in ${digest.url}` }, depth + 1));
     }
     return out;
   }

@@ -64,6 +64,8 @@ export interface Item {
   trashedAt?: string;
   /** The agent that wrote the summary, when it came from the queue. */
   enrichedBy?: string;
+  /** The reader's own note. */
+  note?: string;
   createdAt: string;
   updatedAt: string;
 }

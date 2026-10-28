@@ -44,6 +44,11 @@ const seed = `
   for (const i of items) store.upsert({ url: i.url, aliases: [], title: i.title, flags: [], source: "demo", summary: i.summary,
     judgement: { isAiTool: 1, category: i.category, kind: i.kind, worth: i.worth, engine: "llm", confidence: 1 } });
   for (const [id, n] of [[1, 3], [2, 2], [4, 1]]) for (let k = 0; k < n; k++) store.recordShare(id, { platform: "line", chatId: "demo" });
+  // What a friend wrote with the link, the reader's own note, and a free-standing note.
+  store.recordShare(1, { platform: "line", chatId: "demo", note: zh ? "這個可以拿來管我們的 Hermes agent 團隊" : "Could run our Hermes agent team with this" });
+  store.setNote(2, zh ? "試過了，開專案很快；要搭配 pi agent。" : "Tried it — fast to open a repo; needs pi agent.");
+  store.saveNote({ title: zh ? "這週要試的工具" : "To try this week",
+    body: zh ? "- #1 管 agent 團隊\\n- #3 做 **ASCII** 動畫\\n\\n> 先在測試機上跑" : "- #1 for the agent team\\n- #3 for **ASCII** animations\\n\\n> Run it on the test box first" });
 `;
 const demo = JSON.parse(readFileSync(join(HERE, "demo-items.json"), "utf8"))[LANG];
 await new Promise((resolve, reject) => {
@@ -167,6 +172,59 @@ try {
     await open();
   }
   await shoot(`web-desktop-${LANG}.png`);
+
+  // Notes on a card, the notes page, settings and export.
+  {
+    const id = (await ids())[0];
+    await evaluate(s, `document.querySelector('#item-${id} .link-btn[data-act="note"]').click()`);
+    await waitFor(s, `document.getElementById("note-dlg").open`, "note dialog");
+    await evaluate(s, `(() => { document.getElementById("in-text").value = "remember: check the license"; document.getElementById("in-save").click(); return 1; })()`);
+    await waitFor(s, `document.querySelector('#item-${id} .mynote')?.textContent.includes("check the license")`, "note on the card");
+    assert.equal((await api(`/api/items/${id}`)).note, "remember: check the license");
+    assert.ok((await api("/api/items?q=license")).some((i) => i.id === id), "notes are searchable");
+    assert.ok((await api("/api/items")).find((i) => i.id === 1).said.length, "chat text comes with the item");
+    console.log("✓ a note on a card is saved, shown and searchable");
+
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="notes"]').click()`);
+    await waitFor(s, `document.querySelector(".note-card a[data-card]")`, "notes page with card links");
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    await sleep(300);
+    await shoot(`web-notes-${LANG}.png`);
+    await evaluate(s, `document.querySelector(".note-card a[data-card]").click()`);
+    await waitFor(s, `location.hash === "#item-1" && !!document.getElementById("item-1")`, "jump from a note to its card");
+    console.log("✓ notes page: #1 in a note opens card 1");
+
+    await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
+    await waitFor(s, `document.getElementById("settings-dlg").open && !!document.querySelector('[data-key="DRIFTNET_SUMMARY_RULES"]')`, "settings dialog");
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    await sleep(300);
+    await shoot(`web-settings-${LANG}.png`);
+    await evaluate(s, `(() => {
+      document.querySelector('[data-key="DRIFTNET_SUMMARY_RULES"]').value = "Say whether it is free.";
+      document.querySelector('[data-pref="sort"]').value = "newest";
+      document.querySelector('[data-pref="compact"]').checked = true;
+      document.getElementById("st-save").click(); return 1; })()`);
+    await waitFor(s, `!document.getElementById("settings-dlg").open && document.body.classList.contains("compact")`, "settings saved");
+    const saved = await api("/api/settings");
+    assert.equal(saved.settings.find((x) => x.key === "DRIFTNET_SUMMARY_RULES").value, "Say whether it is free.");
+    assert.match(readFileSync(join(home, ".env"), "utf8"), /DRIFTNET_SUMMARY_RULES=`Say whether it is free\.`/);
+    await waitFor(s, `document.querySelector(".swipe")?.dataset.id === "${demo.length}"`, "newest first");
+    // A foreign page can't change settings, even with no token set.
+    const csrf = await fetch(`http://127.0.0.1:${port}/api/settings`, { method: "PUT", headers: { "content-type": "application/json", origin: "https://evil.test" },
+      body: JSON.stringify({ values: { DRIFTNET_LLM_BASE_URL: "https://evil.test/v1" } }) });
+    assert.equal(csrf.status, 403);
+    const plain = await fetch(`http://127.0.0.1:${port}/api/settings`, { method: "PUT", headers: { "content-type": "text/plain" }, body: "{}" });
+    assert.equal(plain.status, 403, "no simple (preflight-free) requests");
+    await evaluate(s, `(() => { localStorage.removeItem("driftnet-prefs"); return 1; })()`);
+    console.log("✓ settings: saved to ~/.driftnet/.env, display options apply, cross-site writes refused");
+
+    const zipRes = await fetch(`http://127.0.0.1:${port}/api/export?format=vault`);
+    const buf = Buffer.from(await zipRes.arrayBuffer());
+    assert.equal(buf.readUInt32LE(0), 0x04034b50, "a zip");
+    assert.match(await (await fetch(`http://127.0.0.1:${port}/api/export`)).text(), /^# driftnet — /);
+    console.log("✓ export: Markdown and a zip vault");
+    await open();
+  }
 
   // Phone, with touch.
   await viewport(390, 844, true);
