@@ -230,6 +230,7 @@ All settings are environment variables. See [`.env.example`](.env.example).
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
 | `DRIFTNET_DB` | `./data/driftnet.db` | SQLite file |
 | `PORT` | `8787` | HTTP port |
+| `DRIFTNET_HOST` | `127.0.0.1` | Listen address. Put a reverse proxy in front to expose it, or use `0.0.0.0` in a container |
 
 **HTTP endpoints:** `GET /` web page · `GET /api/items` · `GET /api/items/:id` ·
 `POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·

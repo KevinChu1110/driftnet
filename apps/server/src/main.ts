@@ -14,6 +14,8 @@ import { llmsTxt, openApi } from "./feeds.ts";
 const env = process.env;
 const dn = createDriftnet();
 const PORT = Number(env.PORT ?? 8787);
+// Loopback by default: put a reverse proxy (Caddy, nginx, a tunnel) in front to expose it.
+const HOST = env.DRIFTNET_HOST ?? "127.0.0.1";
 const TOKEN = env.DRIFTNET_TOKEN;
 const indexHtml = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
 
@@ -137,8 +139,8 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`driftnet on http://localhost:${PORT}  judge=${dn.engines.judge}  summarizer=${dn.engines.summarizer}`);
+server.listen(PORT, HOST, () => {
+  console.log(`driftnet on http://${HOST}:${PORT}  judge=${dn.engines.judge}  summarizer=${dn.engines.summarizer}`);
   for (const w of dn.warnings) console.warn(`⚠️  ${w}`);
   if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);
   if (env.DISCORD_BOT_TOKEN) startDiscord(dn, env.DISCORD_BOT_TOKEN);

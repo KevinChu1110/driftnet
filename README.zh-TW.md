@@ -212,6 +212,7 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
 | `DRIFTNET_DB` | `./data/driftnet.db` | SQLite 檔案位置 |
 | `PORT` | `8787` | HTTP 埠號 |
+| `DRIFTNET_HOST` | `127.0.0.1` | 監聽位址。要對外請在前面加反向代理；在容器裡用 `0.0.0.0` |
 
 **HTTP 端點：** `GET /` 網頁 · `GET /api/items` · `GET /api/items/:id` ·
 `POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·
