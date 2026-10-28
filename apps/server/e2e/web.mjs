@@ -399,6 +399,21 @@ try {
     await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
     await shoot(`web-connect-${LANG}.png`);
     console.log("✓ connect cards: public URL and share key filled in, password left out");
+    await evaluate(s, `document.getElementById("cx-close").click()`);
+
+    // A phone that got a link from a bot: no password stored, only ?key= in the link.
+    await evaluate(s, `(() => { localStorage.removeItem("driftnet-token"); localStorage.removeItem("driftnet-key"); return 1; })()`);
+    await cdp("Page.navigate", { url: `http://127.0.0.1:${port}/?key=${key}#item-1` }, s);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "cards through a share-key link");
+    assert.equal(await evaluate(s, `location.search`), "", "the key is taken out of the address bar");
+    assert.equal(await evaluate(s, `location.hash`), "#item-1");
+    assert.equal(await evaluate(s, `localStorage.getItem("driftnet-key")`), key);
+    // Changing something asks for the password, with a way back to browsing.
+    await evaluate(s, `document.querySelector('#item-1 [data-act="favorite"]').click()`);
+    await waitFor(s, `!!document.getElementById("token-back")`, "password asked only to edit");
+    await evaluate(s, `document.getElementById("token-back").click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "back to browsing");
+    console.log("✓ a share-key link opens on a phone without a password; editing asks for it");
   }
 
   console.log("\nall web checks passed");

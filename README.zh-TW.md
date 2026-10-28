@@ -326,6 +326,7 @@ ChatGPT、Grok、架在伺服器上的 Hermes 或 OpenClaw）。伺服器只聽 
 1. **管理密碼。**自己取一組，或按「產生」；旁邊會顯示強弱。只能在這台電腦上設定。知道它的人可以新增、移動、刪除，所以不要沿用其他網站的密碼。
 2. **誰可以讀。**選「要有密碼或分享碼才能讀」，沒有就什麼都看不到。
 3. **唯讀分享碼。**給只會開連結的 AI：`…/llms.txt?key=…` 只能讀清單。外流就按「重新產生」。管理密碼永遠不能放在網址裡。
+   聊天機器人和 agent 給你的卡片連結會帶著它，手機點開不用輸入密碼；網頁會記住分享碼，並把它從網址列拿掉。
 4. **公開網址。**按一下就透過 Cloudflare 開一個臨時的 `https://….trycloudflare.com`（免帳號；
    [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
    要自己裝，driftnet 不會幫你下載）。必須先設密碼，開啟後讀取會改成私人，driftnet 關掉就跟著關。

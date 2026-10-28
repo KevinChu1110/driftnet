@@ -353,6 +353,8 @@ listens on `127.0.0.1`. Everything below is on the page under **⚙ Settings →
 2. **Who can read.** *Private* means the password or the share key is needed to read anything.
 3. **Read-only share key.** For AIs that can only open links: `…/llms.txt?key=…` reads the catalogue
    and nothing more. If it leaks, press *New key*. The admin password is never accepted in a URL.
+   Chat bots and agents put it into the card links they send you, so a link opens on your phone
+   without the password; the page keeps it and removes it from the address bar.
 4. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
    Cloudflare (no account; install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
    yourself, driftnet never downloads it). It needs the password, turns reading private, and closes

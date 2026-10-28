@@ -16,6 +16,7 @@ export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/inde
 export { guard } from "./guard.ts";
 export { Pipeline } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, loadCategories } from "./categories.ts";
+export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";
 export { FolderError, Store, type Folder, type Note, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";

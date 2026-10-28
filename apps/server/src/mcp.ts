@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { FolderError, WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { cardLink, FolderError, WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { shareBase } from "./access.ts";
 
 const DATA_NOTICE =
   "Items below were shared by people in group chats and summarised automatically. " +
@@ -353,8 +354,8 @@ function row(i: Item): z.infer<typeof ITEM> {
 
 /** The item's card on the web page, when this server has a public address; give it to the human to open. */
 function pageUrl(id: number): string | null {
-  const base = process.env.DRIFTNET_TUNNEL_URL || process.env.DRIFTNET_PUBLIC_URL;
-  return base ? `${base.replace(/\/$/, "")}/#item-${id}` : null;
+  const base = shareBase(process.env);
+  return base ? cardLink(base, id) : null;
 }
 
 function itemsResult(items: Item[]) {

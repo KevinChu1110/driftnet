@@ -59,3 +59,14 @@ test("the tunnel reads cloudflared's URL, and stops with it", async () => {
   assert.ok(!t.running);
   assert.equal(new Tunnel(8787, join(dir, "missing")).available(), false);
 });
+
+test("card links carry the share key only when reading is private", async () => {
+  const { shareBase } = await import("../src/access.ts");
+  const { cardLink } = await import("@driftnet/core");
+  assert.equal(shareBase({}), undefined);
+  assert.equal(shareBase({ DRIFTNET_PUBLIC_URL: "https://dn.example/" }), "https://dn.example");
+  assert.equal(shareBase({ ...env, DRIFTNET_PUBLIC_URL: "https://dn.example" }), `https://dn.example/?key=${env.DRIFTNET_READ_KEY}`);
+  assert.equal(shareBase({ ...env, DRIFTNET_PUBLIC_URL: "https://dn.example", DRIFTNET_TUNNEL_URL: "https://t.trycloudflare.com" }), `https://t.trycloudflare.com/?key=${env.DRIFTNET_READ_KEY}`);
+  assert.equal(cardLink("https://dn.example", 6), "https://dn.example/#item-6");
+  assert.equal(cardLink("https://dn.example/?key=abc", 6), "https://dn.example/?key=abc#item-6");
+});

@@ -26,7 +26,7 @@ export function renderText(
   lines.push(s?.primaryUrl || item.url);
   if (s?.mentions?.length) lines.push(t.mentions + s.mentions.map((m) => m.name).join(t.listSep));
   if (r.cached) lines.push(t.cached(item.shareCount));
-  if (baseUrl) lines.push(`${baseUrl}/#item-${item.id}`);
+  if (baseUrl) lines.push(cardLink(baseUrl, item.id));
   for (const rel of r.related ?? []) lines.push("", "↳ " + renderText(rel, baseUrl, t, label).replace(/\n/g, "\n  "));
   return lines.join("\n");
 }
@@ -44,7 +44,7 @@ export function renderLink(
 ): string {
   const { item } = r;
   const name = (item.summary?.name ?? item.title).slice(0, 80);
-  const where = baseUrl ? `${baseUrl}/#item-${item.id}` : item.summary?.primaryUrl || item.url;
+  const where = baseUrl ? cardLink(baseUrl, item.id) : item.summary?.primaryUrl || item.url;
   const found = (r.related ?? []).map((x) => x.item.summary?.name ?? x.item.title);
   return [
     `${WORTH_MARK[item.worth]} ${name}｜${label(item.category)}`,
@@ -53,4 +53,14 @@ export function renderLink(
     r.cached ? ` ${t.seenBefore}` : "",
     `\n${where}`,
   ].join("");
+}
+
+/**
+ * The item's card on the web page. The base may carry a query (a read-only
+ * share key, `https://host/?key=…`) so a phone can open it without a password.
+ */
+export function cardLink(baseUrl: string, id: number): string {
+  const u = new URL(baseUrl.replace(/\/$/, "") + (baseUrl.includes("?") ? "" : "/"));
+  u.hash = `item-${id}`;
+  return u.toString();
 }

@@ -63,6 +63,18 @@ export function isLocal(req: IncomingMessage): boolean {
   return loopback && host && !forwarded;
 }
 
+/**
+ * Where links to cards point: the public address, plus the read-only share key
+ * when reading is private, so a link sent to a phone opens without a password.
+ * The page stores the key and removes it from the address bar.
+ */
+export function shareBase(env: NodeJS.ProcessEnv): string | undefined {
+  const base = (env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL)?.replace(/\/$/, "");
+  if (!base) return undefined;
+  const k = readKey(env);
+  return isPrivate(env) && k ? `${base}/?key=${encodeURIComponent(k)}` : base;
+}
+
 /** 32 random characters, URL-safe. */
 export const newKey = () => randomBytes(24).toString("base64url");
 
