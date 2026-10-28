@@ -40,7 +40,13 @@ jobs:
 
       - name: Publish to npm
         working-directory: dist/npm
-        run: npm publish --provenance --access public
+        # Already on npm (published by hand)? Then only the steps below run.
+        run: |
+          if [ "$(npm view driftnet@$VERSION version 2>/dev/null)" = "$VERSION" ]; then
+            echo "driftnet@$VERSION is already on npm"
+          else
+            npm publish --provenance --access public
+          fi
 
       - name: Wait until npm serves it
         run: |
