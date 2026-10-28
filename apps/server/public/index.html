@@ -276,12 +276,19 @@
   .meter[data-s="weak"] i { width: 33%; background: var(--danger); }
   .meter[data-s="ok"] i { width: 66%; background: var(--star); }
   .meter[data-s="strong"] i { width: 100%; background: var(--ok); }
+  .tok { justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .tok.revoked { opacity: .55; }
+  .tok-name { display: grid; gap: 2px; min-width: 0; }
+  .tok .btn { flex: none; }
+  .keyrow select { min-height: 38px; flex: none; }
   .warn { background: var(--star-soft); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 4px 0 10px; }
   .warn.danger { background: var(--danger-soft); }
   .conn { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
   .conn h4 { margin: 0 0 4px; font-size: 15px; }
   .conn p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
   .conn pre { margin: 0; background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; white-space: pre; overflow-x: auto; }
+  .conn-mint { margin-top: 8px; }
+  .conn-mint .warn { margin: 0; }
   .conn-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .conn .copy { min-height: 36px; padding: 4px 12px; font-size: 13px; flex: none; }
   .welcome { background: var(--accent-soft); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
@@ -581,6 +588,11 @@
         accessMode: "Who can read", accessChoices: { "": "Anyone who can reach this page", public: "Anyone who can reach this page", private: "Only with the password or the share key" },
         shareKey: "Read-only share key", shareKeyHelp: "For AIs that can only open links (ChatGPT, Grok, Claude.ai): they can read your catalogue (notes included), nothing more. If it leaks, make a new one.",
         newShareKey: "New key", noShareKey: "No share key yet.",
+        agentTokens: "Agent tokens", agentTokensHelp: "One key per agent instead of the admin password. A write token can add, move and tidy; a read token can only look. Revoke one and only that agent is cut off; changing the admin password doesn't affect them.",
+        tokName: "Agent name", tokScope: "Access", tokScopes: { write: "Read and write", read: "Read only" }, tokCreate: "Create token",
+        tokNew: "New token for “{name}”", tokNewWarn: "Copy it now. It will not be shown again; only a fingerprint is kept.",
+        tokNone: "No tokens yet.", tokCreatedOn: "created", tokLastUsed: "last used", tokNever: "never", tokRevoke: "Revoke", tokRevoked: "revoked",
+        tokNameNeeded: "Give the token a name.", tokPasswordOnly: "Set an admin password first: tokens are what you give agents instead of it.",
         tunnel: "Public URL for cloud AIs", tunnelHelp: "Claude.ai, ChatGPT, Grok and agents on other machines can't reach localhost. This opens a temporary https address through Cloudflare (no account). It changes every time and closes when driftnet stops.",
         tunnelOn: "Open a public URL", tunnelOff: "Close it", tunnelNeedsPassword: "Save an admin password first.",
         tunnelInstall: "Needs cloudflared (driftnet never downloads it for you):", tunnelPrivate: "Opening it switches reading to “only with the password or the share key”.",
@@ -672,6 +684,11 @@
         accessMode: "誰可以讀", accessChoices: { "": "連得到這個網頁的人都可以", public: "連得到這個網頁的人都可以", private: "要有密碼或分享碼才能讀" },
         shareKey: "唯讀分享碼", shareKeyHelp: "給只會開連結的 AI（ChatGPT、Grok、Claude 網頁版）：只能讀你的清單（包含筆記），不能改。外流的話重產一組就好。",
         newShareKey: "重新產生", noShareKey: "還沒有分享碼。",
+        agentTokens: "Agent 專用金鑰", agentTokensHelp: "每個 agent 用自己的金鑰，不必拿管理密碼出去。可寫入的金鑰能收錄、搬移、整理；唯讀的只能看。撤銷其中一把只會斷掉那個 agent，換管理密碼也不影響它們。",
+        tokName: "Agent 名稱", tokScope: "權限", tokScopes: { write: "可讀寫", read: "唯讀" }, tokCreate: "建立金鑰",
+        tokNew: "「{name}」的新金鑰", tokNewWarn: "請現在複製。之後不會再顯示，系統只留下指紋。",
+        tokNone: "還沒有金鑰。", tokCreatedOn: "建立於", tokLastUsed: "最後使用", tokNever: "從未", tokRevoke: "撤銷", tokRevoked: "已撤銷",
+        tokNameNeeded: "請幫金鑰取個名字。", tokPasswordOnly: "請先設定管理密碼：金鑰就是用來取代它交給 agent 的。",
         tunnel: "給雲端 AI 的公開網址", tunnelHelp: "Claude 網頁版、ChatGPT、Grok 和其他機器上的 agent 連不到 localhost。這會透過 Cloudflare（免帳號）開一個臨時的 https 網址；每次都不一樣，driftnet 關掉就跟著關。",
         tunnelOn: "開啟公開網址", tunnelOff: "關閉", tunnelNeedsPassword: "要先儲存管理密碼。",
         tunnelInstall: "需要 cloudflared（driftnet 不會自動幫你下載）：", tunnelPrivate: "開啟後，「誰可以讀」會改成要有密碼或分享碼。",
@@ -1141,11 +1158,17 @@
 
   // ── Settings ─────────────────────────────────────────────────────────────
   let serverSettings = null;
+  /** The token just created: shown once in the Access tab, then gone. */
+  let justMinted = null;
   async function openSettings(welcome = false) {
     const t = T(), st = t.st;
     const token = store.get("driftnet-token");
     const res = await fetch("/api/settings", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
     serverSettings = res?.ok ? await res.json() : null;
+    // Agent tokens: only the admin password may list them, so a failure just hides the section.
+    const tokRes = serverSettings ? await fetch("/api/agent-tokens", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null) : null;
+    const agentTokens = tokRes?.ok ? await tokRes.json() : null;
+    const minted = justMinted; justMinted = null;
     const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(label)}</option>`;
     const local = `<fieldset class="set-group"><legend>${esc(st.display)}</legend>
       <label class="set-row"><span>${esc(st.sort)}</span><select data-pref="sort">${Object.entries(st.sorts).map(([k, v]) => opt(k, v, prefs.sort)).join("")}</select></label>
@@ -1174,7 +1197,7 @@
       const accessStatus = `<p class="set-status">${esc(st.accessStatus(yes(a.passwordSet), yes(a.readKey), a.tunnel.running ? a.tunnel.url : "—"))}</p>`;
       server = {
         general: group("language") + group("chat"),
-        access: accessStatus + accessPanel(serverSettings, field),
+        access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) : ""),
         ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,
       };
@@ -1259,6 +1282,25 @@
       <div class="set-row"><span>${esc(st.tunnel)}</span>${tun}<small>${esc(st.tunnelHelp)}</small>${t.error ? `<small class="dlg-error">${esc(t.error)}</small>` : ""}</div>
     </fieldset>`;
   }
+  function tokensPanel(a, tokens, minted) {
+    const st = T().st;
+    const when = (iso) => esc(iso.slice(0, 16).replace("T", " "));
+    const rows = tokens.length ? tokens.map((k) => `<div class="keyrow tok ${k.revokedAt ? "revoked" : ""}">
+        <span class="tok-name"><b>${esc(k.name)}</b> <span class="badge">${esc(st.tokScopes[k.scope])}</span>
+        <small>${esc(st.tokCreatedOn)} ${when(k.createdAt)} · ${esc(st.tokLastUsed)} ${k.lastUsedAt ? when(k.lastUsedAt) : esc(st.tokNever)}${k.revokedAt ? ` · ${esc(st.tokRevoked)}` : ""}</small></span>
+        ${k.revokedAt ? "" : `<button class="btn danger" type="button" data-revoke="${esc(k.id)}">${esc(st.tokRevoke)}</button>`}</div>`).join("")
+      : `<small>${esc(st.tokNone)}</small>`;
+    const box = minted ? `<div class="warn"><b>${esc(st.tokNew.replace("{name}", minted.name))}</b><br>${esc(st.tokNewWarn)}
+        <div class="keyrow"><input id="ac-newtok" readonly value="${esc(minted.token)}"><button class="btn" type="button" data-copy="#ac-newtok">${esc(st.copy)}</button></div></div>` : "";
+    const form = a.passwordSet
+      ? `<div class="keyrow"><input id="at-name" maxlength="60" placeholder="${esc(st.tokName)}" autocomplete="off" aria-label="${esc(st.tokName)}">
+          <select id="at-scope" aria-label="${esc(st.tokScope)}">${["write", "read"].map((c) => `<option value="${c}">${esc(st.tokScopes[c])}</option>`).join("")}</select>
+          <button class="btn primary" type="button" id="at-create">${esc(st.tokCreate)}</button></div>`
+      : `<small>${esc(st.tokPasswordOnly)}</small>`;
+    return `<fieldset class="set-group" id="agent-tokens"><legend>${esc(st.agentTokens)}</legend>
+      <small>${esc(st.agentTokensHelp)}</small>${box}
+      <div class="set-row">${rows}</div><div class="set-row">${form}</div></fieldset>`;
+  }
   async function adminFetch(path, method, body) {
     const token = store.get("driftnet-token");
     const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
@@ -1267,6 +1309,10 @@
     if (!res?.ok) { $("st-error").textContent = friendlyError(data?.error) ?? T().failed; return null; }
     return data;
   }
+  // Enter in the token name creates the token; it must not submit the whole settings form.
+  $("st-body").addEventListener("keydown", (e) => {
+    if (e.target.id === "at-name" && e.key === "Enter") { e.preventDefault(); $("at-create").click(); }
+  });
   $("st-body").addEventListener("input", (e) => {
     if (e.target.id !== "ac-pw") return;
     const pw = e.target.value, s = pw ? pwStrength(pw) : "";
@@ -1295,6 +1341,15 @@
       // Whatever was typed (a new password, private reading) is saved first, not thrown away.
       if (!(await saveSettings())) return;
       if (await adminFetch("/api/read-key", "POST", {})) openSettings();
+    } else if (b.id === "at-create") {
+      const name = $("at-name").value.trim();
+      if (!name) { $("st-error").textContent = st.tokNameNeeded; return; }
+      // Whatever was typed elsewhere in Settings is saved first, not thrown away by the redraw.
+      if (!(await saveSettings())) return;
+      const made = await adminFetch("/api/agent-tokens", "POST", { name, scope: $("at-scope").value });
+      if (made) { justMinted = made; openSettings(); }
+    } else if (b.dataset.revoke) {
+      if (await adminFetch(`/api/agent-tokens/${encodeURIComponent(b.dataset.revoke)}`, "DELETE")) openSettings();
     } else if (b.id === "ac-tunnel") {
       if (b.dataset.on === "1" && !(await saveSettings())) return;
       b.disabled = true; b.textContent = b.dataset.on === "1" ? st.tunnelStarting : b.textContent;
@@ -1871,14 +1926,18 @@
     const key = a?.readKey || (zh ? "<唯讀分享碼>" : "<share-key>");
     const pw = zh ? "<你的管理密碼>" : "<your-admin-password>";
     const withKey = (u) => (a?.private || a?.readKey ? `${u}?key=${key}` : u);
-    const card = (id, title, desc, code) => `<div class="conn"><div class="conn-head"><h4>${esc(title)}</h4>
-      <button class="btn copy" type="button" data-copy="#cx-${id}">${esc(st.copy)}</button></div><p>${esc(desc)}</p><pre id="cx-${id}">${esc(code)}</pre></div>`;
+    // With an admin password set, agent cards offer their own token instead of the password.
+    const canMint = !!a?.passwordSet;
+    const secrets = {};
+    const card = (id, title, desc, code, agent) => `<div class="conn" id="cc-${id}"><div class="conn-head"><h4>${esc(title)}</h4>
+      <button class="btn copy" type="button" data-copy="#cx-${id}">${esc(st.copy)}</button></div><p>${esc(desc)}</p><pre id="cx-${id}">${esc(code)}</pre>
+      ${agent && canMint ? `<div class="conn-mint"><button class="btn" type="button" data-mint="${id}" data-agent="${esc(agent)}">${esc(zh ? "幫這個 agent 建一把專用金鑰" : "Create a token for this agent")}</button></div>` : ""}</div>`;
     const cards = [
       card("ccp", zh ? "Claude Code：裝插件" : "Claude Code: the plugin", zh ? "在 Claude Code 裡輸入。會裝好 skill 和本機 MCP。" : "Type it inside Claude Code. Brings the skill and a local MCP server.",
         `/plugin install driftnet --marketplace KevinChu1110/driftnet`),
       card("cc", zh ? "Claude Code：連到這個 driftnet" : "Claude Code: connect to this driftnet",
         zh ? "在終端機執行。先 export DRIFTNET_TOKEN=你的管理密碼，指令會自動帶入。" : "Run in a terminal. Export DRIFTNET_TOKEN=<your admin password> first; the command reads it.",
-        `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer $DRIFTNET_TOKEN"`),
+        `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer $DRIFTNET_TOKEN"`, "Claude Code"),
       card("claude", zh ? "Claude 網頁版／桌面版（自訂 connector）" : "Claude.ai / Claude Desktop (custom connector)",
         zh ? "設定 → Connectors → 新增自訂 connector，貼上這個網址。用分享碼連線，只能搜尋和查看，不能改。" : "Settings → Connectors → Add custom connector, paste this URL. The share key makes it read-only: search and look, no changes.",
         withKey(`${base}/mcp`)),
@@ -1890,8 +1949,13 @@
         zh ? `讀一下 ${withKey(`${base}/llms.txt`)} ，這是我收藏的 AI 工具清單。幫我找適合「（你的需求）」的工具。`
            : `Read ${withKey(`${base}/llms.txt`)} — it's my catalogue of AI tools. Find me one for: (your task).`),
       card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。把裡面的 <你的管理密碼> 換成真的密碼；有了它，agent 可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. Replace <your-admin-password> with the real one; with it they can save, vote and work the queue.",
-        JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2)),
+        JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2), "Hermes"),
     ].join("");
+    // What each agent card shows once it has its own token.
+    snippets = {
+      cc: (tok) => `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer ${tok}"`,
+      agents: (tok) => JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${tok}` } } } }, null, 2),
+    };
     const warn = isLocalUrl
       ? `<p class="warn">${esc(zh ? "這個網址只有這台電腦連得到。雲端的 AI（Claude 網頁版、ChatGPT、Grok、別台機器上的 agent）請先到「設定 → 存取」開公開網址。"
           : "This address only works on this computer. For cloud AIs (Claude.ai, ChatGPT, Grok, agents on other machines), open a public URL first: Settings → Access.")}</p>` : "";
@@ -1901,9 +1965,24 @@
     $("cx-close").textContent = t.close;
     $("connect-dlg").showModal();
   }
+  let snippets = {};
   $("cx-close").onclick = () => $("connect-dlg").close();
   $("connect-dlg").addEventListener("click", async (e) => {
     if (e.target === $("connect-dlg")) return $("connect-dlg").close();
+    const mint = e.target.closest("button[data-mint]");
+    if (mint) {
+      const zh = locale === "zh-TW", id = mint.dataset.mint, agent = mint.dataset.agent;
+      const token = store.get("driftnet-token");
+      mint.disabled = true;
+      const res = await fetch("/api/agent-tokens", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ name: agent, scope: "write" }) }).catch(() => null);
+      const made = res?.ok ? await res.json().catch(() => null) : null;
+      if (!made) { mint.disabled = false; toast(T().failed); return; }
+      $(`cx-${id}`).textContent = snippets[id](made.token);
+      mint.closest(".conn-mint").innerHTML = `<p class="warn">${esc(zh ? `已建立「${agent}」專用金鑰，已填進上面的設定。請現在複製：之後不會再顯示。不用時到「設定 → 存取」撤銷。`
+        : `Token “${agent}” created and filled in above. Copy it now: it will not be shown again. Revoke it in Settings → Access when you no longer need it.`)}</p>`;
+      return;
+    }
     const b = e.target.closest("button[data-copy]");
     if (!b) return;
     await navigator.clipboard?.writeText($("cx-body").querySelector(b.dataset.copy).textContent).catch(() => {});
