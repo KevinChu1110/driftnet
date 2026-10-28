@@ -82,6 +82,7 @@ export class Pipeline {
     if (judged) {
       usage.judgeInputTokens += judged.inputTokens;
       usage.costUsd += judged.costUsd;
+      store.logUsage({ step: "judge", model: judged.model, url: digest.url, inputTokens: judged.inputTokens, costUsd: judged.costUsd });
     }
     if (judged && trusted) {
       judgement = judged.judgement;
@@ -93,6 +94,10 @@ export class Pipeline {
       const r = await this.opts.summarizer.summarize(
         digest, cleanedNote.text, judgement ? undefined : this.opts.categories,
       );
+      store.logUsage({
+        step: "summary", model: r.model, url: digest.url, inputTokens: r.inputTokens, cachedTokens: r.cachedTokens,
+        outputTokens: r.outputTokens, costUsd: r.costUsd, ok: !r.error,
+      });
       summary = r.summary;
       judgement ??= r.judgement ?? null;
       usage.llmInputTokens += r.inputTokens;

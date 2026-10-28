@@ -82,11 +82,35 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-cp .env.example .env   # add ANTHROPIC_API_KEY, and the chat platforms you use
+cp .env.example .env   # add DRIFTNET_ANTHROPIC_API_KEY, and the chat platforms you use
 pnpm dev               # http://localhost:8787
 ```
 
 Requires Node.js 22.13+ (uses the built-in `node:sqlite`).
+
+> [!NOTE]
+> The key variable is `DRIFTNET_ANTHROPIC_API_KEY`, not `ANTHROPIC_API_KEY`. If you export the
+> latter, Claude Code picks it up and switches from your subscription to API billing.
+
+The startup line shows which models are actually in effect
+(`judge=jev  summarizer=claude-haiku-5-5 / low`). Override with `DRIFTNET_SUMMARY_MODEL` and
+`DRIFTNET_SUMMARY_EFFORT`; a mistyped effort falls back to `low` with a warning instead of
+silently breaking every summary.
+
+## What it costs, and where your data goes
+
+Every paid call (judge or summary, failed ones included) is logged. The **Cost** tab on the web
+page shows spend per month, step and model, the average per item, and how many repeat shares
+the cache served for free. Figures are estimates from list prices; your provider's bill is
+authoritative.
+
+> [!IMPORTANT]
+> "Self-hosted" describes storage, not the models. The database lives on your server. But to
+> judge and summarise a link, driftnet sends a **digest** of it (title, a clipped excerpt, the
+> chat note it was shared with) to **TypeSafe** (Jev, if `TYPESAFE_API_KEY` is set) and to
+> **Anthropic** (if `DRIFTNET_ANTHROPIC_API_KEY` is set), under their API terms. Chat messages
+> without a link are never processed or stored. Set `DRIFTNET_JUDGE=off` /
+> `DRIFTNET_SUMMARIZER=off` and nothing goes to a model provider; items are then only extracted and listed.
 
 | Platform | Needs | Public URL? |
 |---|---|---|

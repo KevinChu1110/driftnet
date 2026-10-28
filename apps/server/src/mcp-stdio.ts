@@ -6,4 +6,5 @@ import { createMcpServer } from "./mcp.ts";
 // stdout is the protocol channel, so route logs to stderr.
 console.log = console.error;
 const dn = createDriftnet();
+for (const w of dn.warnings) console.error(`⚠️  ${w}`);
 await createMcpServer(dn, process.env.DRIFTNET_AGENT ?? "local").connect(new StdioServerTransport());

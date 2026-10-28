@@ -12,6 +12,7 @@ export interface Judge {
 
 export interface JudgeResult {
   judgement: Judgement;
+  model: string;
   inputTokens: number;
   costUsd: number;
   /** Extra pollution flags the judge spotted (e.g. "injection"). */

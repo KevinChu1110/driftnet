@@ -70,6 +70,7 @@ export class JevJudge implements Judge {
           engine: "jev",
           confidence: a.category.confidence,
         },
+        model: "jev-latest",
         inputTokens,
         costUsd: inputTokens * INPUT_PRICE,
         ...(a.aimed_at_ai?.type === "noul" && a.aimed_at_ai.noul >= 0.7 ? { flags: ["injection"] } : {}),

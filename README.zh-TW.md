@@ -49,11 +49,30 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-cp .env.example .env   # 填 ANTHROPIC_API_KEY 和要用的聊天平台；DRIFTNET_LANGUAGE="Traditional Chinese (Taiwan)"
+cp .env.example .env   # 填 DRIFTNET_ANTHROPIC_API_KEY 和要用的聊天平台；DRIFTNET_LANGUAGE="Traditional Chinese (Taiwan)"
 pnpm dev               # http://localhost:8787
 ```
 
 需要 Node.js 22.13 以上（使用內建的 `node:sqlite`）。各平台設定見英文版 README。
+
+> [!NOTE]
+> 金鑰變數是 `DRIFTNET_ANTHROPIC_API_KEY`，**刻意不用** `ANTHROPIC_API_KEY`：後者一旦 export，
+> Claude Code 也會讀到，從訂閱額度改走 API 計費。
+
+啟動時會印出實際生效的模型（`judge=jev  summarizer=claude-haiku-5-5 / low`）。可用
+`DRIFTNET_SUMMARY_MODEL`、`DRIFTNET_SUMMARY_EFFORT` 覆寫；effort 打錯字會退回 `low` 並提醒，
+不會讓每次摘要都默默失敗。
+
+## 花多少錢、資料去哪裡
+
+每次付費呼叫（判斷或摘要，失敗的也算）都會記帳。網頁的 **Cost** 分頁按月、步驟、模型列出花費，
+每則平均成本，以及快取幫你省下多少次重複分享。數字是依牌價估算，實際以供應商帳單為準。
+
+> [!IMPORTANT]
+> 「自架」指的是儲存，不是模型。資料庫在你自己的伺服器上；但判斷和摘要時，driftnet 會把連結的
+> **摘錄**（標題、截短的內文、分享時附的聊天文字）送到 **TypeSafe**（有設 `TYPESAFE_API_KEY` 時，Jev）
+> 和 **Anthropic**（有設 `DRIFTNET_ANTHROPIC_API_KEY` 時），適用各家 API 條款。沒有連結的聊天訊息
+> 不會被處理或儲存。設 `DRIFTNET_JUDGE=off`／`DRIFTNET_SUMMARIZER=off` 就不會送任何內容給模型供應商，只做擷取和列表。
 
 ## 待辦（歡迎貢獻）
 

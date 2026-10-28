@@ -40,6 +40,16 @@
   .meta { color: var(--muted); font-size: 13px; display: flex; gap: 12px; flex-wrap: wrap; }
   .flag { color: var(--warn); font-size: 13px; }
   .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+  .tab { color: var(--accent); font-size: 14px; text-decoration: none; }
+  .usage h2 { font-size: 16px; margin: 4px 0 8px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .kpi .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:nth-child(-n+3), td:nth-child(-n+3) { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
   @media (max-width: 720px) {
     .layout { grid-template-columns: 1fr; }
     nav { position: static; border-right: 0; border-bottom: 1px solid var(--line); max-height: none; display: flex; overflow-x: auto; gap: 4px; padding: 8px 16px; }
@@ -54,6 +64,7 @@
 <header>
   <h1>driftnet</h1>
   <span class="stats" id="stats"></span>
+  <a class="tab" href="#usage" id="usage-link">Cost</a>
   <input id="q" type="search" placeholder="Search tools, tags, links…" aria-label="Search">
 </header>
 <div class="layout">
@@ -83,6 +94,7 @@
       const b = e.target.closest("button");
       if (!b) return;
       state[b.dataset.field] = b.dataset.value;
+      if (location.hash === "#usage") history.replaceState(null, "", location.pathname);
       $("nav").querySelectorAll(`[data-field="${b.dataset.field}"]`).forEach((x) => x.setAttribute("aria-pressed", x === b));
       render();
     };
@@ -90,6 +102,7 @@
   }
 
   async function render() {
+    if (location.hash === "#usage") return renderUsage();
     const p = new URLSearchParams({ limit: "300" });
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
     const items = await fetch(`/api/items?${p}`).then((r) => r.json());
@@ -117,8 +130,40 @@
     </article>`;
   }
 
+  const usd = (n) => "$" + (n < 0.01 ? n.toFixed(6) : n.toFixed(4));
+  const num = (n) => Number(n ?? 0).toLocaleString();
+
+  async function renderUsage() {
+    const u = await fetch("/api/usage").then((r) => r.json());
+    const kpi = (v, l) => `<div class="card kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+    $("list").innerHTML = `<section class="usage">
+      <div class="kpis">
+        ${kpi(usd(u.totalUsd), "Spent in total (estimate)")}
+        ${kpi(usd(u.avgPerItemUsd), "Per item")}
+        ${kpi(num(u.items), "Items")}
+        ${kpi(num(u.cacheHits), "Repeat shares served free")}
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h2>By month</h2>
+        <div class="scroll"><table>
+          <thead><tr><th>Month</th><th>Step</th><th>Model</th><th>Calls</th><th>Failed</th><th>Input</th><th>Cached</th><th>Output</th><th>Cost</th></tr></thead>
+          <tbody>${u.rows.map((r) => `<tr><td>${esc(r.month)}</td><td>${esc(r.step)}</td><td>${esc(r.model)}</td>
+            <td>${num(r.calls)}</td><td>${num(r.failed)}</td><td>${num(r.input_tokens)}</td><td>${num(r.cached_tokens)}</td>
+            <td>${num(r.output_tokens)}</td><td>${usd(r.cost_usd)}</td></tr>`).join("") || `<tr><td colspan="9">No paid calls yet.</td></tr>`}</tbody>
+        </table></div>
+        <p class="meta">judge: ${esc(u.engines.judge)} · summary: ${esc(u.engines.summarizer)} · Estimated from list prices; your provider's bill is authoritative.</p>
+      </div>
+    </section>`;
+  }
+
+  window.addEventListener("hashchange", () => { if (location.hash === "#usage" || !location.hash.startsWith("#item-")) render(); });
+
   let t;
-  $("q").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 200); };
+  $("q").oninput = (e) => { clearTimeout(t); t = setTimeout(() => {
+    state.q = e.target.value.trim();
+    if (location.hash === "#usage") history.replaceState(null, "", location.pathname);
+    render();
+  }, 200); };
   load();
 </script>
 </body>

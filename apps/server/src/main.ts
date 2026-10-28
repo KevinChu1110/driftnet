@@ -50,6 +50,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
     if (req.method === "GET" && path === "/api/stats") return send(res, 200, { ...dn.store.stats(), engines: dn.engines });
+    if (req.method === "GET" && path === "/api/usage") return send(res, 200, { ...dn.store.usageReport(), engines: dn.engines });
 
     if (req.method === "GET" && path === "/api/items") {
       const p = url.searchParams;
@@ -136,6 +137,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`driftnet on http://localhost:${PORT}  judge=${dn.engines.judge}  summarizer=${dn.engines.summarizer}`);
+  for (const w of dn.warnings) console.warn(`⚠️  ${w}`);
   if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);
   if (env.DISCORD_BOT_TOKEN) startDiscord(dn, env.DISCORD_BOT_TOKEN);
   if (env.LINE_CHANNEL_SECRET) console.log("[line] webhook at /webhooks/line");

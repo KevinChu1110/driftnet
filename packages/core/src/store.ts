@@ -17,6 +17,29 @@ export interface Reputation {
   score: number;
 }
 
+export interface UsageRow {
+  step: "judge" | "summary";
+  model: string;
+  url: string;
+  inputTokens: number;
+  cachedTokens?: number;
+  outputTokens?: number;
+  costUsd: number;
+  ok?: boolean;
+}
+
+export interface UsageReport {
+  rows: {
+    month: string; step: string; model: string; calls: number; failed: number;
+    input_tokens: number; cached_tokens: number; output_tokens: number; cost_usd: number;
+  }[];
+  totalUsd: number;
+  items: number;
+  /** Shares served from the cache instead of being processed again. */
+  cacheHits: number;
+  avgPerItemUsd: number;
+}
+
 export interface ListQuery {
   q?: string;
   category?: string;
@@ -74,6 +97,19 @@ export class Store {
         at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         UNIQUE (item_id, voter)
       );
+      CREATE TABLE IF NOT EXISTS usage_log (
+        id INTEGER PRIMARY KEY,
+        at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        step TEXT NOT NULL,
+        model TEXT NOT NULL,
+        url TEXT NOT NULL,
+        input_tokens INTEGER NOT NULL,
+        cached_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cost_usd REAL NOT NULL,
+        ok INTEGER NOT NULL DEFAULT 1
+      );
+      CREATE INDEX IF NOT EXISTS usage_log_at ON usage_log(at);
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
     `);
@@ -148,6 +184,45 @@ export class Store {
       )
       .get(source) as { up: number; down: number };
     return { source, up: r.up, down: r.down, score: (r.up + 1) / (r.up + r.down + 2) };
+  }
+
+  /** One row per paid call (judge or summary), including failed ones — they cost too. */
+  logUsage(row: UsageRow): void {
+    this.db
+      .prepare(
+        `INSERT INTO usage_log (step, model, url, input_tokens, cached_tokens, output_tokens, cost_usd, ok)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(row.step, row.model, row.url, row.inputTokens, row.cachedTokens ?? 0, row.outputTokens ?? 0, row.costUsd, row.ok === false ? 0 : 1);
+  }
+
+  /**
+   * Spend per month and step, newest first, plus what the cache saved: every
+   * share after the first is a link we did not pay for again.
+   */
+  usageReport(months = 6): UsageReport {
+    const rows = this.db
+      .prepare(
+        `SELECT substr(at, 1, 7) AS month, step, model, COUNT(*) AS calls, SUM(1 - ok) AS failed,
+                SUM(input_tokens) AS input_tokens, SUM(cached_tokens) AS cached_tokens,
+                SUM(output_tokens) AS output_tokens, SUM(cost_usd) AS cost_usd
+         FROM usage_log GROUP BY month, step, model ORDER BY month DESC, step LIMIT ?`,
+      )
+      .all(months * 4) as unknown as UsageReport["rows"];
+    const t = this.db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM items) AS items,
+                (SELECT COALESCE(SUM(share_count), 0) FROM items) AS shares,
+                (SELECT COALESCE(SUM(cost_usd), 0) FROM usage_log) AS total`,
+      )
+      .get() as { items: number; shares: number; total: number };
+    return {
+      rows,
+      totalUsd: t.total,
+      items: t.items,
+      cacheHits: Math.max(0, t.shares - t.items),
+      avgPerItemUsd: t.items ? t.total / t.items : 0,
+    };
   }
 
   /** Net votes per item, for hiding items the community voted down. */
