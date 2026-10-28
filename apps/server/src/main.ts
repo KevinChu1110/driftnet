@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { bulkAction, bulkUndo } from "./bulk.ts";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
@@ -194,6 +195,13 @@ const server = createServer(async (req, res) => {
         throw err;
       }
       return send(res, 405, { error: "method not allowed" });
+    }
+    // Many cards at once (multi-select in the page); each call is one transaction and returns what undo needs.
+    if (req.method === "POST" && (path === "/api/items/bulk" || path === "/api/items/bulk/undo")) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const body = await readJson<unknown>(req);
+      const out = path === "/api/items/bulk" ? bulkAction(dn.store, body) : bulkUndo(dn.store, body);
+      return send(res, out.status, out.body);
     }
     const moveMatch = /^\/api\/items\/(\d+)\/move$/.exec(path);
     if (req.method === "POST" && moveMatch) {

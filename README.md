@@ -125,10 +125,15 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
 - **Mind map.** Folders branch out on both sides of the root like XMind, a colour per branch (one tap
   switches to everything on the right). Tap a folder to open
   it, tap a card to preview it, and drag a card onto a folder to file it (on a phone, hold it a moment
-  first, so a quick swipe still pans). Drag a folder onto another to nest it. Search highlights the
-  matches; big folders fold into “+N”.
+  first, so a quick swipe still pans). Shift-click adds cards to a selection (on a phone, hold one, let
+  go, then tap more cards) and dragging any of them onto a folder files them all. Drag a folder onto
+  another to nest it. Search highlights the matches; big folders fold into “+N”.
 - **Swipe right** to add a favorite, **swipe left** to move to the trash; a short swipe does nothing,
   and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.
+- **Select many cards.** `x` selects the focused card, Shift-click selects a range, and on a phone a long
+  press (about half a second) starts selecting. A bar at the bottom then offers **Move to…**, ★, **Trash**
+  (**Restore** in the trash), **Select all** and **Clear**; `Esc` clears. The whole batch is one change,
+  and one **Undo** puts every card back exactly where it was.
 - **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
   agents and `/llms.txt` too; if someone shares one again, it comes back.
 - **Notes.** 📝 on any card for your own note (tried it? needs a GPU?). What people wrote with the link
@@ -143,7 +148,9 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   key, so it opens on a phone without a password; edit buttons appear after **Unlock** with the admin
   password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
 - **Keyboard.** `j`/`k` step through cards, `f` favorite, `m` move (type to find the folder), `n` note,
-  `#` trash, `z` undo, `/` search, `g m` mind map, `?` the list.
+  `#` trash, `x` select, `z` undo, `/` search, `g m` mind map, `?` the list. `1`–`9` file the focused card
+  (or the selection) into the nine folders you file into most; `?` shows which number is which, and the
+  **Move to…** picker marks them too.
 - **Add to Home Screen** to open it like an app.
 
 <p align="center"><img src="assets/map-en.jpg" alt="The mind map: folders branching out from driftnet, cards under them, the read-only view on a phone" width="100%"></p>

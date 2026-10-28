@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { cardLink, FolderError, WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { cardLink, FolderError, ItemError, WORTH, type Driftnet, type Item } from "@driftnet/core";
 import { shareBase } from "./access.ts";
 
 const DATA_NOTICE =
@@ -268,21 +268,25 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     {
       title: "Move an item to a folder",
       description:
-        "File an item into one of the reader's folders, e.g. when it was sorted into the wrong one. " +
-        "The placement is treated as the reader's choice: automatic classification will not move the item again. " +
-        "Moving an item to the folder it is already in changes nothing. Fails if the item or the folder does not exist.",
+        "File an item, or several at once, into one of the reader's folders, e.g. when they were sorted into the wrong one. " +
+        "Pass either id (one item) or ids (up to 500, moved all-or-nothing in one go). " +
+        "The placement is treated as the reader's choice: automatic classification will not move the items again. " +
+        "Moving an item to the folder it is already in changes nothing. Fails if any item or the folder does not exist, and then nothing moves.",
       inputSchema: {
-        id: z.number().int().positive().describe("Item id to move"),
+        id: z.number().int().positive().optional().describe("Item id to move; give this or ids, not both"),
+        ids: z.array(z.number().int().positive()).min(1).max(500).optional().describe("Item ids to move together (1-500); give this or id, not both"),
         folder: z.string().describe("Target folder id from driftnet_list_folders"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ id, folder }) => {
+    async ({ id, ids, folder }) => {
+      if ((id === undefined) === (ids === undefined)) return { content: [{ type: "text", text: "Give exactly one of id or ids." }], isError: true };
+      const list = [...new Set(ids ?? [id!])];
       try {
-        return dn.store.moveItem(id, folder, opts.actor)
-          ? { content: [{ type: "text", text: `Moved ${id} to ${dn.categories[folder]}.` }] }
-          : { content: [{ type: "text", text: `No item ${id}.` }], isError: true };
+        dn.store.moveItems(list, folder, opts.actor);
+        return { content: [{ type: "text", text: list.length === 1 ? `Moved ${list[0]} to ${dn.categories[folder]}.` : `Moved ${list.length} items to ${dn.categories[folder]}.` }] };
       } catch (err) {
+        if (err instanceof ItemError) return { content: [{ type: "text", text: `No item ${err.message.replace("no item ", "")}.` }], isError: true };
         if (err instanceof FolderError) return { content: [{ type: "text", text: err.message }], isError: true };
         throw err;
       }

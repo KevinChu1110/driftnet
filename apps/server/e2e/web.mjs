@@ -291,6 +291,23 @@ try {
     console.log("✓ phone: 📁 picker moves a card, undo moves it back");
   }
 
+  // Holding a card (~0.5 s) starts selecting; a tap on another card adds it; Clear ends it.
+  {
+    const [a, b] = await ids();
+    const at = await evaluate(s, `(() => { const r = document.querySelector('#item-${a} .card').getBoundingClientRect(); return { x: r.x + 40, y: r.bottom - 10 }; })()`);
+    await cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at] }, s);
+    await sleep(700);
+    await cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }, s);
+    await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 1 && !document.getElementById("selbar").hidden`, "long press selects");
+    await evaluate(s, `document.querySelector('#item-${b} .card .meta span').scrollIntoView({ block: "center" })`);
+    await tap(`#item-${b} .card .meta span`);
+    await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 2`, "a tap adds a card while selecting");
+    await evaluate(s, `document.querySelector('#selbar [data-sel="clear"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 0 && document.getElementById("selbar").hidden`, "cleared");
+    await evaluate(s, `scrollTo(0, 0)`);
+    console.log("✓ phone: a long press starts selecting cards");
+  }
+
   // A picture mid-swipe, then let go short of the threshold: nothing happens.
   {
     const box = await evaluate(s, `(() => { const r = document.querySelector('#item-${first} .card').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + 30 }; })()`);
@@ -359,6 +376,58 @@ try {
   assert.equal((await api("/api/stats")).trash, before, "scrolling must not trash a card");
   console.log("✓ a vertical drag is a scroll, not a swipe");
   void box;
+
+  // Select three cards (x, then Shift-click the third), move them together, undo; then a number key files a card.
+  {
+    await viewport(1280, 820, false);
+    await open();
+    const key = async (k) => {
+      const text = k.length === 1 ? k : undefined;
+      await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: k, ...(text ? { text } : {}) }, s);
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: k }, s);
+      await sleep(120);
+    };
+    const three = (await ids()).slice(0, 3);
+    const folders = await api("/api/folders");
+    const cats = await Promise.all(three.map(async (id) => (await api(`/api/items/${id}`)).category));
+    const dest = folders.find((f) => !cats.includes(f.id)).id;
+    await evaluate(s, `document.querySelector('#item-${three[0]} .card').focus()`);
+    await key("x");
+    const r = await evaluate(s, `(() => { const r = document.querySelector('#item-${three[2]} .card').getBoundingClientRect(); return { x: r.left + 6, y: r.top + 6 }; })()`);
+    const click = async (type) => cdp("Input.dispatchMouseEvent", { type, x: r.x, y: r.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1, modifiers: 8 }, s);
+    await click("mousePressed"); await click("mouseReleased");
+    await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 3 && !document.getElementById("selbar").hidden`, "three selected and the bar showing");
+    assert.match(await evaluate(s, `document.querySelector("#selbar .sel-n").textContent`), /3/);
+    await evaluate(s, `document.querySelector('#selbar [data-sel="move"]').click()`);
+    await waitFor(s, `document.getElementById("move-dlg").open`, "move picker for the selection");
+    await evaluate(s, `document.querySelector('#mv-list [data-to="${dest}"]').click()`);
+    await waitFor(s, `document.getElementById("toast").classList.contains("show") && document.getElementById("selbar").hidden`, "bulk toast");
+    for (const id of three) assert.equal((await api(`/api/items/${id}`)).category, dest, "all three are in the folder");
+    await evaluate(s, `document.getElementById("toast-undo").click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 0`, "list back");
+    await sleep(500);
+    for (const [n, id] of three.entries()) assert.equal((await api(`/api/items/${id}`)).category, cats[n], "undo put each card back where it was");
+    console.log("✓ selected three cards, moved them together, and Undo put them back");
+
+    // Esc clears a selection.
+    await evaluate(s, `document.querySelector('#item-${three[0]} .card').focus()`);
+    await key("x");
+    await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 1`, "one selected");
+    await key("Escape");
+    await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 0 && document.getElementById("selbar").hidden`, "Esc cleared it");
+
+    // The folder just filed into three times is now quick folder 1: the key files a single card there.
+    const one = (await ids()).find((id) => !three.includes(id)) ?? three[0];
+    await evaluate(s, `document.querySelector('#item-${one} .card').focus()`);
+    await key("1");
+    await waitFor(s, `document.getElementById("toast").classList.contains("show")`, "quick move toast");
+    assert.equal((await api(`/api/items/${one}`)).category, dest, "key 1 filed the card into the most-used folder");
+    console.log("✓ number key 1 filed a card into the most-used folder");
+    await key("?");
+    await waitFor(s, `document.getElementById("keys-dlg").open && document.getElementById("ky-body").textContent.includes(${JSON.stringify(folders.find((f) => f.id === dest).label[LANG] ?? "")})`, "legend in the ? dialog");
+    await evaluate(s, `document.getElementById("keys-dlg").close()`);
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+  }
   // The mind map: open a folder, drag a card onto another folder, nest a folder.
   {
     await viewport(1280, 820, false);
@@ -419,6 +488,26 @@ try {
       for (let k = 0; k < 20 && (await api(`/api/items/${cid}`)).category !== dest; k++) await sleep(150);
       assert.equal((await api(`/api/items/${cid}`)).category, dest, "hold + tap a folder files the card");
       console.log("✓ phone map: hold a card, tap a folder — filed");
+    }
+    // Touch: hold one card, tap a second to add it, tap a folder — both are filed in one go.
+    {
+      const keys = await evaluate(s, `[...document.querySelectorAll(".mnode.item")].slice(0, 2).map((n) => n.dataset.key)`);
+      const [x, y] = keys.map((k) => Number(k.slice(2)));
+      const was = await Promise.all([x, y].map(async (id) => (await api(`/api/items/${id}`)).category));
+      const dest = await evaluate(s, `[...document.querySelectorAll(".mnode.folder")].map((n) => n.dataset.key.slice(2)).find((k) => !${JSON.stringify(was)}.includes(k))`);
+      const centre = (key) => evaluate(s, `(() => { const n = document.querySelector('.mnode[data-key="${key}"]'); n.scrollIntoView({ block: "center", inline: "center" }); const r = n.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      await cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [await centre(keys[0])] }, s);
+      await sleep(450);
+      await cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }, s);
+      await waitFor(s, `!document.getElementById("pickbar").hidden`, "first card picked up");
+      await tap(`.mnode[data-key="${keys[1]}"]`);
+      await waitFor(s, `document.querySelectorAll(".mnode.sel").length === 2`, "second card added to the pick-up");
+      await evaluate(s, `document.querySelector('.mnode[data-key="f:${dest}"]').scrollIntoView({ block: "center", inline: "center" })`);
+      await tap(`.mnode[data-key="f:${dest}"]`);
+      for (let k = 0; k < 20 && (await api(`/api/items/${y}`)).category !== dest; k++) await sleep(150);
+      assert.equal((await api(`/api/items/${x}`)).category, dest, "the held card is filed");
+      assert.equal((await api(`/api/items/${y}`)).category, dest, "and so is the one added to it");
+      console.log("✓ phone map: hold a card, tap another, tap a folder — both filed together");
     }
     await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
     console.log("✓ mind map: expand, drag a card onto a folder (mouse), phone layout");
