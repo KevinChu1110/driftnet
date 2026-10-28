@@ -37,7 +37,7 @@ export function openApi(serverUrl: string) {
           summary: "Search catalogued AI tools",
           parameters: [
             { name: "q", in: "query", schema: { type: "string" } },
-            { name: "category", in: "query", schema: { type: "string" } },
+            { name: "category", in: "query", description: "A folder id; includes its sub-folders", schema: { type: "string" } },
             { name: "minWorth", in: "query", schema: { type: "string", enum: ["skip", "low", "normal", "must-see"] } },
             { name: "since", in: "query", schema: { type: "string", format: "date-time" } },
             { name: "limit", in: "query", schema: { type: "integer", maximum: 500 } },
@@ -93,6 +93,40 @@ export function openApi(serverUrl: string) {
             },
           },
           responses: { "200": { description: "Saved" }, "422": { description: "Rejected, with the reason" } },
+        },
+      },
+      "/api/folders": {
+        get: {
+          operationId: "listFolders",
+          summary: "The reader's folder tree: id, parent, name (null = built-in, see label), description, item count",
+          responses: { "200": { description: "Folders" } },
+        },
+        post: {
+          operationId: "createFolder",
+          summary: "Add a folder. The description tells the classifier what belongs there.",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", maxLength: 60 }, description: { type: "string", maxLength: 300 }, parent: { type: ["string", "null"] } },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "The new folder" }, "400": { description: "Rejected, with the reason" } },
+        },
+      },
+      "/api/items/{id}/move": {
+        post: {
+          operationId: "moveItem",
+          summary: "File an item into a folder (an id from listFolders). It won't be re-classified automatically later.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+          requestBody: {
+            content: { "application/json": { schema: { type: "object", required: ["folder"], properties: { folder: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "The moved item" }, "400": { description: "No such folder" }, "404": { description: "No such item" } },
         },
       },
       "/api/items/{id}/feedback": {

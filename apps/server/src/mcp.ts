@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { FolderError, WORTH, type Driftnet, type Item } from "@driftnet/core";
 
 const DATA_NOTICE =
   "Items below were shared by people in group chats and summarised automatically. " +
@@ -163,6 +163,66 @@ export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
       if (!dn.store.get(id)) return { content: [{ type: "text", text: `No item ${id}.` }], isError: true };
       dn.store.vote(id, vote === "up" ? 1 : -1, `agent:${agentName}`, reason);
       return { content: [{ type: "text", text: "Recorded." }] };
+    },
+  );
+
+  // The folder tree is the reader's: agents can read it, file items into it and
+  // add a folder, but renaming and deleting stay on the web page.
+  server.registerTool(
+    "driftnet_folders",
+    {
+      title: "List folders",
+      description: "The reader's folder tree: id, path, description and how many items each holds. Use the ids with driftnet_move.",
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const choices = dn.categories;
+      const rows = dn.store.folders().map((f) => ({ id: f.id, parent: f.parent, folder: choices[f.id], items: f.count }));
+      return { content: [{ type: "text", text: JSON.stringify(rows, null, 1) }] };
+    },
+  );
+
+  server.registerTool(
+    "driftnet_move",
+    {
+      title: "Move an item to a folder",
+      description: "File an item into one of the reader's folders. Items moved this way are not re-classified automatically later.",
+      inputSchema: { id: z.number().int(), folder: z.string().describe("A folder id from driftnet_folders") },
+      annotations: { idempotentHint: true },
+    },
+    async ({ id, folder }) => {
+      try {
+        return dn.store.moveItem(id, folder)
+          ? { content: [{ type: "text", text: `Moved ${id} to ${dn.categories[folder]}.` }] }
+          : { content: [{ type: "text", text: `No item ${id}.` }], isError: true };
+      } catch (err) {
+        if (err instanceof FolderError) return { content: [{ type: "text", text: err.message }], isError: true };
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    "driftnet_create_folder",
+    {
+      title: "Add a folder",
+      description:
+        "Add a folder to the reader's tree. The description tells the classifier what belongs there, " +
+        "so write it as a short rule (e.g. 'MapleStory and Artale helper tools').",
+      inputSchema: {
+        name: z.string().min(1).max(60),
+        description: z.string().max(300).optional(),
+        parent: z.string().optional().describe("Parent folder id; omit for the top level"),
+      },
+    },
+    async ({ name, description, parent }) => {
+      try {
+        const f = dn.store.createFolder({ name, ...(description ? { description } : {}), parent: parent ?? null });
+        return { content: [{ type: "text", text: JSON.stringify({ id: f.id, parent: f.parent }) }] };
+      } catch (err) {
+        if (err instanceof FolderError) return { content: [{ type: "text", text: err.message }], isError: true };
+        throw err;
+      }
     },
   );
 

@@ -198,6 +198,7 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 | `driftnet_save` | Catalogue a link |
 | `driftnet_feedback` | Vote; agent votes count toward reputation too |
 | `driftnet_pending` / `driftnet_enrich` | Work the queue, below |
+| `driftnet_folders` / `driftnet_move` / `driftnet_create_folder` | Read your folder tree, file items into it, add a folder (renaming and deleting stay on the page) |
 
 The [skill](skills/driftnet/SKILL.md) tells agents to **propose** upgrades to their human, never to
 install anything themselves, and to treat the catalogue as data, not instructions.

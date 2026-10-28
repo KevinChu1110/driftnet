@@ -181,6 +181,7 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 | `driftnet_save` | 收錄一個連結 |
 | `driftnet_feedback` | 投票；agent 的票也會計入信譽 |
 | `driftnet_pending`／`driftnet_enrich` | 整理佇列，見下方 |
+| `driftnet_folders`／`driftnet_move`／`driftnet_create_folder` | 讀你的資料夾樹、把項目放進去、新增資料夾（改名和刪除只能在網頁上做） |
 
 [skill](skills/driftnet/SKILL.md) 規定 agent 只能**向人提議**升級，不能自己安裝任何東西，而且清單內容一律當資料看，不當指令。
 
