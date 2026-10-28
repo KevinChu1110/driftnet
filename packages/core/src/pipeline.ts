@@ -4,7 +4,7 @@ import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
 import type { Summarizer } from "./summarize.ts";
-import type { Digest, IngestResult, Judgement, ShareContext, Summary } from "./types.ts";
+import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Summary } from "./types.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
 
 export interface PipelineOptions {
@@ -39,16 +39,21 @@ export class Pipeline {
     return results;
   }
 
-  async ingest(url: string, ctx: ShareContext, depth = 0): Promise<IngestResult> {
+  async ingest(url: string, ctx: ShareContext, depth = 0, page?: PageContent): Promise<IngestResult> {
     const { store } = this.opts;
 
     const hit = store.findByUrl(url);
-    if (hit) {
+    // Page content from a logged-in browser can rescue an item that was stored
+    // without a summary (login wall); otherwise a repeat link costs nothing.
+    if (hit && (!page?.text || hit.summary)) {
       store.recordShare(hit.id, ctx);
-      return { item: store.get(hit.id)!, cached: true };
+      // The browser may see what the first pass could not, e.g. a repo linked
+      // in the comments: catalogue that alongside.
+      const related = depth === 0 ? await this.newReposFrom(page, hit.url, ctx) : [];
+      return { item: store.get(hit.id)!, cached: true, ...(related.length ? { related } : {}) };
     }
 
-    let digest = await extract(url);
+    let digest = withPage(await extract(url), page);
     digest = await this.followToTool(digest);
 
     // A post that points at a repo we already have: just link them up.
@@ -124,6 +129,15 @@ export class Pipeline {
     return rest;
   }
 
+  private async newReposFrom(page: PageContent | undefined, from: string, ctx: ShareContext): Promise<IngestResult[]> {
+    const repos = [...new Set((page?.links ?? []).map((l) => canonicalize(l)).filter((l): l is string => !!l && !!matchGithub(l)))]
+      .filter((repo) => repo !== from && !this.opts.store.findByUrl(repo))
+      .slice(0, 3);
+    const out: IngestResult[] = [];
+    for (const repo of repos) out.push(await this.ingest(repo, { ...ctx, note: `Linked from ${from}` }, 1));
+    return out;
+  }
+
   /** Named open-source projects without a link → look them up on GitHub and catalogue them too. */
   private async resolveMentions(
     mentions: { name: string; openSource: boolean }[],
@@ -157,6 +171,24 @@ export class Pipeline {
       meta: { ...target.meta, via: hostOf(digest.url) },
     };
   }
+}
+
+/** Text the fetched page budget allows; matches the web extractor. */
+const PAGE_TEXT_BUDGET = 2000;
+
+/** Prefer what the browser saw when it says more than the anonymous fetch did. */
+function withPage(digest: Digest, page: PageContent | undefined): Digest {
+  if (!page) return digest;
+  const text = (page.text ?? "").trim();
+  const links = (page.links ?? [])
+    .map((l) => canonicalize(l))
+    .filter((l): l is string => Boolean(l) && hostOf(l!) !== hostOf(digest.url));
+  return {
+    ...digest,
+    title: digest.title === digest.url || !digest.title ? page.title?.trim() || digest.title : digest.title,
+    text: text.length > digest.text.length ? text.slice(0, PAGE_TEXT_BUDGET) : digest.text,
+    outlinks: [...new Set([...digest.outlinks, ...links])].slice(0, 20),
+  };
 }
 
 function sourceOf(digest: Digest): string {

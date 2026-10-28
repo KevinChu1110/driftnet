@@ -119,6 +119,24 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 For local development, expose the webhooks with `cloudflared tunnel` or `ngrok`.
 
+### Chrome extension: what you see while logged in
+
+Anonymous fetches hit login walls: a Facebook photo post returns nothing, and "link in the
+comments" is invisible. The extension in [`apps/chrome-extension`](apps/chrome-extension) sends
+what **you** see instead:
+
+- **Toolbar button**: sends the page you're on. Expands "See more", and if the post links nowhere,
+  opens the comments once to find the link.
+- **Right-click a link**: sends that link with the text of the post around it.
+- **Right-click a selection**: sends just the selected text.
+
+It reads a tab only when you click (`activeTab`), and sends only to your own server. Install with
+`chrome://extensions` → Developer mode → **Load unpacked** → `apps/chrome-extension`, then set
+the server URL and `DRIFTNET_TOKEN` in its settings.
+
+Tested on real posts: a photo post went from 0 characters (anonymous) to the full text plus
+comments, and a reel saying "link in the comments" yielded the GitHub repo from its comments.
+
 **In the chat:** messages without a link are ignored. Every reply ends with the item number. Vote
 with `👍12` / `👎12 reason` (or `+12` / `-12`).
 
@@ -252,6 +270,7 @@ All settings are environment variables. See [`.env.example`](.env.example).
 ```text
 packages/core     pipeline, extractors, judge (Jev), summariser + model adapters, guard, store
 apps/server       HTTP API, web page, MCP, chat adapters
+apps/chrome-extension  send what you see while logged in
 skills/driftnet   Agent Skill
 ```
 
@@ -264,6 +283,7 @@ Extension points:
 - **Extractor** for a new site: `registerExtractor()` in `packages/core/src/extractors`
 - **Model**: implement `LlmProvider` in `packages/core/src/llm`
 - **Chat platform**: call `handleChatText()` from `apps/server/src/adapters/handle.ts`
+- **Browser capture**: per-site tweaks go in `apps/chrome-extension/collect.js`
 - **Judge**: implement `Judge` in `packages/core/src/judge`
 - **Bot language**: add a locale to `packages/core/src/i18n.ts`
 
@@ -272,9 +292,8 @@ Extension points:
 These came from running driftnet on links people actually share:
 
 - [ ] **Video transcripts.** Many reels only say the tool's name out loud (captions, Whisper).
-- [ ] **Login-walled posts.** Facebook photo posts return nothing anonymously. Needs a pluggable
-      logged-in fetcher, or OCR on the post image.
-- [ ] **Links in comments.** "Link in the first comment" is everywhere.
+- [x] **Login-walled posts** and **links in comments**: the Chrome extension.
+- [ ] **Extension polish.** Icons, Threads/X/Instagram-specific capture, a Chrome Web Store build.
 - [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, voting by reaction.
 - [ ] **Weekly digest** posted back to the chat.
 - [ ] **More adapters.** Native Gemini, Bedrock, Vertex, more judges.

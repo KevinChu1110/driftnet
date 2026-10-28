@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { categoryLabels, createDriftnet, resolveLocale, WORTH, type Kind, type Worth } from "@driftnet/core";
+import { canonicalize, categoryLabels, createDriftnet, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack } from "./adapters/slack.ts";
@@ -77,10 +77,26 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/api/ingest") {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
-      const body = JSON.parse(await readBody(req)) as { text?: string; url?: string; note?: string; chat?: string };
+      const body = JSON.parse(await readBody(req)) as {
+        text?: string; url?: string; note?: string; chat?: string; platform?: string; page?: PageContent;
+      };
+      const ctx = {
+        platform: /^[a-z0-9-]{1,32}$/.test(body.platform ?? "") ? body.platform! : "http",
+        chatId: String(body.chat ?? "api").slice(0, 64),
+      };
+      // A single URL with what the browser saw on it (the Chrome extension).
+      const url = body.page && body.url ? canonicalize(body.url) : null;
+      if (url) {
+        const page: PageContent = {
+          ...(typeof body.page!.title === "string" ? { title: body.page!.title.slice(0, 300) } : {}),
+          ...(typeof body.page!.text === "string" ? { text: body.page!.text.slice(0, 20_000) } : {}),
+          ...(Array.isArray(body.page!.links) ? { links: body.page!.links.filter((l) => typeof l === "string").slice(0, 50) } : {}),
+        };
+        const note = body.note?.slice(0, 1000);
+        return send(res, 200, [await dn.pipeline.ingest(url, { ...ctx, ...(note ? { note } : {}) }, 0, page)]);
+      }
       const text = [body.url, body.text, body.note].filter(Boolean).join(" ");
-      const results = await dn.pipeline.ingestMessage(text, { platform: "http", chatId: body.chat ?? "api" });
-      return send(res, 200, results);
+      return send(res, 200, await dn.pipeline.ingestMessage(text, ctx));
     }
     if (req.method === "POST" && itemMatch?.[2]) {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });

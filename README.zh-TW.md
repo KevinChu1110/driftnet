@@ -109,6 +109,20 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 本機開發時可用 `cloudflared tunnel` 或 `ngrok` 把 webhook 開出去。
 
+### Chrome 擴充：送出你登入後看到的內容
+
+不登入抓網頁常常碰壁：FB 圖片貼文什麼都拿不到，「連結在留言」也看不到。
+[`apps/chrome-extension`](apps/chrome-extension) 這個擴充改送**你自己**看到的內容：
+
+- **工具列按鈕**：送出目前這頁。會先按開「查看更多」；如果貼文本身沒有外部連結，會自動打開留言找一次。
+- **在連結上按右鍵**：送出那個連結，加上它所在那則貼文的文字。
+- **選取文字後按右鍵**：只送選取的內容。
+
+只有你按下時才讀取該分頁（`activeTab`），內容只送到你自己的伺服器。安裝：`chrome://extensions` → 開發人員模式 →
+**載入未封裝項目** → 選 `apps/chrome-extension`，再到擴充的設定填伺服器網址和 `DRIFTNET_TOKEN`。
+
+實測：圖片貼文從不登入時的 0 字，變成完整內文加留言；說「連結在留言」的 reel，從留言裡找到了 GitHub repo。
+
 **在聊天室裡：** 沒有連結的訊息一律忽略。每則回覆最後都有項目編號，用 `👍12`／`👎12 原因`
 （或 `+12`／`-12`）投票。
 
@@ -232,6 +246,7 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 ```text
 packages/core     流程、擷取器、判斷（Jev）、摘要＋模型轉接、防污染、儲存
 apps/server       HTTP API、網頁、MCP、聊天平台轉接
+apps/chrome-extension  送出你登入後看到的內容
 skills/driftnet   Agent Skill
 ```
 
@@ -244,6 +259,7 @@ pnpm typecheck && pnpm test
 - **新網站的擷取器**：`packages/core/src/extractors` 的 `registerExtractor()`
 - **新模型**：在 `packages/core/src/llm` 實作 `LlmProvider`
 - **新聊天平台**：從 `apps/server/src/adapters/handle.ts` 呼叫 `handleChatText()`
+- **瀏覽器擷取**：各網站的調整放在 `apps/chrome-extension/collect.js`
 - **新判斷器**：在 `packages/core/src/judge` 實作 `Judge`
 - **bot 介面語言**：在 `packages/core/src/i18n.ts` 加一組語系
 
@@ -252,8 +268,8 @@ pnpm typecheck && pnpm test
 這些都是拿大家真正會分享的連結實測後發現的：
 
 - [ ] **影片轉文字。** 很多 reels 只用講的報工具名稱（字幕、Whisper）。
-- [ ] **需要登入的貼文。** FB 圖片貼文不登入什麼都拿不到，需要可插拔的登入瀏覽器，或對貼文圖片做 OCR。
-- [ ] **抓留言裡的連結。** 「連結在第一則留言」到處都是。
+- [x] **需要登入的貼文**和**留言裡的連結**：Chrome 擴充。
+- [ ] **擴充打磨。** 圖示、Threads／X／Instagram 專屬擷取、上架 Chrome 線上應用程式商店。
 - [ ] **豐富回覆。** LINE Flex、Slack Block Kit、Discord embed、用表情符號投票。
 - [ ] **每週摘要**推回聊天室。
 - [ ] **更多轉接。** 原生 Gemini、Bedrock、Vertex，以及更多判斷器。

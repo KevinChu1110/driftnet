@@ -69,6 +69,16 @@ export interface ShareContext {
   note?: string;
 }
 
+/**
+ * What a browser extension saw on the page, logged in: the post text, comments
+ * and links that an anonymous fetch cannot reach. Untrusted like any content.
+ */
+export interface PageContent {
+  title?: string;
+  text?: string;
+  links?: string[];
+}
+
 export interface IngestResult {
   item: Item;
   /** true when the item came from the cache: nothing was fetched or sent to a model. */
