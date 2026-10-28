@@ -100,6 +100,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ### Chrome extension
 
+<p align="center"><img src="assets/extension-en.jpg" alt="The driftnet popup over a social post: saved, with category, worth and a three-point summary" width="100%"></p>
+<sub>Recorded by the extension's end-to-end test (<code>pnpm e2e:extension</code>) on a test page: the caption is cut off and the link sits in the comments.</sub>
+
 An anonymous fetch of a Facebook photo post returns nothing. The extension sends what **you** see
 while logged in: it expands "See more" and, if the post links nowhere, opens the comments once to
 find the link. Tested on real posts: a photo post went from 0 characters to its full text and

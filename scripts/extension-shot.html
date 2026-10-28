@@ -1,0 +1,24 @@
+<!-- Composes the README extension screenshot. Run apps/chrome-extension/e2e.mjs with SCREENSHOTS=<dir> (and SHOT_LANG), replace SHOTS and LANG below, then screenshot this file at 1100x620 @2x. -->
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body { margin: 0; width: 1100px; height: 700px; background: #dee1e6; font: 13px -apple-system, "PingFang TC", sans-serif; overflow: hidden; }
+  .tabs { height: 34px; display: flex; align-items: flex-end; padding-left: 80px; }
+  .tab { background: #fff; border-radius: 8px 8px 0 0; padding: 7px 16px; width: 220px; color: #333; }
+  .dots { position: absolute; top: 12px; left: 14px; display: flex; gap: 8px; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .bar { background: #fff; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid #dadce0; }
+  .url { flex: 1; background: #f1f3f4; border-radius: 16px; padding: 7px 14px; color: #5f6368; }
+  .ext { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #e8f0fe; position: relative; }
+  .ext img { width: 18px; height: 18px; }
+  .ext b { position: absolute; right: -4px; bottom: -4px; background: #2e7d32; color: #fff; font-size: 9px; border-radius: 6px; padding: 0 3px; }
+  .page { position: absolute; top: 75px; left: 0; width: 1100px; height: 625px; overflow: hidden; }
+  .page img { width: 1100px; display: block; }
+  .popup { position: absolute; top: 72px; right: 22px; width: 360px; border-radius: 10px; overflow: hidden; background: #fff;
+           box-shadow: 0 8px 28px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.08); }
+  .popup img { width: 360px; display: block; }
+</style></head><body>
+  <div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+  <div class="tabs"><div class="tab">AI Tools Daily</div></div>
+  <div class="bar"><span>←</span><span>→</span><span>↻</span><div class="url">social.example/posts/1d4ZiYhANT</div><div class="ext"><img src="../apps/chrome-extension/icons/32.png"><b>✓</b></div></div>
+  <div class="page"><img src="SHOTS/LANG/post.png"></div>
+  <div class="popup"><img src="SHOTS/LANG/popup.png"></div>
+</body></html>

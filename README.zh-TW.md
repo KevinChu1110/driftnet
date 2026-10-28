@@ -92,6 +92,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ### Chrome 擴充
 
+<p align="center"><img src="assets/extension-zh-TW.jpg" alt="driftnet 彈出視窗疊在一則社群貼文上：已收錄，附分類、評價和三點摘要" width="100%"></p>
+<sub>由擴充的端到端測試（<code>pnpm e2e:extension</code>）在測試頁面上錄製：說明被截斷，連結藏在留言裡。</sub>
+
 不登入去抓 FB 圖片貼文，什麼都拿不到。擴充改送**你自己**登入後看到的內容：會先按開「查看更多」；如果貼文本身
 沒有外部連結，會打開留言找一次。實測：圖片貼文從 0 字變成完整內文加留言；說「連結在留言」的 reel，
 從留言裡找到了 GitHub repo。
