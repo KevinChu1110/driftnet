@@ -5,12 +5,12 @@
   "description": "Search, save and rate AI tools people shared in chats. Local catalogue, any model or none.",
   "repository": { "url": "https://github.com/KevinChu1110/driftnet", "source": "github" },
   "websiteUrl": "https://github.com/KevinChu1110/driftnet",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "driftnet",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "transport": { "type": "stdio" },
       "packageArguments": [{ "type": "positional", "value": "mcp" }],
       "environmentVariables": [
