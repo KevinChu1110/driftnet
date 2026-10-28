@@ -1,0 +1,16 @@
+{
+  "name": "@driftnet/server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/main.ts",
+    "mcp": "tsx --env-file-if-exists=../../.env src/mcp-stdio.ts"
+  },
+  "dependencies": {
+    "@driftnet/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "discord.js": "^14.27.0",
+    "zod": "^4.6.7"
+  }
+}

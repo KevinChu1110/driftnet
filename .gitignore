@@ -1,0 +1,7 @@
+node_modules/
+.env
+data/
+*.db
+*.db-*
+graphify-out/
+.DS_Store
