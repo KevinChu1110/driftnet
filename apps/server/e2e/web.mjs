@@ -571,6 +571,9 @@ try {
     console.log("✓ connect cards: public URL and share key filled in, password left out");
 
     // A card makes a token for its agent and shows the snippet with it, not the password.
+    assert.equal(await evaluate(s, `document.getElementById("cn-cc").value`), "Claude Code", "the card suggests a name");
+    assert.equal(await evaluate(s, `document.getElementById("cn-agents").value`), "Hermes", "the shared card suggests Hermes");
+    await evaluate(s, `document.getElementById("cn-cc").value = "Claude Code (laptop)"`);
     await evaluate(s, `document.querySelector('[data-mint="cc"]').click()`);
     await waitFor(s, `document.getElementById("cx-cc").textContent.includes("dn_")`, "token on the Claude Code card");
     const cardToken = (await evaluate(s, `document.getElementById("cx-cc").textContent`)).match(/dn_[\w-]+/)[0];
@@ -582,7 +585,7 @@ try {
     // Settings → Access lists it; make a read token, see it once, revoke it.
     await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
     await waitFor(s, `document.getElementById("settings-dlg").open && !!document.querySelector("#agent-tokens .tok")`, "agent tokens listed");
-    assert.ok((await evaluate(s, `document.getElementById("agent-tokens").innerText`)).includes("Claude Code"));
+    assert.ok((await evaluate(s, `document.getElementById("agent-tokens").innerText`)).includes("Claude Code (laptop)"), "the card mints with the edited name");
     await evaluate(s, `(() => { document.getElementById("at-name").value = "Dashboard"; document.getElementById("at-scope").value = "read"; document.getElementById("at-create").click(); return 1; })()`);
     await waitFor(s, `!!document.getElementById("ac-newtok")?.value`, "new token shown once");
     await evaluate(s, `document.getElementById("agent-tokens").scrollIntoView({ block: "start" })`);
@@ -595,6 +598,10 @@ try {
     await waitFor(s, `[...document.querySelectorAll("#agent-tokens .tok.revoked")].some((r) => r.innerText.includes("Dashboard"))`, "token revoked in the list");
     assert.equal((await asAgent(readToken, "/api/items")).status, 401, "a revoked token stops at once");
     assert.equal(await evaluate(s, `!!document.getElementById("ac-newtok")`), false, "the token is not shown a second time");
+    // A revoked token can be removed from the list; an active one has no Remove button.
+    assert.equal(await evaluate(s, `[...document.querySelectorAll("#agent-tokens .tok")].filter((r) => !r.classList.contains("revoked")).some((r) => r.querySelector("[data-remove]"))`), false, "active tokens can't be removed");
+    await evaluate(s, `[...document.querySelectorAll("#agent-tokens .tok.revoked")].find((r) => r.innerText.includes("Dashboard")).querySelector("[data-remove]").click()`);
+    await waitFor(s, `![...document.querySelectorAll("#agent-tokens .tok")].some((r) => r.innerText.includes("Dashboard"))`, "revoked token removed from the list");
     await evaluate(s, `document.getElementById("st-cancel").click()`);
     console.log("✓ agent tokens: made from a card and from Settings, scoped, shown once, revoked at once");
 
