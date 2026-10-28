@@ -1,8 +1,9 @@
 <div align="center">
 
-# driftnet
-
-**把連結丟進群組聊天室，自動分類、說明、整理成可搜尋的清單。**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-zh-TW-dark.svg">
+  <img src="assets/banner-zh-TW-light.svg" alt="driftnet：把連結丟進群組聊天室，自動分類、說明、整理成可搜尋的清單" width="100%">
+</picture>
 
 [English](README.md) · **繁體中文**
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 16 px only: wave and net outline; anything inside the net is noise at this size. -->
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2459e0"/>
+      <stop offset="1" stop-color="#0f9f8f"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#sea)"/>
+  <path d="M5 9 q2.75 -2.5 5.5 0 t5.5 0 t5.5 0 t5.5 0" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M6 16 C6 23 10.5 27 16 27 C21.5 27 26 23 26 16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M4.5 16 H27.5" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>

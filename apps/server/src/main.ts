@@ -28,6 +28,11 @@ if (PRIVATE && !TOKEN) {
   process.exit(1);
 }
 const indexHtml = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+/** Icons are public even in private mode: the browser asks for them before any token. */
+const STATIC: Record<string, [Buffer, string]> = {
+  "/favicon.svg": [readFileSync(new URL("../public/favicon.svg", import.meta.url)), "image/svg+xml"],
+  "/apple-touch-icon.png": [readFileSync(new URL("../public/apple-touch-icon.png", import.meta.url)), "image/png"],
+};
 
 /** Writes (ingest, feedback, MCP) need DRIFTNET_TOKEN when it is set; reads are public. */
 function authorized(req: IncomingMessage): boolean {
@@ -59,6 +64,11 @@ const server = createServer(async (req, res) => {
   try {
     // The page itself holds no data; in private mode it asks for the token.
     if (req.method === "GET" && path === "/") return send(res, 200, indexHtml, "text/html; charset=utf-8");
+    const asset = req.method === "GET" ? STATIC[path] : undefined;
+    if (asset) {
+      res.writeHead(200, { "content-type": asset[1], "cache-control": "public, max-age=86400" });
+      return res.end(asset[0]);
+    }
     if (PRIVATE && req.method === "GET" && !authorized(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
@@ -188,6 +198,12 @@ const server = createServer(async (req, res) => {
     console.error(`[http] ${req.method} ${path}:`, err);
     if (!res.headersSent) send(res, 500, { error: (err as Error).message });
   }
+});
+
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code !== "EADDRINUSE") throw err;
+  console.error(`Port ${PORT} is already in use. Is driftnet already running? (pnpm service:status) Or set PORT in ${driftnetHome(env)}/.env.`);
+  process.exit(1);
 });
 
 server.listen(PORT, HOST, () => {

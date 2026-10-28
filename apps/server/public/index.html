@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>driftnet</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   :root {
     --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
@@ -18,6 +20,7 @@
   body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
   header { display: flex; gap: 16px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
   header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  .brand { display: flex; align-items: center; gap: 8px; }
   header .stats { color: var(--muted); font-size: 13px; }
   .lang { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
   header input { flex: 1; min-width: 180px; max-width: 420px; margin-left: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
@@ -53,7 +56,7 @@
 </head>
 <body>
 <header>
-  <h1>driftnet</h1>
+  <h1 class="brand"><img src="/favicon.svg" alt="" width="26" height="26">driftnet</h1>
   <span class="stats" id="stats"></span>
   <input id="q" type="search">
   <button id="lang" class="lang" type="button"></button>
@@ -128,6 +131,10 @@
   }
 
   async function load() {
+    // Words on screen before any data arrives (the token prompt needs them too).
+    const saved0 = store.get("driftnet-locale");
+    if (STRINGS[saved0]) locale = saved0;
+    applyLocale();
     let stats, ui;
     try {
       [stats, ui] = await Promise.all([api("/api/stats"), api("/api/ui")]);

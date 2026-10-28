@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="driftnet: 把連結丟進群組聊天室， 自動分類、說明、整理成可搜尋的清單。">
+  <style>
+    .bg { fill: #f6f8fc; } .wave { stroke: #2459e0; stroke-opacity: .10; }
+    .word { fill: #0f172a; } .tag { fill: #475569; } .foot { fill: #64748b; }
+    .chip { fill: #ffffff; stroke: #dbe3f0; } .chiplink { stroke: #2459e0; } .chiptext { fill: #334155; }
+    .card { fill: #ffffff; stroke: #dbe3f0; } .cardname { fill: #0f172a; } .cardcat { fill: #64748b; }
+    .net { stroke: #0f9f8f; } .netmesh { stroke: #0f9f8f; stroke-opacity: .35; } .arrow { stroke: #94a3b8; }
+    text { font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', 'Segoe UI', sans-serif; }
+    .word { font-size: 76px; font-weight: 700; letter-spacing: -2px; }
+    .tag { font-size: 25px; } .foot { font-size: 17px; letter-spacing: .5px; }
+    .chiptext { font-size: 15px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .cardname { font-size: 18px; font-weight: 650; } .cardcat { font-size: 14px; }
+  </style>
+  <defs><clipPath id="bigbowl"><path d="M886 206 H954 C954 231 939 250 920 250 C901 250 886 231 886 206 Z"/></clipPath></defs>
+  <rect width="1280" height="420" rx="24" class="bg"/>
+  <g fill="none" stroke-width="3" class="wave">
+    <path d="M0 330 q40 -26 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+    <path d="M-40 368 q40 -26 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+  </g>
+  <svg x="72" y="84" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="logosea" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2459e0"/>
+      <stop offset="1" stop-color="#0f9f8f"/>
+    </linearGradient>
+    <clipPath id="logobowl"><path d="M24 62 H104 C104 89 86 108 64 108 C42 108 24 89 24 62 Z"/></clipPath>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#logosea)"/>
+  <!-- the drift -->
+  <path d="M18 34 q11.5 -9 23 0 t23 0 t23 0 t23 0" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="6" stroke-linecap="round"/>
+  <!-- the net -->
+  <g clip-path="url(#logobowl)" stroke="#fff" stroke-opacity=".45" stroke-width="3">
+    <path d="M4 62 L64 122 M24 62 L84 122 M44 62 L104 122 M64 62 L124 122 M84 62 L144 122 M-16 62 L44 122"/>
+    <path d="M124 62 L64 122 M104 62 L44 122 M84 62 L24 122 M64 62 L4 122 M44 62 L-16 122 M144 62 L84 122"/>
+  </g>
+  <!-- what it caught: a link, lifted off the mesh by a halo in the sea colour -->
+  <g transform="translate(64 82) rotate(-30)" fill="none" stroke-linecap="round">
+    <g stroke="#1a7fb0" stroke-width="15">
+      <rect x="-20" y="-7.5" width="23" height="15" rx="7.5"/>
+      <rect x="-3" y="-7.5" width="23" height="15" rx="7.5"/>
+    </g>
+    <g stroke="#fff" stroke-width="6.5">
+      <rect x="-20" y="-7.5" width="23" height="15" rx="7.5"/>
+      <rect x="-3" y="-7.5" width="23" height="15" rx="7.5"/>
+    </g>
+  </g>
+  <path d="M24 62 C24 89 42 108 64 108 C86 108 104 89 104 62" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M17 62 H111" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>
+  <text x="224" y="176" class="word">driftnet</text>
+  <text x="76" y="262" class="tag">把連結丟進群組聊天室，</text>
+  <text x="76" y="298" class="tag">自動分類、說明、整理成可搜尋的清單。</text>
+  <text x="76" y="368" class="foot">LINE · Slack · Discord · Telegram · Chrome · MCP</text>
+  <g transform="translate(604 96)" opacity="0.55">
+      <rect width="240" height="44" rx="22" class="chip"/>
+      <g transform="translate(26 22) rotate(-30)" fill="none" class="chiplink" stroke-width="2.6">
+        <rect x="-9" y="-4" width="11" height="8" rx="4"/><rect x="-2" y="-4" width="11" height="8" rx="4"/>
+      </g>
+      <text x="46" y="28" class="chiptext">facebook.com/share/v/…</text>
+    </g>
+<g transform="translate(624 184)" opacity="0.8">
+      <rect width="240" height="44" rx="22" class="chip"/>
+      <g transform="translate(26 22) rotate(-30)" fill="none" class="chiplink" stroke-width="2.6">
+        <rect x="-9" y="-4" width="11" height="8" rx="4"/><rect x="-2" y="-4" width="11" height="8" rx="4"/>
+      </g>
+      <text x="46" y="28" class="chiptext">threads.com/@pohuang…</text>
+    </g>
+<g transform="translate(584 272)" opacity="1">
+      <rect width="240" height="44" rx="22" class="chip"/>
+      <g transform="translate(26 22) rotate(-30)" fill="none" class="chiplink" stroke-width="2.6">
+        <rect x="-9" y="-4" width="11" height="8" rx="4"/><rect x="-2" y="-4" width="11" height="8" rx="4"/>
+      </g>
+      <text x="46" y="28" class="chiptext">youtu.be/dQw4w9WgX…</text>
+    </g>
+  <g fill="none" stroke-width="2.5" stroke-linecap="round" class="arrow" stroke-dasharray="2 8">
+    <path d="M850 118 C878 132 896 160 906 196"/><path d="M870 206 H876"/><path d="M830 294 C862 288 890 268 904 246"/>
+  </g>
+  <g clip-path="url(#bigbowl)" stroke-width="2.5" class="netmesh">
+    <path d="M866 206 L916 256 M886 206 L936 256 M906 206 L956 256 M926 206 L976 256 M846 206 L896 256"/>
+    <path d="M974 206 L924 256 M954 206 L904 256 M934 206 L884 256 M914 206 L864 256 M994 206 L944 256"/>
+  </g>
+  <path d="M886 206 C886 231 901 250 920 250 C939 250 954 231 954 206" fill="none" stroke-width="5" stroke-linecap="round" class="net"/>
+  <path d="M879 206 H961" stroke-width="5" stroke-linecap="round" class="net"/>
+  <path d="M968 222 H994" stroke-width="2.5" stroke-linecap="round" class="arrow" stroke-dasharray="2 8"/>
+  <g transform="translate(1004 86)">
+      <rect width="236" height="64" rx="14" class="card"/>
+      <circle cx="26" cy="32" r="7" fill="#2459e0"/>
+      <text x="46" y="28" class="cardname">Paperclip</text>
+      <text x="46" y="48" class="cardcat">Agent 框架</text>
+    </g>
+<g transform="translate(1004 170)">
+      <rect width="236" height="64" rx="14" class="card"/>
+      <circle cx="26" cy="32" r="7" fill="#c2410c"/>
+      <text x="46" y="28" class="cardname">RealWonder</text>
+      <text x="46" y="48" class="cardcat">圖片影片</text>
+    </g>
+<g transform="translate(1004 254)">
+      <rect width="236" height="64" rx="14" class="card"/>
+      <circle cx="26" cy="32" r="7" fill="#0f9f8f"/>
+      <text x="46" y="28" class="cardname">ascii-sharks</text>
+      <text x="46" y="48" class="cardcat">設計前端</text>
+    </g>
+</svg>

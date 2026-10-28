@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2459e0"/>
+      <stop offset="1" stop-color="#0f9f8f"/>
+    </linearGradient>
+    <clipPath id="bowl"><path d="M24 62 H104 C104 89 86 108 64 108 C42 108 24 89 24 62 Z"/></clipPath>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#sea)"/>
+  <!-- the drift -->
+  <path d="M18 34 q11.5 -9 23 0 t23 0 t23 0 t23 0" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="6" stroke-linecap="round"/>
+  <!-- the net -->
+  <g clip-path="url(#bowl)" stroke="#fff" stroke-opacity=".45" stroke-width="3">
+    <path d="M4 62 L64 122 M24 62 L84 122 M44 62 L104 122 M64 62 L124 122 M84 62 L144 122 M-16 62 L44 122"/>
+    <path d="M124 62 L64 122 M104 62 L44 122 M84 62 L24 122 M64 62 L4 122 M44 62 L-16 122 M144 62 L84 122"/>
+  </g>
+  <!-- what it caught: a link, lifted off the mesh by a halo in the sea colour -->
+  <g transform="translate(64 82) rotate(-30)" fill="none" stroke-linecap="round">
+    <g stroke="#1a7fb0" stroke-width="15">
+      <rect x="-20" y="-7.5" width="23" height="15" rx="7.5"/>
+      <rect x="-3" y="-7.5" width="23" height="15" rx="7.5"/>
+    </g>
+    <g stroke="#fff" stroke-width="6.5">
+      <rect x="-20" y="-7.5" width="23" height="15" rx="7.5"/>
+      <rect x="-3" y="-7.5" width="23" height="15" rx="7.5"/>
+    </g>
+  </g>
+  <path d="M24 62 C24 89 42 108 64 108 C86 108 104 89 104 62" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M17 62 H111" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>

@@ -1,8 +1,9 @@
 <div align="center">
 
-# driftnet
-
-**Drop links into your group chat. Get them sorted, explained and searchable.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-en-dark.svg">
+  <img src="assets/banner-en-light.svg" alt="driftnet: drop links into your group chat, get them sorted, explained and searchable" width="100%">
+</picture>
 
 **English** · [繁體中文](README.zh-TW.md)
 
