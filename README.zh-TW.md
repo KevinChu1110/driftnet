@@ -7,6 +7,8 @@
 
 [English](README.md) · **繁體中文**
 
+[📖 這是什麼](#-這是什麼) · [🎥 實際看看](#-實際看看) · [✨ 核心功能](#-核心功能) · [🚀 開始使用](#-開始使用) · [連結怎麼被處理](#連結怎麼被處理) · [接法](#接法) · [網頁](#網頁) · [模型](#模型) · [Agent](#agent) · [設定](#設定) · [放上網路](#放上網路選用) · [資料去哪裡](#資料去哪裡) · [參與開發](#參與開發)
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
 [![CI](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml)
@@ -19,12 +21,18 @@
 
 </div>
 
+## 📖 這是什麼
+
 在 Threads、Facebook、X、YouTube 看到好用的 AI 工具，貼到某個地方說「之後再看」。兩百個連結之後，再也沒人看。
 
 **driftnet 幫你接住這些連結。** 動態消息像一條水流，好東西只漂過一次就不見了；driftnet 是你放進水流裡的那張網。
 丟進聊天室（LINE、Slack、Discord、Telegram）、按一下 Chrome 擴充，或交給你的 agent 都可以。driftnet 會追到每個連結
 真正介紹的工具，分類，用你的語言寫一段簡短說明，放到可以搜尋的網頁上。repo、文章和影片也一樣處理。
 它跑在你自己的電腦上，可以接任何模型，也可以完全不接；你的 agent 也能透過 MCP 讀同一份清單。
+
+## 🎥 實際看看
+
+**1. 貼文變成工具。** 一則沒有附任何連結的 Facebook reel 丟進聊天室。driftnet 讀了說明文字，用名稱到 GitHub 找到兩個 repo，各收成一張卡片。聊天室只回一行，整理好的摘要在網頁上。
 
 ```text
 你  ▸ 這週的 AI 整理 https://www.facebook.com/share/v/1DfVB2odi3/
@@ -33,37 +41,49 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
       https://driftnet.example/#item-1
 ```
 
-<sub>實測結果。這篇貼文沒有附任何連結，driftnet 讀了說明文字，再用名稱到 GitHub 找到兩個 repo。聊天室只回一行，整理好的摘要在網頁上。</sub>
+<p align="center"><img src="assets/cards-zh-TW.jpg" alt="driftnet 卡片清單：每則分享的貼文都變成它真正介紹的 repo，附一句摘要、所屬資料夾和被分享的次數" width="100%"></p>
+<sub>實測結果。這篇貼文沒有附任何連結，driftnet 讀了說明文字，再用名稱到 GitHub 找到兩個 repo。</sub>
 
-<p align="center"><img src="assets/screenshot-zh-TW.jpg" alt="driftnet 網頁：左邊是自己的資料夾樹，右邊是整理好的工具" width="100%"></p>
+**2. 一眼看懂它是什麼。** 之前：聊天室裡一條光禿禿的連結。之後：一張卡片，有網頁上的圖片、一句話的答案、**你會看到什麼**和**為什麼會在這裡**，幾秒就能判斷要不要點開。
 
-**目錄** · [為什麼](#為什麼用-driftnet) · [開始使用](#開始使用) · [你的用法](#哪種用法適合你) · [接法](#接法) ·
-[模型](#模型) · [Agent](#agent) · [運作方式](#運作方式) ·
-[設定](#設定) · [放上網路](#放上網路選用) · [資料去哪裡](#資料去哪裡) ·
-[參與開發](#參與開發)
+<p align="center"><img src="assets/card-modal-zh-TW.jpg" alt="打開一張卡片：圖片、一句話摘要、你會看到什麼、為什麼會在這裡，以及開啟連結、加入最愛、移動、寫筆記、重新整理的按鈕" width="100%"></p>
 
-## 為什麼用 driftnet
+**3. 用樹狀圖整理。** AI 自己分好的新連結會放在收件匣，附兩、三個建議資料夾。也可以在樹狀圖上把卡片拖到資料夾，樹狀圖像 XMind 一樣從中心往外展開。
 
-- **追到真正的工具。** 貼文附了 repo，就收錄 repo；貼文只提到專案名稱，就到 GitHub 用名稱完全比對；
-  「連結在留言」？Chrome 擴充會打開留言找；一篇週報整理文，會拆成每個專案各一筆。模型編出來的連結一律丟掉。
-- **幾乎不花錢。** 重複的連結不再處理；頁面先整理成約 350 token 的大綱才給模型看；再由選用的判斷器 [Jev](https://console.typesafe.ai)（需要 TypeSafe 金鑰）
-  用約 100ms 決定哪些值得摘要。實測 5 個 FB reels，判斷全部只花 $0.00029。沒有 Jev 時，由你選的模型逐筆分類；
-  連模型也沒接，連結就全部放在「other」，不分類。
-- **學會排除垃圾。** 按 👎，發布者的信譽就下降；一直被倒讚的來源之後就不再花錢處理。提示詞注入永遠不會傳給 agent。
-- **完全屬於你。** 資料存在本機 SQLite；模型自己選（API、你的 Claude 或 Google 訂閱、Ollama，或完全不接）；
-  介面、回覆和摘要都支援英文與繁體中文。
-- **不是稍後閱讀 App。** Pocket、Raindrop 存的是你給它的那個連結；driftnet 會順著貼文追到它在講的工具，只留一份
-  簡短大綱而不是整頁內容，你的 agent 還能透過 MCP 讀寫同一份清單。
+<p align="center"><img src="assets/map-zh-TW.jpg" alt="樹狀圖：資料夾從 driftnet 往外展開、底下掛著卡片；以及手機上的唯讀瀏覽" width="100%"></p>
 
-## 開始使用
+## ✨ 核心功能
 
-不需要伺服器，也不需要雲端帳號。一行就好：
+- 🎯 **追到真正的工具。** 貼文附了 repo，就收錄 repo；貼文只提到專案名稱，就到 GitHub 用名稱完全比對。模型編出來的連結一律丟掉。
+- 💬 **看得懂「連結在留言」。** [Chrome 擴充](#chrome-擴充)會打開留言找；一篇週報整理文，會拆成每個專案各一筆。
+- 📥 **很多種丟法。** Chrome 按鈕、Discord、Telegram、Slack 或 LINE 機器人、你的 agent，或一個 HTTP 請求（見[接法](#接法)）。
+- 🖼️ **一眼看懂的卡片。** 圖片、一句話的答案、你會看到什麼、為什麼會在這裡。
+- 🗂️ **資料夾就是分類。** AI 照每個資料夾的路徑和說明分新連結，建議放在收件匣等你確認。
+- 🧠 **樹狀圖和並排檢視。** 把卡片拖到資料夾；✨ AI 整理建議會提一份方案，你套用之前什麼都不會動（見[網頁](#網頁)）。
+- 📱 **可以搜尋的網頁，手機也能用。** 筆記、復原和垃圾桶、鍵盤快捷鍵、唯讀分享連結。
+- 💸 **幾乎不花錢。** 重複的連結不再處理；頁面先整理成約 350 token 的大綱才給模型看。實測 5 個 FB reels，判斷全部只花 $0.00029。
+- ⚖️ **選用的判斷器。** [Jev](https://console.typesafe.ai)（需要 TypeSafe 金鑰）用約 100ms 決定哪些值得摘要。沒有 Jev 時，由你選的模型逐筆分類。
+- 🗳️ **學會排除垃圾。** 按 👎，發布者的信譽就下降；一直被倒讚的來源之後就不再花錢處理。
+- 🛡️ **預設就安全。** 拒絕指向私有或本機位址的連結，提示詞注入永遠不會傳給 agent。
+- 🤖 **agent 也能用。** MCP、`/openapi.json`、`/llms.txt`、`/feed.xml` 和對外 Webhook；也可以讓它們自己來讀（見 [Agent](#agent)）。
+- 🧩 **模型任選或不接，資料屬於你。** API、你的 Claude 或 Google 訂閱、Ollama，或完全不接（連結就全部放在「other」，不分類）。資料存在本機 SQLite；介面、回覆和摘要都支援英文與繁體中文。
+- 🚫 **不是稍後閱讀 App。** Pocket、Raindrop 存的是你給它的那個連結；driftnet 會順著貼文追到它在講的工具，只留一份簡短大綱而不是整頁內容，你的 agent 還能透過 MCP 讀寫同一份清單。
+
+## 🚀 開始使用
+
+不需要伺服器，也不需要雲端帳號。需要 Node.js 22.13 以上。
+
+### 1. 一行指令
 
 ```bash
 npx driftnet        # 自動打開 http://localhost:8787，⚙ 設定會帶你選模型
 ```
 
-想改程式，或設成開機自動執行，就從原始碼跑：
+不管從哪裡啟動，設定都在 `~/.driftnet/.env`，清單在 `~/.driftnet/driftnet.db`（用 `DRIFTNET_HOME` 可以一起搬走）。
+
+### 2. 從原始碼跑
+
+想改程式，或設成開機自動執行：
 
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
@@ -72,7 +92,9 @@ pnpm start                                                 # http://localhost:87
 pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
 ```
 
-或用 Docker（只要裝 Docker）：
+### 3. Docker
+
+只要裝 Docker：
 
 ```bash
 docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
@@ -81,21 +103,51 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 
 不加 `start` 時，容器就是 stdio 的 MCP 伺服器（`docker run -i --rm -v driftnet:/data driftnet`）。
 
-需要 Node.js 22.13 以上。不管從哪裡啟動，設定都在 `~/.driftnet/.env`，清單在 `~/.driftnet/driftnet.db`
-（用 `DRIFTNET_HOME` 可以一起搬走）。試試看：
+### 4. 送出第一個連結
 
 ```bash
 curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   -d '{"text": "看這個 https://github.com/paperclipai/paperclip"}'
 ```
 
-## 哪種用法適合你
+### 哪種用法適合你
 
 | 你是 | 從這裡開始 | 模型 |
 |---|---|---|
 | 只有我自己，用我的電腦 | [Chrome 擴充](#chrome-擴充)加[網頁](#網頁) | 用 Ollama 跑本機模型（見[模型](#模型)），或不接 |
 | 一個群組聊天室 | Discord、Telegram、Slack 或 LINE 機器人，見[接法](#接法) | 任選 |
 | 我的 agent | [MCP、Claude Code 外掛或 agent 佇列](#agent) | 不用接：由 agent 自己讀 |
+
+
+## 連結怎麼被處理
+
+大部分連結根本不會送到模型；會送的，也只送一份精簡大綱。
+
+1. **擷取，並先檢查。** 看過的連結直接沿用（先去掉追蹤參數）。沒看過的，就讀 GitHub API 和 README、YouTube 說明、`og:` 標籤，或你在瀏覽器看到的頁面（擴充）。拒絕指向私有或本機位址的連結，去除隱藏字元，標記提示詞注入。
+2. **整理成大綱。** 標題加每段開頭，拿掉選單、Cookie 提示和頁尾，上限約 350 token。
+3. **判斷。** 一直被倒讚的來源只存不摘要。有開 [Jev](https://console.typesafe.ai) 就由它用約 100ms 決定資料夾、類型和值不值得看；沒有就由你的模型來。連模型也沒接，連結就全部放在「other」，不分類。
+4. **摘要。** 只有值得看的才呼叫一次：一句話摘要、你會看到什麼、為什麼會在這裡。`DRIFTNET_SUMMARY_DEPTH` 決定每張卡片寫多少（`brief`、`standard` 或 `detailed`）。
+5. **追蹤。** 內容裡附上或提到名稱的 repo，也會查到並收錄。
+6. **放進你的資料夾。** AI 照資料夾的路徑和說明分類；新連結會放在收件匣，附兩、三個建議資料夾，點一下就歸檔。
+7. **顯示在網頁上，也提供給 agent。** 網頁上看得到，agent 可以走 MCP、`/llms.txt`、`/feed.xml` 或對外 Webhook 取得。匯出可以整包帶走。
+
+<details>
+<summary><b>八個步驟的完整說明</b></summary>
+
+| 步驟 | 做什麼 | 用模型？ |
+|---|---|---|
+| 1. 快取 | 同一個連結再出現時直接沿用；比對前先去掉 `utm_`、`fbclid`、`si` 等追蹤參數，並統一分享短網址、`youtu.be` 和 repo 子路徑 | 否 |
+| 2. 擷取 | GitHub API＋README、YouTube 說明、`og:` 標籤，或你在瀏覽器看到的頁面（擴充）；PDF 和影片不會被當成文字下載 | 否 |
+| 3. 大綱 | 標題加每段開頭；拿掉選單、麵包屑、Cookie 提示和頁尾；上限約 350 **token**，中日文一字算一個 token | 否 |
+| 4. 防污染 | 拒絕指向私有或本機位址的連結（每一次轉址都檢查）；去除隱藏字元；標記提示詞注入 | 否 |
+| 5. 信譽 | 3 票以上、好評低於 25% 的來源只存不摘要 | 否 |
+| 6. 判斷（選用） | 有 TypeSafe 金鑰時，[Jev](https://console.typesafe.ai) 用選擇題回答放哪個資料夾、類型、值不值得看、有沒有注入，約 100ms；沒有 Jev 時，改由你的模型在第 7 步分類 | 極小的分類器 |
+| 7. 摘要 | 只有值得看的才做一次結構化呼叫，或排進 agent 佇列 | 一次 |
+| 8. 追蹤 | 內容裡附上或提到名稱的 repo，也會查到並收錄 | 否 |
+
+大綱的做法借用 [Moli](https://github.com/lexmount/moli) 這類 agent 瀏覽器的概念，但不需要裝它：實測一篇中文文章從 831 降到 404 token。
+
+</details>
 
 ## 接法
 
@@ -115,12 +167,17 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
 <sub>Discord 實測畫面：一則訊息兩個連結，各回一行。使用者名稱和伺服器網址已隱藏。</sub>
 
-### 網頁
+## 網頁
+
+<p align="center"><img src="assets/screenshot-zh-TW.jpg" alt="driftnet 網頁：左邊是自己的資料夾樹，右邊是整理好的工具" width="100%"></p>
 
 <p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：☰ 選單裡的資料夾樹、在樹狀圖上整理卡片（按住後點資料夾）、一張卡片往左滑向垃圾桶" width="100%"></p>
 
 每個連結都會整理到一個網頁上，可以搜尋、依資料夾和類型篩選，手機也能開。在手機上，側邊欄會收進左上角的 ☰，
 搜尋框下方有一行字告訴你現在看的是哪個資料夾。
+
+<details>
+<summary><b>網頁上能做的全部事情</b></summary>
 
 - **收件匣。**AI 自己分好、你還沒確認過的新連結，會放在側邊欄最上面的 **收件匣（N）**，每張附兩、三個建議資料夾。
   點一下（或按 `1`–`3`）就歸檔，`s` 跳過，`m` 開完整的資料夾選單；你放好的卡片就會離開收件匣，按復原會再回來。
@@ -153,7 +210,10 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   `1`–`9` 把目前這張（或已選取的卡片）放進你最常整理進去的九個資料夾；`?` 會列出每個數字對應哪個資料夾，**移動到…** 選單裡也有標示。
 - 用瀏覽器的**加入主畫面**，就能像 App 一樣打開。
 
-<p align="center"><img src="assets/map-zh-TW.jpg" alt="樹狀圖：資料夾從 driftnet 往外展開、底下掛著卡片；以及手機上的唯讀瀏覽" width="100%"></p>
+</details>
+
+<details>
+<summary><b>更多截圖</b></summary>
 
 <p align="center"><img src="assets/notes-settings-zh-TW.jpg" alt="筆記頁（可以連到卡片）和設定視窗" width="100%"></p>
 
@@ -169,7 +229,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 <p align="center"><img src="assets/pair-zh-TW.jpg" alt="設定 → 存取 → 用 QR code 解鎖手機：一次性的 QR code，5 分鐘倒數" width="100%"></p>
 
-### Chrome 擴充
+</details>
+
+## Chrome 擴充
 
 <p align="center"><img src="assets/extension-zh-TW.jpg" alt="driftnet 彈出視窗疊在一則社群貼文上：已收錄，附分類、評價和三點摘要" width="100%"></p>
 <sub>由擴充的端到端測試（<code>pnpm e2e:extension</code>）在測試頁面上錄製：說明被截斷，連結藏在留言裡。</sub>
@@ -255,6 +317,9 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 每個 agent 各用自己的金鑰，不要拿管理密碼出去：**設定 → 存取 → Agent 專用金鑰**（或「連接 AI」卡片上的
 「幫這個 agent 建一把專用金鑰」，可先改名稱）。把金鑰放在 `$DRIFTNET_TOKEN` 的位置即可。
 
+<details>
+<summary><b>全部 MCP 工具</b></summary>
+
 | MCP 工具 | 用途 |
 |---|---|
 | `driftnet_search` | 挑工具前先搜尋清單 |
@@ -269,6 +334,8 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 | `driftnet_suggest_folders` | 請模型替資料夾樹提一份整理方案（只提案，要你在網頁上套用） |
 | `driftnet_create_folder`／`driftnet_update_folder`／`driftnet_delete_folder` | 新增、改名或改說明、刪除資料夾（內容會移到上一層；唯一標為「破壞性」的工具） |
 | `driftnet_trash_item`／`driftnet_restore_item`／`driftnet_favorite_item`／`driftnet_set_note` | 整理卡片：丟垃圾桶（隨時可還原）、加最愛、寫筆記 |
+
+</details>
 
 [skill](skills/driftnet/SKILL.md) 規定 agent 只能**向人提議**升級，不能自己安裝任何東西，而且清單內容一律當資料看，不當指令。
 
@@ -303,23 +370,6 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 
 </details>
 
-## 運作方式
-
-大部分連結根本不會送到模型；會送的，也只送一份精簡大綱。
-
-| 步驟 | 做什麼 | 用模型？ |
-|---|---|---|
-| 1. 快取 | 同一個連結再出現時直接沿用；比對前先去掉 `utm_`、`fbclid`、`si` 等追蹤參數，並統一分享短網址、`youtu.be` 和 repo 子路徑 | 否 |
-| 2. 擷取 | GitHub API＋README、YouTube 說明、`og:` 標籤，或你在瀏覽器看到的頁面（擴充）；PDF 和影片不會被當成文字下載 | 否 |
-| 3. 大綱 | 標題加每段開頭；拿掉選單、麵包屑、Cookie 提示和頁尾；上限約 350 **token**，中日文一字算一個 token | 否 |
-| 4. 防污染 | 拒絕指向私有或本機位址的連結（每一次轉址都檢查）；去除隱藏字元；標記提示詞注入 | 否 |
-| 5. 信譽 | 3 票以上、好評低於 25% 的來源只存不摘要 | 否 |
-| 6. 判斷（選用） | 有 TypeSafe 金鑰時，[Jev](https://console.typesafe.ai) 用選擇題回答放哪個資料夾、類型、值不值得看、有沒有注入，約 100ms；沒有 Jev 時，改由你的模型在第 7 步分類 | 極小的分類器 |
-| 7. 摘要 | 只有值得看的才做一次結構化呼叫，或排進 agent 佇列 | 一次 |
-| 8. 追蹤 | 內容裡附上或提到名稱的 repo，也會查到並收錄 | 否 |
-
-大綱的做法借用 [Moli](https://github.com/lexmount/moli) 這類 agent 瀏覽器的概念，但不需要裝它：實測一篇中文文章從 831 降到 404 token。
-
 ## 設定
 
 所有設定都是環境變數，通常寫在 `~/.driftnet/.env`，範例見 [`.env.example`](.env.example)。
@@ -338,6 +388,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_CLI_PATH` | `claude`／`gemini` | `claude-cli`／`gemini-cli` 使用的執行檔 |
 | `DRIFTNET_CLI_CONCURRENCY` | `1` | 同時最多跑幾個 CLI |
 | `DRIFTNET_LANGUAGE` | `English` | 摘要和 bot 回覆的語言 |
+| `DRIFTNET_SUMMARY_DEPTH` | `standard` | 每張卡片寫多少：`brief`、`standard` 或 `detailed` |
 | `DRIFTNET_LOCALE` | 跟 `DRIFTNET_LANGUAGE` | 強制 bot 自己的用語用 `en` 或 `zh-TW` |
 | `DRIFTNET_REPLY` | `link` | 聊天回覆：`link`（一行＋網頁連結）、`full`（摘要直接貼在聊天室）或 `off` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | 啟用 Jev 判斷；`DRIFTNET_JUDGE=off` 可關閉 |
