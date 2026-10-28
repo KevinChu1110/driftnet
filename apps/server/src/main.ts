@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { BlockedUrl, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { applyFolderTemplate, TemplateError, BlockedUrl, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
 import { applySuggested, suggestFolders } from "./plan.ts";
 import { tokenRoute } from "./tokens.ts";
@@ -16,7 +16,7 @@ import { createMcpServer } from "./mcp.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
 import { actorOf, canRead, foreignOrigin, isAdmin, isLocal, isPassword, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
-import { llmsTxt, openApi } from "./feeds.ts";
+import { atomFeed, llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
 // Settings the environment itself provides (systemd, Docker, the shell) win over the file; the page shows them read-only.
@@ -160,6 +160,16 @@ const server = createServer(async (req, res) => {
     if (triedCredentials(req) && throttled(req)) return send(res, 429, { error: "too many wrong passwords; try again in 15 minutes" });
     if (req.method === "GET" && !canRead(req, env, dn.store) && !isTrustedLocal(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
+    if (req.method === "GET" && path === "/feed.xml") {
+      const folder = url.searchParams.get("folder") || undefined;
+      if (folder && !dn.store.folders().some((f) => f.id === folder)) return send(res, 404, { error: "no such folder" });
+      const base = (env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL)?.replace(/\/$/, "") || undefined;
+      const k = readKey(env);
+      // Cards link to the page (with the share key when private, so a phone opens them), or to the tool itself.
+      const pageBase = base ? (isPrivate(env) && k ? `${base}/?key=${encodeURIComponent(k)}` : base) : undefined;
+      const self = `${base ?? `${url.protocol}//${url.host}`}/feed.xml${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`;
+      return send(res, 200, atomFeed(dn, { self, pageBase, folder }), "application/atom+xml; charset=utf-8");
+    }
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL || `${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
     if (req.method === "GET" && path === "/api/ui") {
@@ -184,6 +194,16 @@ const server = createServer(async (req, res) => {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const out = path === "/api/folders/suggest" ? await suggestFolders(dn, env.DRIFTNET_LANGUAGE || "English") : applySuggested(dn, await readJson<unknown>(req));
       return send(res, out.status, out.body);
+    }
+    // First run: swap the untouched starter folders for another template. 409 once the reader has put anything in.
+    if (req.method === "POST" && path === "/api/folders/template") {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      try {
+        return send(res, 200, { template: applyFolderTemplate(dn.store, String((await readJson<{ template?: string }>(req)).template ?? "")) });
+      } catch (err) {
+        if (err instanceof TemplateError) return send(res, err.message.startsWith("unknown") ? 400 : 409, { error: err.message });
+        throw err;
+      }
     }
     const folderMatch = /^\/api\/folders(?:\/([^/]+))?$/.exec(path);
     if (folderMatch && req.method !== "GET") {

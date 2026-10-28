@@ -51,16 +51,25 @@ export function useResolverForTests(fake: Resolver): () => void {
   };
 }
 
-/** net.connect-compatible lookup that refuses private answers. */
+/** net.connect-compatible lookup that refuses private answers (except for `allowHost`, the one name the caller was explicitly told to reach). */
+function guardedLookupFor(allowHost?: string) {
+  return (
+    hostname: string,
+    options: LookupOptions,
+    callback: (err: Error | null, address: string | LookupAddress[], family?: number) => void,
+  ): void => guardedLookup(hostname, options, callback, allowHost);
+}
+
 function guardedLookup(
   hostname: string,
   options: LookupOptions,
   callback: (err: Error | null, address: string | LookupAddress[], family?: number) => void,
+  allowHost?: string,
 ): void {
   resolve(hostname).then(
     (answers) => {
       if (!answers.length) return callback(new BlockedUrl(`${hostname} did not resolve`), "");
-      if (!allowPrivate() && !answers.every((a) => isPublicAddress(a.address))) {
+      if (!allowPrivate() && hostname.toLowerCase() !== allowHost && !answers.every((a) => isPublicAddress(a.address))) {
         return callback(new BlockedUrl(`${hostname} resolves to a private or local address`), "");
       }
       if (options.all) return callback(null, answers);
@@ -71,24 +80,36 @@ function guardedLookup(
 }
 
 const dispatcher = new Agent({ connect: { lookup: guardedLookup as never } });
+const hostDispatchers = new Map<string, Agent>();
+/** A dispatcher that also reaches one named private host (kept per host, so keep-alive still works). */
+function dispatcherFor(allowHost?: string): Agent {
+  if (!allowHost) return dispatcher;
+  let d = hostDispatchers.get(allowHost);
+  if (!d) hostDispatchers.set(allowHost, (d = new Agent({ connect: { lookup: guardedLookupFor(allowHost) as never } })));
+  return d;
+}
 
-function assertAllowed(url: URL): void {
+function assertAllowed(url: URL, allowHost?: string): void {
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new BlockedUrl(`${url.protocol} links are not fetched`);
   // Literal IPs never go through DNS, so they are checked here.
   const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (!allowPrivate() && isIP(host) && !isPublicAddress(host)) {
+  if (!allowPrivate() && host.toLowerCase() !== allowHost && isIP(host) && !isPublicAddress(host)) {
     throw new BlockedUrl(`${url.hostname} is a private or local address`);
   }
 }
 
-/** fetch() that refuses private targets on every hop. Max 5 redirects. */
-export async function safeFetch(input: string, init: RequestInit = {}): Promise<Response> {
+/**
+ * fetch() that refuses private targets on every hop. Max 5 redirects.
+ * `allowHost`: one host name the caller was told to reach on purpose (the user's own webhook); redirects elsewhere stay guarded.
+ */
+export async function safeFetch(input: string, init: RequestInit = {}, allowHost?: string): Promise<Response> {
   let url = new URL(input);
+  const allow = allowHost?.toLowerCase().replace(/^\[|\]$/g, "");
   for (let hop = 0; hop <= 5; hop++) {
-    assertAllowed(url);
+    assertAllowed(url, allow);
     let res: Response;
     try {
-      res = (await undiciFetch(url, { ...(init as UndiciInit), redirect: "manual", dispatcher })) as unknown as Response;
+      res = (await undiciFetch(url, { ...(init as UndiciInit), redirect: "manual", dispatcher: dispatcherFor(allow) })) as unknown as Response;
     } catch (err) {
       // undici wraps lookup errors as "fetch failed"; surface the refusal itself.
       const cause = (err as { cause?: unknown }).cause;

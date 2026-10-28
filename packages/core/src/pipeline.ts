@@ -5,7 +5,7 @@ import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
 import { enrichSchema, normalizeSummary, type Summarizer } from "./summarize.ts";
-import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Suggestion, Summary } from "./types.ts";
+import type { Digest, IngestResult, Item, Judgement, PageContent, ShareContext, Suggestion, Summary } from "./types.ts";
 import { keywordSuggestions } from "./suggest.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
 import { clipTokens, digestBudget } from "./digest.ts";
@@ -42,7 +42,14 @@ export class Pipeline {
   /** Links being processed right now, so simultaneous shares pay once. */
   private readonly inflight = new Map<string, Promise<IngestResult>>();
 
+  /** Called (never awaited) whenever an item is finished: summarised, or stored without a model. One place for webhooks and the like. */
+  onItem?: (item: Item, event: "item.added" | "item.updated") => void;
+
   constructor(private readonly opts: PipelineOptions) {}
+
+  private done(item: Item, event: "item.added" | "item.updated"): void {
+    try { this.onItem?.(item, event); } catch (err) { console.warn(`[driftnet] item hook failed: ${(err as Error).message}`); }
+  }
 
   /** Swap the judge, model and rules in place; work already running finishes with the old ones. */
   configure(engines: Engines): void {
@@ -177,6 +184,8 @@ export class Pipeline {
       flags, source, suggestions,
     });
     store.recordShare(item.id, ctx);
+    // Stored without a model counts too (an agent's later summary is announced as item.updated by enrich()).
+    this.done(store.get(item.id)!, hit ? "item.updated" : "item.added");
     const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
     for (const r of related) store.linkFound(item.id, r.item.id);
     return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
@@ -241,6 +250,7 @@ export class Pipeline {
     if (summary.primaryUrl && !(await urlExists(summary.primaryUrl))) delete summary.primaryUrl;
 
     const saved = this.opts.store.enrich(id, summary, agent, { ...(category ? { category } : {}), ...(worth ? { worth } : {}) });
+    this.done(saved, "item.updated");
     const digest: Digest = { url: saved.url, kind: saved.kind, title: saved.title, text: "", outlinks: [], meta: {} };
     const related = await this.resolveMentions(summary.mentions ?? [], digest, { platform: "agent", chatId: agent }, 0);
     for (const r of related) this.opts.store.linkFound(id, r.item.id);

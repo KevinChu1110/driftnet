@@ -11,6 +11,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="alternate" type="application/atom+xml" title="driftnet" href="/feed.xml">
 <style>
   :root {
     --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
@@ -309,6 +310,8 @@
   .empty.first { display: grid; gap: 14px; justify-items: center; }
   .empty.first .add { display: flex; gap: 8px; width: min(520px, 100%); }
   .empty.first .add input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
+  .empty.first .tpl { display: grid; gap: 6px; justify-items: center; margin-top: 8px; }
+  .empty.first .tpl-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
   .empty.first .btn { display: inline-flex; align-items: center; gap: 6px; }
   @media (pointer: coarse) {
     .mnode .opt { padding: 10px; margin: -6px -12px -6px 0; }
@@ -660,6 +663,7 @@
       emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "Download a backup (Markdown)", exportVault: "Download for Obsidian / Notion",
       saved: "Saved", settings: "Settings", pickedUp: (n) => `Picked up “${n}” — tap the folder it goes into`, alreadyThere: "It's already in that folder",
       readOnlyNudge: "You can only look here — tap Unlock at the top to change things", filterFolders: "Type to find a folder…", undoHint: "z undoes",
+      tplTitle: "Start with folders for:", tplAi: "AI & coding", tplResearch: "Research", tplEveryday: "Everyday", tplSkip: "Keep the default", tplFailed: "Can't change the folders now: you already have cards or changed them.",
       addLink: "Add", addPlaceholder: "Paste a link to a tool, post or video…", added: "Saved — sorting it now",
       shortcuts: "Keys: j / k next / previous · f favorite · m move · n note · # trash · / search · g m mind map",
       keysTitle: "Keyboard shortcuts", keysMove: "Move, favorite, trash", keysSelect: "Select several cards", keysGo: "Go to", keysQuick: "File into your most-used folders",
@@ -689,7 +693,7 @@
         plugins: "Plugins", pluginsNone: (dir) => `No plugins. Put .js files in ${dir} — see examples/plugins in the repo.`,
         status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries: ${e.summarizer === "off" ? "off" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
-        savedServer: "Saved — already in effect", chat: "Chat replies", genCopied: "New password generated and copied — press Save to keep it",
+        savedServer: "Saved — already in effect", chat: "Chat replies", webhook: "Outgoing webhook", feed: "Feed (RSS)", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
         accessStatus: (pw, key, url) => `Password: ${pw === "✓" ? "set" : "not set"} · Share key: ${key === "✓" ? "made" : "none"} · Public URL: ${url === "—" ? "off" : url}`,
         access: "Access & connections",
@@ -738,6 +742,9 @@
           DRIFTNET_PUBLIC_URL: ["This page's public URL", "Replies link here, e.g. https://driftnet.example.com"],
           DRIFTNET_SUMMARY_RULES: ["Extra rules for summaries", "e.g. Say whether it's free. Mention if it needs a GPU."],
           DRIFTNET_BLOCK_DOMAINS: ["Never catalogue these domains", "Comma or space separated, e.g. example.com, spam.io"],
+          DRIFTNET_WEBHOOK_URL: ["Webhook URL", "driftnet POSTs each new or updated card here (n8n, Zapier, Slack workflows…). Treated as a secret."],
+          DRIFTNET_WEBHOOK_SECRET: ["Webhook signing secret", "Optional. Adds X-Driftnet-Signature: sha256=<HMAC of the body>."],
+          DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["Allow a local webhook", "Needed when the receiver is on your own network (n8n on a LAN). Only that exact address is allowed."],
         },
         choices: {
           DRIFTNET_LLM_PROVIDER: { "": "None", anthropic: "Anthropic (API key)", openai: "OpenAI-compatible (OpenAI, Gemini, Grok, Ollama…)", "claude-cli": "Claude subscription (Claude Code CLI)", "gemini-cli": "Google account (Gemini CLI)" },
@@ -745,6 +752,7 @@
           DRIFTNET_JUDGE: { "": "On when a key is set", off: "Off" },
           DRIFTNET_LOCALE: { "": "Same as the summaries", en: "English", "zh-TW": "繁體中文" },
           DRIFTNET_REPLY: { "": "One line + link (default)", link: "One line + link", full: "Full summary", off: "Don't reply" },
+          DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "No (public addresses only)", 1: "Yes" },
         },
       },
     },
@@ -786,6 +794,7 @@
       emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "下載備份（Markdown）", exportVault: "下載給 Obsidian／Notion",
       saved: "已儲存", settings: "設定", pickedUp: (n) => `已拿起「${n}」，點要放進去的資料夾`, alreadyThere: "它已經在這個資料夾裡了",
       readOnlyNudge: "目前只能看。要修改，請點上方的「解鎖」", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
+      tplTitle: "從這些資料夾開始：", tplAi: "AI 與程式", tplResearch: "研究", tplEveryday: "日常生活", tplSkip: "維持預設", tplFailed: "現在不能換資料夾了：已經有卡片，或資料夾被你改過。",
       addLink: "收錄", addPlaceholder: "貼上工具、貼文或影片的連結…", added: "收到，正在整理",
       shortcuts: "快捷鍵：j／k 下一張／上一張 · f 最愛 · m 移動 · n 筆記 · # 垃圾桶 · / 搜尋 · g m 樹狀圖",
       keysTitle: "快捷鍵", keysMove: "移動、最愛、垃圾桶", keysSelect: "一次選多張卡片", keysGo: "切換畫面", keysQuick: "放進最常用的資料夾",
@@ -815,7 +824,7 @@
         plugins: "外掛", pluginsNone: (dir) => `沒有外掛。把 .js 檔放進 ${dir}，範例在 repo 的 examples/plugins。`,
         status: (e) => `目前：分類用 ${({ jev: "Jev", llm: "模型", heuristic: "內建規則" })[e.judge] ?? e.judge}，摘要用 ${e.summarizer === "off" ? "（未開啟）" : e.summarizer}`, keep: "已設定，留空就不變", unset: "未設定",
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
-        savedServer: "已儲存，馬上生效", chat: "聊天室回覆", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
+        savedServer: "已儲存，馬上生效", chat: "聊天室回覆", webhook: "對外 Webhook", feed: "訂閱源（RSS）", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
         tabGeneral: "一般", tabAccess: "存取", tabAi: "AI",
         accessStatus: (pw, key, url) => `密碼：${pw === "✓" ? "已設定" : "未設定"} · 分享碼：${key === "✓" ? "已產生" : "沒有"} · 公開網址：${url === "—" ? "關閉" : url}`,
         access: "存取與連線",
@@ -864,6 +873,9 @@
           DRIFTNET_PUBLIC_URL: ["這個網頁的公開網址", "回覆裡的連結會指到這裡，例如 https://driftnet.example.com"],
           DRIFTNET_SUMMARY_RULES: ["摘要的額外規則", "例如：說明是否免費。需要 GPU 的話要提到。"],
           DRIFTNET_BLOCK_DOMAINS: ["不要收錄的網域", "用逗號或空白分隔，例如 example.com, spam.io"],
+          DRIFTNET_WEBHOOK_URL: ["Webhook 網址", "每張新增或更新的卡片都會 POST 到這裡（n8n、Zapier、Slack 工作流程…）。視為機密。"],
+          DRIFTNET_WEBHOOK_SECRET: ["Webhook 簽章密鑰", "選填。會加上 X-Driftnet-Signature: sha256=<內容的 HMAC>。"],
+          DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["允許本機 Webhook", "接收端在你自己的區域網路時需要（例如內網的 n8n）。只放行你填的那個位址。"],
         },
         choices: {
           DRIFTNET_LLM_PROVIDER: { "": "不使用", anthropic: "Anthropic（API 金鑰）", openai: "OpenAI 相容（OpenAI、Gemini、Grok、Ollama…）", "claude-cli": "Claude 訂閱（Claude Code CLI）", "gemini-cli": "Google 帳號（Gemini CLI）" },
@@ -871,6 +883,7 @@
           DRIFTNET_JUDGE: { "": "有金鑰就開", off: "關閉" },
           DRIFTNET_LOCALE: { "": "跟摘要一樣", en: "English", "zh-TW": "繁體中文" },
           DRIFTNET_REPLY: { "": "一行＋連結（預設）", link: "一行＋連結", full: "完整摘要", off: "不回覆" },
+          DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "否（只允許公開位址）", 1: "是" },
         },
       },
     },
@@ -1437,7 +1450,7 @@
       const yes = (b) => (b ? "✓" : "—");
       const accessStatus = `<p class="set-status">${esc(st.accessStatus(yes(a.passwordSet), yes(a.readKey), a.tunnel.running ? a.tunnel.url : "—"))}</p>`;
       server = {
-        general: group("language") + group("chat"),
+        general: group("language") + group("chat") + group("webhook"),
         access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) + pairPanel(serverSettings.access) : ""),
         ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,
@@ -2376,6 +2389,8 @@
         zh ? "只要 AI 會開網址就行，把這段貼進對話。唯讀。" : "Any AI that can open a link: paste this into the chat. Read-only.",
         zh ? `讀一下 ${withKey(`${base}/llms.txt`)} ，這是我收藏的 AI 工具清單。幫我找適合「（你的需求）」的工具。`
            : `Read ${withKey(`${base}/llms.txt`)} — it's my catalogue of AI tools. Find me one for: (your task).`),
+      card("feed", st.feed, zh ? "RSS／Atom 訂閱源：最新 50 張卡片。給 RSS 閱讀器或 n8n、Zapier 用；加上 ?folder=資料夾代號 可只看一個資料夾。" : "RSS / Atom feed of the newest 50 cards, for feed readers, n8n or Zapier. Add ?folder=<folder-id> for one folder.",
+        withKey(`${base}/feed.xml`)),
       card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。把裡面的 <你的管理密碼> 換成真的密碼；有了它，agent 可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. Replace <your-admin-password> with the real one; with it they can save, vote and work the queue.",
         JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2), "Hermes"),
     ].join("");
@@ -2649,6 +2664,26 @@
       else moveItem(id, to);
     });
   })();
+  /** One-time chooser on a brand-new catalogue whose folders are still the untouched starter set. */
+  const untouchedSeed = () => folders.length > 0 && folders.every((f) => f.builtin && !f.name && !f.parent);
+  function templateChooser(t) {
+    if (!untouchedSeed() || store.get("driftnet-template-seen")) return "";
+    return `<div class="tpl"><small>${esc(t.tplTitle)}</small><div class="tpl-row">${[["ai", t.tplAi], ["research", t.tplResearch], ["everyday", t.tplEveryday]]
+      .map(([k, l]) => `<button class="btn" type="button" data-template="${k}">${esc(l)}</button>`).join("")}</div></div>`;
+  }
+  async function pickTemplate(template) {
+    store.set("driftnet-template-seen", "1");
+    // "ai" is what is already there: nothing to replace.
+    if (template !== "ai") {
+      const token = store.get("driftnet-token");
+      const res = await fetch("/api/folders/template", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+                                                         body: JSON.stringify({ template }) }).catch(() => null);
+      if (res?.status === 401) return needAdmin();
+      if (!res?.ok) toast(res?.status === 409 ? T().tplFailed : T().failed);
+    }
+    folders = await api("/api/folders").catch(() => folders);
+    await load();
+  }
   async function renderCards() {
     const p = new URLSearchParams({ limit: "300" });
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
@@ -2662,8 +2697,9 @@
       : `<div class="empty first"><span>${esc(empty)}</span>${state.view === "all" && !state.q && !state.category && role === "admin"
           ? `<form class="add" id="add-form"><input id="add-url" type="url" inputmode="url" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
              <button class="btn primary" type="submit">${ic("plus")} ${esc(t.addLink)}</button></form>
-             <button class="btn" type="button" data-connect-empty>${ic("plug")} ${esc(t.st.connect)}</button>` : ""}</div>`;
+             <button class="btn" type="button" data-connect-empty>${ic("plug")} ${esc(t.st.connect)}</button>${templateChooser(t)}` : ""}</div>`;
     $("add-form")?.addEventListener("submit", addLink);
+    for (const b of $("list").querySelectorAll("[data-template]")) b.addEventListener("click", () => pickTemplate(b.dataset.template));
     $("list").querySelector("[data-connect-empty]")?.addEventListener("click", () => openConnect());
     for (const el of $("list").querySelectorAll(".swipe")) attachSwipe(el);
     syncSelection();

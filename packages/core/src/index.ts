@@ -9,6 +9,7 @@ import { createProvider } from "./llm/index.ts";
 import type { LlmProvider } from "./llm/types.ts";
 import { Summarizer } from "./summarize.ts";
 import { categoryLabel, resolveLocale, type Locale } from "./i18n.ts";
+import { sendWebhook } from "./webhook.ts";
 import { defaultDbPath } from "./home.ts";
 
 export * from "./types.ts";
@@ -16,7 +17,7 @@ export { canonicalize, extractUrls } from "./url.ts";
 export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/index.ts";
 export { guard } from "./guard.ts";
 export { Pipeline } from "./pipeline.ts";
-export { DEFAULT_CATEGORIES, loadCategories } from "./categories.ts";
+export { DEFAULT_CATEGORIES, FOLDER_TEMPLATES, TEMPLATE_NAMES, isTemplate, loadCategories, applyFolderTemplate, TemplateError, type FolderTemplate } from "./categories.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";
 export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation } from "./store.ts";
@@ -25,6 +26,7 @@ export { Summarizer } from "./summarize.ts";
 export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
+export { sendWebhook, shouldNotify, webhookPayload, signBody } from "./webhook.ts";
 export { renderLink, renderText } from "./render.ts";
 export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
 export type { Judge, JudgeResult } from "./judge/index.ts";
@@ -49,7 +51,7 @@ export interface Driftnet {
 export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   const store = new Store(env.DRIFTNET_DB ?? defaultDbPath(env));
   // The reader's folder tree is the taxonomy; the built-in shelves only seed it.
-  store.seedFolders(loadCategories());
+  store.seedFolders(loadCategories(env));
   const folderLabel = (id: string, locale: Locale = resolveLocale(env)): string =>
     store.folders().find((f) => f.id === id)?.name ?? categoryLabel(id, locale);
   const choices = () => store.folderChoices((f) => f.name ?? categoryLabel(f.id, "en"));
@@ -62,6 +64,8 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
     },
   });
   pipeline.configure(built.engines);
+  // Read per event, so ⚙ Settings can set the webhook without a restart. Fire and forget.
+  pipeline.onItem = (item, event) => { if (env.DRIFTNET_WEBHOOK_URL) void sendWebhook(store, item, event, env); };
   return {
     pipeline,
     store,

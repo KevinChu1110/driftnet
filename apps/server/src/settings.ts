@@ -11,7 +11,7 @@ import { driftnetHome } from "@driftnet/core";
  */
 export interface Setting {
   key: string;
-  group: "model" | "language" | "chat" | "rules" | "access";
+  group: "model" | "language" | "chat" | "rules" | "access" | "webhook";
   secret?: boolean;
   choices?: readonly string[];
   multiline?: boolean;
@@ -34,6 +34,10 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_PUBLIC_URL", group: "chat" },
   { key: "DRIFTNET_SUMMARY_RULES", group: "rules", multiline: true, max: 1000 },
   { key: "DRIFTNET_BLOCK_DOMAINS", group: "rules", max: 2000 },
+  // Outgoing webhook: the URL is secret-ish (tokens often live in it), so it is masked like a key.
+  { key: "DRIFTNET_WEBHOOK_URL", group: "webhook", secret: true },
+  { key: "DRIFTNET_WEBHOOK_SECRET", group: "webhook", secret: true, max: 200 },
+  { key: "DRIFTNET_WEBHOOK_ALLOW_LOCAL", group: "webhook", choices: ["", "1"] },
   // Access: the page shows these in their own panel (password strength, share key, public URL).
   { key: "DRIFTNET_TOKEN", group: "access", secret: true, min: 8, max: 200 },
   { key: "DRIFTNET_READ_KEY", group: "access", min: 16, max: 200 },
