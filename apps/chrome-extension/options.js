@@ -18,7 +18,10 @@ $("save").addEventListener("click", async () => {
       if (!granted) return void (result.textContent = t("permissionDenied"));
     }
     await chrome.storage.local.set({ serverUrl, token: $("token").value.trim() });
-    const stats = await (await fetch(`${serverUrl}/api/stats`)).json();
+    const token = $("token").value.trim();
+    const res = await fetch(`${serverUrl}/api/stats`, token ? { headers: { authorization: `Bearer ${token}` } } : {});
+    if (res.status === 401) throw new Error("HTTP 401 — check the token");
+    const stats = await res.json();
     result.textContent = t("savedOk", String(stats.items));
   } catch (err) {
     result.textContent = `${t("failed")}: ${err.message}`;

@@ -1,8 +1,8 @@
 import type { Digest } from "../types.ts";
-import { clip, fetchText, metaTags } from "./http.ts";
+import { fetchText, metaTags } from "./http.ts";
+import { clipTokens, digestBudget } from "../digest.ts";
 import { extractUrls } from "../url.ts";
 
-const DESCRIPTION_BUDGET = 1500;
 
 export function matchYoutube(url: string): string | null {
   return /^https:\/\/youtube\.com\/watch\?(?:.*&)?v=([\w-]{6,})/.exec(url)?.[1] ?? null;
@@ -25,7 +25,7 @@ export async function extractYoutube(url: string): Promise<Digest | null> {
     url: `https://youtube.com/watch?v=${id}`,
     kind: "video",
     title: meta["og:title"] ?? meta["title"] ?? id,
-    text: clip(description, DESCRIPTION_BUDGET),
+    text: clipTokens(description, digestBudget()),
     outlinks: extractUrls(description).filter((u) => !u.includes("youtube.com")).slice(0, 10),
     meta: { channel },
   };

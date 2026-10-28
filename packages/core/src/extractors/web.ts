@@ -1,12 +1,12 @@
 import type { Digest, Kind } from "../types.ts";
-import { clip, fetchText, metaTags, visibleText } from "./http.ts";
+import { decodeEntities, fetchText, metaTags } from "./http.ts";
+import { clipTokens, digestBudget, outlineHtml } from "../digest.ts";
 import { canonicalize, extractUrls, hostOf } from "../url.ts";
 
-const TEXT_BUDGET = 2000;
 
 /** Sites that hide the post behind a login wall for anonymous fetches. */
 const SOCIAL_HOSTS = [
-  "threads.net", "facebook.com", "fb.watch", "instagram.com", "x.com", "twitter.com",
+  "threads.net", "threads.com", "facebook.com", "fb.watch", "instagram.com", "x.com", "twitter.com",
   "linkedin.com", "tiktok.com",
 ];
 
@@ -35,8 +35,11 @@ export async function extractWeb(url: string): Promise<Digest | null> {
   const caption = (meta["og:title"] ?? "").replace(/^[^|]*(?:views|觀看|reactions|心情)[^|]*\|\s*/i, "");
   const short = meta["og:description"] ?? meta["description"] ?? "";
   const description = social && caption.length > short.length ? caption : short;
-  const body = social ? "" : visibleText(page.body);
-  const text = [description, body].filter(Boolean).join("\n\n");
+  // Social pages are login walls apart from their meta caption; others get an outline.
+  const budget = digestBudget();
+  const lead = clipTokens(description, Math.floor(budget / 3));
+  const body = social ? "" : outlineHtml(page.body, budget - (lead ? Math.ceil(lead.length / 2) : 0));
+  const text = [lead, body].filter(Boolean).join("\n\n");
 
   const kind: Kind = social
     ? (meta["og:type"]?.startsWith("video") ? "video" : "post")
@@ -48,10 +51,29 @@ export async function extractWeb(url: string): Promise<Digest | null> {
     url: canonicalize(page.url) ?? url,
     kind,
     title: firstLine(social ? caption || short : meta["og:title"] ?? meta["twitter:title"] ?? meta["title"] ?? "") || hostOf(url),
-    text: clip(text, TEXT_BUDGET),
-    outlinks: extractUrls(text).filter((u) => hostOf(u) !== hostOf(url)).slice(0, 10),
+    text,
+    outlinks: [...new Set([...extractUrls(text), ...(social ? [] : contentLinks(page.body, page.url))])]
+      .filter((u) => hostOf(u) !== hostOf(url))
+      .slice(0, 10),
     meta: { site: meta["og:site_name"] ?? hostOf(url) },
   };
+}
+
+/** Links inside the main content (not nav, header, footer, sidebars), absolute and canonical. */
+function contentLinks(html: string, base: string): string[] {
+  const main =
+    /<(article|main)[\s>][\s\S]*?<\/\1>/i.exec(html)?.[0] ?? /<body[\s>][\s\S]*<\/body>/i.exec(html)?.[0] ?? html;
+  const body = main.replace(/<(nav|header|footer|aside|script|style)[\s>][\s\S]*?<\/\1>/gi, " ");
+  const out: string[] = [];
+  for (const m of body.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"'#][^"']*)["']/gi)) {
+    try {
+      const u = canonicalize(new URL(decodeEntities(m[1]!), base).href);
+      if (u) out.push(u);
+    } catch {
+      // relative junk, javascript: links
+    }
+  }
+  return out;
 }
 
 export function isLoginWall(url: string): boolean {

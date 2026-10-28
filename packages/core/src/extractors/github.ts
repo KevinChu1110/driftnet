@@ -1,8 +1,8 @@
 import type { Digest } from "../types.ts";
-import { clip, fetchText } from "./http.ts";
+import { fetchText } from "./http.ts";
+import { digestBudget, outlineMarkdown } from "../digest.ts";
 import { extractUrls } from "../url.ts";
 
-const README_BUDGET = 2500;
 
 export function matchGithub(url: string): { owner: string; repo: string } | null {
   const m = /^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/.exec(url);
@@ -34,7 +34,7 @@ export async function extractGithub(url: string): Promise<Digest | null> {
     url: `https://github.com/${repo.full_name}`.toLowerCase(),
     kind: "repo",
     title: repo.full_name,
-    text: [repo.description ?? "", clip(readme, README_BUDGET)].filter(Boolean).join("\n\n"),
+    text: [repo.description ?? "", outlineMarkdown(readme, digestBudget())].filter(Boolean).join("\n\n"),
     outlinks: repo.homepage ? extractUrls(repo.homepage) : [],
     meta: {
       stars: repo.stargazers_count,

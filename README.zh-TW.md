@@ -70,6 +70,13 @@ bot ▸ 📌 本週 AI 大事 (3/11)｜news
 - 「本週 AI 大事」這類整理文 → 整理文一筆，它提到的每個開源專案再各一筆。
 - 好幾個連結黏在一起沒空格，也能正確拆開。
 
+### 讀大綱，不讀整頁
+
+借用 [Moli](https://github.com/lexmount/moli) 這類 agent 瀏覽器的概念，但不需要裝它：先把頁面整理成骨架
+（標題、每段開頭、清單重點），拿掉選單、麵包屑、Cookie 提示和頁尾，再用 **token** 而不是字元設上限；
+中文、日文大約一個字算一個 token，英文大約四個字元算一個。實測真實分享的連結：一篇中文文章從 831 降到 404 token，
+README 開頭的 `<strong>Quickstart</strong> &middot;` 這類殘渣也不會再送給模型。
+
 ### 學會排除垃圾
 
 - 在聊天室（`👎12 廣告`）、網頁上或由 agent 投票，票數會累積成發布者的信譽。發布者指 GitHub 帳號、YouTube 頻道或網域。
@@ -222,7 +229,9 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_CATEGORIES` | 內建 | 自訂分類的 JSON 檔：`{ "id": "說明" }` |
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
-| `DRIFTNET_TOKEN` | — | 伺服器公開後，寫入（收錄、投票、MCP）都需要這個 token |
+| `DRIFTNET_TOKEN` | — | 伺服器能從外部連到時，寫入（收錄、投票、MCP）都需要這個 token |
+| `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀，寫入要 token。`private`：連讀取都要 token，網頁第一次開會請你輸入 |
+| `DRIFTNET_DIGEST_TOKENS` | `350` | 送給判斷器和模型的頁面大綱的 token 預算 |
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
 | `DRIFTNET_DB` | `./data/driftnet.db` | SQLite 檔案位置 |
 | `PORT` | `8787` | HTTP 埠號 |
@@ -231,6 +240,21 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 **HTTP 端點：** `GET /` 網頁 · `GET /api/items` · `GET /api/items/:id` ·
 `POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+
+## 放上網路
+
+伺服器預設只聽 `127.0.0.1`。要從手機或其他電腦連，在前面加一個有 HTTPS 的反向代理，並選擇誰可以讀：
+
+```bash
+DRIFTNET_TOKEN=$(openssl rand -hex 24)
+DRIFTNET_ACCESS=private        # 或 public：清單公開，寫入照樣要 token
+```
+
+```caddyfile
+driftnet.example.com {
+	reverse_proxy 127.0.0.1:8787
+}
+```
 
 ## 資料去哪裡
 

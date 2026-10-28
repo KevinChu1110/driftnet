@@ -68,6 +68,9 @@ export function decodeEntities(s: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ")
+    .replace(/&(middot|bull|mdash|ndash|hellip|lsquo|rsquo|ldquo|rdquo|copy|reg|trade|laquo|raquo);/g, (_, n: string) =>
+      ({ middot: "·", bull: "•", mdash: "—", ndash: "–", hellip: "…", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”",
+         copy: "©", reg: "®", trade: "™", laquo: "«", raquo: "»" })[n]!)
     .replace(/&amp;/g, "&");
 }
 

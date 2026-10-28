@@ -1,4 +1,5 @@
 import type { Digest, Judgement } from "../types.ts";
+import { clipTokens, digestBudget } from "../digest.ts";
 
 /**
  * A judge answers multiple-choice questions about a digest. It never writes prose,
@@ -25,8 +26,9 @@ export function judgeState(digest: Digest, note: string | undefined): string {
     `URL: ${digest.url}`,
     `Title: ${digest.title}`,
     meta && `Meta: ${meta}`,
-    note && `Shared with note: ${note.slice(0, 500)}`,
-    digest.text && `Content:\n${digest.text.slice(0, 1200)}`,
+    note && `Shared with note: ${clipTokens(note, 150)}`,
+    // Extractors already outline and budget the content; this is a safety net.
+    digest.text && `Content:\n${clipTokens(digest.text, digestBudget())}`,
   ]
     .filter(Boolean)
     .join("\n");

@@ -27,6 +27,8 @@ export function openApi(serverUrl: string) {
     openapi: "3.1.0",
     info: { title: "driftnet", version: "0.1.0", description: "Search and save shared AI tools." },
     servers: [{ url: serverUrl }],
+    components: { securitySchemes: { bearer: { type: "http", scheme: "bearer" } } },
+    security: [{ bearer: [] }],
     paths: {
       "/api/items": {
         get: {

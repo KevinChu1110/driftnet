@@ -6,6 +6,7 @@ import type { Store } from "./store.ts";
 import type { Summarizer } from "./summarize.ts";
 import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Summary } from "./types.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
+import { clipTokens, digestBudget } from "./digest.ts";
 
 export interface PipelineOptions {
   store: Store;
@@ -173,9 +174,6 @@ export class Pipeline {
   }
 }
 
-/** Text the fetched page budget allows; matches the web extractor. */
-const PAGE_TEXT_BUDGET = 2000;
-
 /** Prefer what the browser saw when it says more than the anonymous fetch did. */
 function withPage(digest: Digest, page: PageContent | undefined): Digest {
   if (!page) return digest;
@@ -186,7 +184,7 @@ function withPage(digest: Digest, page: PageContent | undefined): Digest {
   return {
     ...digest,
     title: digest.title === digest.url || !digest.title ? page.title?.trim() || digest.title : digest.title,
-    text: text.length > digest.text.length ? text.slice(0, PAGE_TEXT_BUDGET) : digest.text,
+    text: text.length > digest.text.length ? clipTokens(text, digestBudget()) : digest.text,
     outlinks: [...new Set([...digest.outlinks, ...links])].slice(0, 20),
   };
 }

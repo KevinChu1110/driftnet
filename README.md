@@ -75,6 +75,15 @@ Social posts are usually *about* a tool, not the tool itself:
 - A weekly roundup → one item for the roundup, plus one per open-source project it mentions.
 - Links pasted back-to-back without spaces are split correctly.
 
+### Reads the outline, not the whole page
+
+Borrowing the idea behind agent browsers such as [Moli](https://github.com/lexmount/moli), without
+running one: a page is turned into its skeleton (headings, the opening of each section, key list
+items) with menus, breadcrumbs, cookie banners and footers removed, then capped in **tokens**,
+counting Chinese and Japanese text at about one token per character instead of four characters
+per token. On real shared links, a Chinese article went from 831 to 404 tokens, and README
+headers like `<strong>Quickstart</strong> &middot;` no longer reach the model.
+
 ### Learns what to ignore
 
 - Vote in chat (`👎12 ad`), on the web, or from an agent. Votes add up to a reputation per
@@ -244,7 +253,9 @@ All settings are environment variables. See [`.env.example`](.env.example).
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_CATEGORIES` | built-in | JSON file of your own shelves: `{ "id": "description" }` |
 | `GITHUB_TOKEN` | — | Raises the GitHub API limit from 60 to 5,000 requests per hour |
-| `DRIFTNET_TOKEN` | — | Required for writes (ingest, votes, MCP) once the server is public |
+| `DRIFTNET_TOKEN` | — | Required for writes (ingest, votes, MCP) once the server is reachable |
+| `DRIFTNET_ACCESS` | `public` | `public`: anyone can read, writes need the token. `private`: every read needs the token too; the web page asks for it once |
+| `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget for the page outline sent to the judge and the model |
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
 | `DRIFTNET_DB` | `./data/driftnet.db` | SQLite file |
 | `PORT` | `8787` | HTTP port |
@@ -253,6 +264,22 @@ All settings are environment variables. See [`.env.example`](.env.example).
 **HTTP endpoints:** `GET /` web page · `GET /api/items` · `GET /api/items/:id` ·
 `POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+
+## Putting it online
+
+By default the server listens on `127.0.0.1` only. To reach it from a phone or another computer,
+put a reverse proxy with HTTPS in front and choose who may read:
+
+```bash
+DRIFTNET_TOKEN=$(openssl rand -hex 24)
+DRIFTNET_ACCESS=private        # or public: an open catalogue, writes still need the token
+```
+
+```caddyfile
+driftnet.example.com {
+	reverse_proxy 127.0.0.1:8787
+}
+```
 
 ## Where your data goes
 

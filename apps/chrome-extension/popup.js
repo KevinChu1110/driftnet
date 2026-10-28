@@ -7,7 +7,8 @@ $("settings").textContent = t("openSettings");
 /** Category display names come from the server, in the browser's language. */
 async function categoryLabel(serverUrl, id) {
   try {
-    const ui = await (await fetch(`${serverUrl}/api/ui`)).json();
+    const { token } = await chrome.storage.local.get("token");
+    const ui = await (await fetch(`${serverUrl}/api/ui`, token ? { headers: { authorization: `Bearer ${token}` } } : {})).json();
     const lang = chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh-TW" : "en";
     return ui.categories?.[id]?.[lang] ?? id;
   } catch {

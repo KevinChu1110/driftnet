@@ -66,6 +66,7 @@
   const STRINGS = {
     en: {
       title: "driftnet", search: "Search tools, tags, links…", all: "All", any: "Any",
+      tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
       categories: "Categories", kind: "Kind", switchTo: "中文",
       stats: (n, s) => `${n} items · shared ${s}×`, shared: (n) => `shared ${n}×`,
       empty: "Nothing here yet — drop a link in your chat.",
@@ -75,6 +76,7 @@
     },
     "zh-TW": {
       title: "driftnet", search: "搜尋工具、標籤、連結…", all: "全部", any: "不限",
+      tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
       categories: "分類", kind: "類型", switchTo: "EN",
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
       empty: "還沒有內容，把連結丟進聊天室吧。",
@@ -90,6 +92,27 @@
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 
+  // Private instances need the token on every read; it stays in this browser only.
+  async function api(path) {
+    const token = store.get("driftnet-token");
+    const res = await fetch(path, token ? { headers: { authorization: `Bearer ${token}` } } : {});
+    if (res.status === 401) throw Object.assign(new Error("unauthorized"), { unauthorized: true });
+    return res.json();
+  }
+
+  function askToken() {
+    $("nav").innerHTML = "";
+    $("list").innerHTML = `<form class="card" id="token-form">
+      <p>${esc(T().tokenPrompt)}</p>
+      <input id="token" type="password" autocomplete="current-password" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+      <p><button class="lang" type="submit">${esc(T().tokenSave)}</button></p></form>`;
+    $("token-form").onsubmit = (e) => {
+      e.preventDefault();
+      store.set("driftnet-token", $("token").value.trim());
+      load();
+    };
+  }
+
   let locale = "en";
   let catLabels = {};
   const T = () => STRINGS[locale] ?? STRINGS.en;
@@ -103,7 +126,13 @@
   }
 
   async function load() {
-    const [stats, ui] = await Promise.all([fetch("/api/stats").then((r) => r.json()), fetch("/api/ui").then((r) => r.json())]);
+    let stats, ui;
+    try {
+      [stats, ui] = await Promise.all([api("/api/stats"), api("/api/ui")]);
+    } catch (err) {
+      if (err.unauthorized) return askToken();
+      throw err;
+    }
     catLabels = ui.categories;
     // The viewer's choice wins over the server default.
     const saved = store.get("driftnet-locale");
@@ -132,7 +161,7 @@
   async function render() {
     const p = new URLSearchParams({ limit: "300" });
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
-    const items = await fetch(`/api/items?${p}`).then((r) => r.json());
+    const items = await api(`/api/items?${p}`);
     $("list").innerHTML = items.length ? items.map(card).join("") : `<div class="empty">${esc(T().empty)}</div>`;
     if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
   }

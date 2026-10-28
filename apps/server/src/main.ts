@@ -17,6 +17,15 @@ const PORT = Number(env.PORT ?? 8787);
 // Loopback by default: put a reverse proxy (Caddy, nginx, a tunnel) in front to expose it.
 const HOST = env.DRIFTNET_HOST ?? "127.0.0.1";
 const TOKEN = env.DRIFTNET_TOKEN;
+/**
+ * public  — anyone can read the catalogue; writes need DRIFTNET_TOKEN.
+ * private — every read needs the token too (the web page asks for it once).
+ */
+const PRIVATE = env.DRIFTNET_ACCESS === "private";
+if (PRIVATE && !TOKEN) {
+  console.error("DRIFTNET_ACCESS=private needs DRIFTNET_TOKEN to be set");
+  process.exit(1);
+}
 const indexHtml = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
 
 /** Writes (ingest, feedback, MCP) need DRIFTNET_TOKEN when it is set; reads are public. */
@@ -47,7 +56,9 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
   try {
+    // The page itself holds no data; in private mode it asks for the token.
     if (req.method === "GET" && path === "/") return send(res, 200, indexHtml, "text/html; charset=utf-8");
+    if (PRIVATE && req.method === "GET" && !authorized(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
