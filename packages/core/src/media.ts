@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { MediaRef } from "./types.ts";
 
 export const MAX_MEDIA = 6;
@@ -26,8 +27,21 @@ export function mediaKindOf(url: string): "image" | "gif" {
 /** The shape the page and API clients get: a proxy path, never the third-party URL. */
 export interface PublicMedia { src: string; kind: MediaRef["kind"]; alt: string }
 
+/**
+ * An <img> can't send the password, so on a private catalogue each picture path carries a signature
+ * the server made: it opens that one picture and nothing else, and stops working when the picture changes.
+ */
+let mediaSecret = "";
+export function setMediaSecret(secret: string): void { mediaSecret = secret; }
+const sign = (id: number, i: number, url: string) => createHmac("sha256", mediaSecret).update(`${id}/${i}/${url}`).digest("base64url").slice(0, 22);
+export function mediaSigOk(id: number, i: number, url: string, sig: string | null): boolean {
+  if (!mediaSecret || !sig) return false;
+  const want = Buffer.from(sign(id, i, url)), got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got);
+}
+
 export function publicMedia(id: number, media: MediaRef[] | undefined): PublicMedia[] {
-  return (media ?? []).map((m, i) => ({ src: `/api/media/${id}/${i}`, kind: m.kind, alt: m.alt }));
+  return (media ?? []).map((m, i) => ({ src: `/api/media/${id}/${i}${mediaSecret ? `?s=${sign(id, i, m.url)}` : ""}`, kind: m.kind, alt: m.alt }));
 }
 
 /** An item as served to clients: `media` becomes proxy paths. */

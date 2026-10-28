@@ -1,9 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { applyFolderTemplate, TemplateError, BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type IngestResult, type PageContent, publicItem, type Worth } from "@driftnet/core";
+import { applyFolderTemplate, TemplateError, BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type IngestResult, type PageContent, mediaSigOk, publicItem, setMediaSecret, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
 import { applySuggested, suggestFolders } from "./plan.ts";
 import { tokenRoute } from "./tokens.ts";
@@ -26,6 +27,13 @@ const fromEnvironment = new Set(Object.keys(env).filter((k) => env[k] !== undefi
 const envFile = loadHomeEnv(env);
 const plugins = await loadPlugins(env);
 const dn = createDriftnet();
+function signedMedia(path: string, sig: string | null): boolean {
+  const m = /^\/api\/media\/(\d+)\/(\d+)$/.exec(path);
+  const ref = m ? dn.store.get(Number(m[1]))?.media?.[Number(m[2])] : undefined;
+  return !!ref && mediaSigOk(Number(m![1]), Number(m![2]), ref.url, sig);
+}
+// Signs picture paths so <img> works on a private catalogue (see publicMedia).
+setMediaSecret(dn.store.getState("media_secret") ?? (() => { const s = randomBytes(32).toString("base64url"); dn.store.setState("media_secret", s); return s; })());
 const settings = new Settings(env, fromEnvironment);
 const PORT = Number(env.PORT ?? 8787);
 // Loopback by default: put a reverse proxy (Caddy, nginx, a tunnel) in front to expose it.
@@ -165,7 +173,7 @@ const server = createServer(async (req, res) => {
     // OAuth discovery probes (Claude.ai connectors): there is none, say so plainly instead of "unauthorized".
     if (path.startsWith("/.well-known/")) return send(res, 404, { error: "not found" });
     if (triedCredentials(req) && throttled(req)) return send(res, 429, { error: "too many wrong passwords; try again in 15 minutes" });
-    if (req.method === "GET" && !canRead(req, env, dn.store) && !isTrustedLocal(req)) return send(res, 401, { error: "unauthorized" });
+    if (req.method === "GET" && !canRead(req, env, dn.store) && !isTrustedLocal(req) && !signedMedia(path, url.searchParams.get("s"))) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/feed.xml") {
       const folder = url.searchParams.get("folder") || undefined;

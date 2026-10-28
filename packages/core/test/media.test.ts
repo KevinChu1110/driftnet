@@ -130,3 +130,16 @@ test("refreshMedia updates only the pictures", async () => {
   assert.equal(after?.title, before.title);
   assert.deepEqual(after?.summary, before.summary);
 });
+
+test("picture paths are signed per picture and stop working when the picture changes", async () => {
+  const { setMediaSecret, publicMedia, mediaSigOk } = await import("../src/media.ts");
+  setMediaSecret("test-secret");
+  const [m] = publicMedia(7, [{ url: "https://example.com/a.png", kind: "image", alt: "" }]);
+  const sig = new URL(m.src, "http://x").searchParams.get("s");
+  assert.ok(mediaSigOk(7, 0, "https://example.com/a.png", sig));
+  assert.equal(mediaSigOk(7, 1, "https://example.com/a.png", sig), false, "another index");
+  assert.equal(mediaSigOk(8, 0, "https://example.com/a.png", sig), false, "another card");
+  assert.equal(mediaSigOk(7, 0, "https://example.com/b.png", sig), false, "the picture changed");
+  assert.equal(mediaSigOk(7, 0, "https://example.com/a.png", null), false);
+  setMediaSecret("");
+});

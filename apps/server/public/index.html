@@ -515,7 +515,7 @@
   .gallery { margin: 4px 0 0; }
   .g-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); overscroll-behavior-x: contain; }
   .g-track::-webkit-scrollbar { display: none; }
-  .g-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; aspect-ratio: 16 / 9; max-height: 46vh; display: grid; place-items: center; }
+  .g-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; aspect-ratio: 16 / 9; max-height: min(34vh, 340px); display: grid; place-items: center; }
   .g-slide a { display: block; width: 100%; height: 100%; }
   .g-slide img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .g-slide .play { width: 56px; height: 56px; font-size: 22px; }
@@ -2388,8 +2388,10 @@
     openModal(to, modalFrom);
   }
   mdlDlg.addEventListener("close", () => {
+    if (mdlDlg.open) return;   // reopened (a link, a hash) before this queued event ran
     const id = modalId, from = modalFrom;
-    if (!keepHash && /^#item-\d+$/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
+    // Only this card's own hash: a late close event must not wipe the link of a card opened since.
+    if (!keepHash && location.hash === `#item-${id}`) history.replaceState(null, "", location.pathname + location.search);
     keepHash = false;
     mdlDlg.style.transform = "";
     // Focus goes back to the card you ended on (the one you opened, or the last one you stepped to).
@@ -3250,7 +3252,8 @@
     const limit = () => Math.min(140, el.offsetWidth * 0.32);
     const inTrash = state.view === "trash";
     cardEl.addEventListener("pointerdown", (e) => {
-      if (e.button !== 0 || e.target.closest("a, button")) return;
+      // The name is a link and a natural place for a thumb: a swipe may start on it (the click after a drag is swallowed below).
+      if (e.button !== 0 || e.target.closest("button, a:not(.name)")) return;
       x0 = e.clientX; y0 = e.clientY; dx = 0; active = true; horizontal = null;
     });
     cardEl.addEventListener("pointermove", (e) => {

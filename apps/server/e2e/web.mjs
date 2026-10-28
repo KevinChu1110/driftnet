@@ -8,7 +8,7 @@
 // The catalogue is seeded from demo-items.json: summaries a real model wrote.
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,6 +44,10 @@ const seed = `
   store.updateFolder(mine.id, { position: -1 });
   for (const i of items) store.upsert({ url: i.url, aliases: [], title: i.title, flags: [], source: "demo", summary: i.summary,
     judgement: { isAiTool: 1, category: i.category, kind: i.kind, worth: i.worth, engine: "llm", confidence: 1 } });
+  // Pictures: three for ascii-sharks (the first a GIF), one dead link on card 2. The browser serves the bytes (below).
+  const shark = items.findIndex((i) => /ascii-sharks/.test(i.url)) + 1;
+  store.setMedia(shark, [0, 1, 2].map((n) => ({ url: \`https://media.example/shark-\${n}.\${n ? "png" : "gif"}\`, kind: n ? "image" : "gif", alt: \`ascii-sharks picture \${n + 1}\` })));
+  store.setMedia(2, [{ url: "https://media.example/gone.png", kind: "image", alt: "gone" }]);
   for (const [id, n] of [[1, 3], [2, 2], [4, 1]]) for (let k = 0; k < n; k++) store.recordShare(id, { platform: "line", chatId: "demo" });
   // What a friend wrote with the link, the reader's own note, and a free-standing note.
   store.recordShare(1, { platform: "line", chatId: "demo", note: zh ? "這個可以拿來管我們的 Hermes agent 團隊" : "Could run our Hermes agent team with this" });
@@ -100,10 +104,9 @@ const waitFor = async (s, expression, what, ms = 8000) => {
 };
 
 // ── Pictures without the network ─────────────────────────────────────────────
-// This catalogue is offline, so the page's pictures are faked in the browser: GET /api/media/<id>/<n> answers with a
-// generated PNG (n = 9 answers 404, to prove a dead picture is hidden), and the item JSON is topped up with `media`
-// (and demo/why when the seed lacks them). Once the server has the real proxy and the seed stores media, delete this
-// block (the Fetch.enable call below) and seed media the normal way; the steps keep working unchanged.
+// The seed stores real media and the server signs the paths, but the proxy would fetch from the internet: the
+// browser answers GET /api/media/... itself with a generated PNG (card 2's picture answers 404: a dead link must
+// not show as a broken image).
 const crcTable = Int32Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c; });
 const crc32 = (b) => { let c = -1; for (const x of b) c = crcTable[(c ^ x) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; };
 const pngChunk = (type, data) => { const t = Buffer.from(type), n = Buffer.alloc(4), c = Buffer.alloc(4); n.writeUInt32BE(data.length); c.writeUInt32BE(crc32(Buffer.concat([t, data]))); return Buffer.concat([n, t, data, c]); };
@@ -115,43 +118,20 @@ const makePng = (w, h, px) => {
 };
 const picture = (n) => makePng(640, 360, (x, y) => [40 + ((x * 180) / 640 + n * 50) % 200, 90 + (y * 120) / 360, 200 - ((x + y) % 120) - n * 20]);
 const sharkId = demo.findIndex((i) => /ascii-sharks/.test(i.url)) + 1, deadId = 2;
-const extra = {
-  [sharkId]: { media: [0, 1, 2].map((n) => ({ src: `/api/media/${sharkId}/${n}`, kind: n === 0 ? "gif" : "image", alt: `ascii-sharks picture ${n + 1}`, width: 640, height: 360 })),
-    demo: "Draws a school of ASCII-art sharks swimming across a canvas.", why: "Shared as a fun way to liven up a page." },
-  [deadId]: { media: [{ src: `/api/media/${deadId}/9`, kind: "image", alt: "gone" }] },   // 404: must not show as a broken image
-};
-const topUp = (it) => {
-  const x = extra[it?.id];
-  if (!x || !it.summary) return it;
-  if (!it.media?.length) it.media = x.media;
-  it.summary.demo ??= x.demo; it.summary.why ??= x.why;
-  return it;
-};
 ws.addEventListener("message", async (e) => {
   const m = JSON.parse(e.data);
   if (m.method !== "Fetch.requestPaused") return;
-  const { requestId, request, responseStatusCode, responseHeaders } = m.params, sid = m.sessionId;
-  try {
-    const path = new URL(request.url).pathname;
-    if (path.startsWith("/api/media/")) {
-      const n = Number(path.split("/").pop());
-      if (n === 9) return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 404, body: "" }, sid);
-      return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "image/png" }], body: picture(n).toString("base64") }, sid);
-    }
-    if (request.method === "GET" && responseStatusCode === 200) {
-      const r = await cdp("Fetch.getResponseBody", { requestId }, sid);
-      const json = JSON.parse(r.base64Encoded ? Buffer.from(r.body, "base64").toString() : r.body);
-      const out = Array.isArray(json) ? json.map(topUp) : topUp(json);
-      return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(out)).toString("base64") }, sid);
-    }
-    await cdp("Fetch.continueResponse", { requestId }, sid);
-  } catch {
-    await cdp("Fetch.continueRequest", { requestId }, sid).catch(() => cdp("Fetch.continueResponse", { requestId }, sid).catch(() => {}));
-  }
+  const { requestId, request } = m.params, sid = m.sessionId;
+  const [, id, n] = new URL(request.url).pathname.split("/").slice(2).map(Number);
+  if (id === deadId) return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 404, body: "" }, sid).catch(() => {});
+  // ascii-sharks gets real-looking pictures (for the README screenshots); anything else a generated PNG.
+  const shark = id === sharkId && existsSync(join(HERE, "fixtures", `shark-${n}.jpg`));
+  const body = shark ? readFileSync(join(HERE, "fixtures", `shark-${n}.jpg`)) : picture(n);
+  await cdp("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: shark ? "image/jpeg" : "image/png" }], body: body.toString("base64") }, sid).catch(() => {});
 });
 const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
 const { sessionId: s } = await cdp("Target.attachToTarget", { targetId, flatten: true });
-await cdp("Fetch.enable", { patterns: [{ urlPattern: "*/api/media/*", requestStage: "Request" }, { urlPattern: "*/api/items*", requestStage: "Response" }] }, s);
+await cdp("Fetch.enable", { patterns: [{ urlPattern: "*/api/media/*", requestStage: "Request" }] }, s);
 const viewport = async (width, height, mobile) => {
   await cdp("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 2, mobile }, s);
   await cdp("Emulation.setTouchEmulationEnabled", { enabled: mobile, maxTouchPoints: mobile ? 5 : 1 }, s);
@@ -556,6 +536,7 @@ try {
   await waitFor(s, `document.querySelector(".swipe")?.dataset.id === "${third}"`, "trash view");
   await shoot(`web-phone-trash-view-${LANG}.png`);
   await swipe(third, 230);
+  await waitFor(s, `document.querySelectorAll(".swipe").length === 0`, "the swipe restored it");
   assert.equal((await api(`/api/items/${third}`)).trashedAt, undefined);
   assert.equal(await evaluate(s, `document.querySelectorAll(".swipe").length`), 0, "trash is empty again");
   console.log("✓ trash view: swipe right restored it");

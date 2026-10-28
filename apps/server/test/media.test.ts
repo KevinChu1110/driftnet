@@ -124,26 +124,31 @@ test("route: private catalogue needs the key; item JSON never leaks the original
     const ing = await fetch(`${api}/api/ingest`, { method: "POST", headers: admin, body: JSON.stringify({ url: pageUrl }) });
     assert.equal(ing.status, 200);
     const [{ item }] = (await ing.json()) as [{ item: { id: number; media: { src: string }[] } }];
-    assert.equal(item.media[0]!.src, `/api/media/${item.id}/0`);
+    assert.match(item.media[0]!.src, new RegExp(`^/api/media/${item.id}/0\\?s=[\\w-]{22}$`));
     assert.ok(!JSON.stringify(item).includes(base), "original URL stays server-side");
+    const plain = `/api/media/${item.id}/0`;
 
     // Authorization: no key → 401; wrong key → 401; share key and admin → image.
     // (A proxy header makes the request "not this machine", which is how a tunnel or reverse proxy looks.)
     const remote = { "x-forwarded-for": "203.0.113.9" };
-    assert.equal((await fetch(`${api}${item.media[0]!.src}`, { headers: remote })).status, 401);
-    assert.equal((await fetch(`${api}${item.media[0]!.src}?key=wrong`, { headers: remote })).status, 401);
-    const ok = await fetch(`${api}${item.media[0]!.src}?key=${KEY}`, { headers: remote });
+    assert.equal((await fetch(`${api}${plain}`, { headers: remote })).status, 401);
+    assert.equal((await fetch(`${api}${plain}?key=wrong`, { headers: remote })).status, 401);
+    assert.equal((await fetch(`${api}${plain}?s=AAAAAAAAAAAAAAAAAAAAAA`, { headers: remote })).status, 401, "a forged signature");
+    // The signed path from the item JSON opens that picture alone, without a key (an <img> can't send one).
+    assert.equal((await fetch(`${api}${item.media[0]!.src}`, { headers: remote })).status, 200);
+    assert.equal((await fetch(`${api}/api/media/${item.id}/0?s=${new URL(item.media[0]!.src, api).searchParams.get("s")}`.replace("/0?", "/1?"), { headers: remote })).status, 401, "the signature is for one picture");
+    const ok = await fetch(`${api}${plain}?key=${KEY}`, { headers: remote });
     assert.equal(ok.status, 200);
     assert.equal(ok.headers.get("content-type"), "image/png");
     assert.equal(ok.headers.get("cache-control"), "private, max-age=86400");
     assert.equal(ok.headers.get("x-content-type-options"), "nosniff");
     assert.equal(ok.headers.get("content-security-policy"), "default-src 'none'");
     assert.ok(Buffer.from(await ok.arrayBuffer()).equals(PNG));
-    assert.equal((await fetch(`${api}${item.media[0]!.src}`, { headers: admin })).status, 200);
+    assert.equal((await fetch(`${api}${plain}`, { headers: admin })).status, 200);
 
     // Item JSON from the detail endpoint.
     const one = (await (await fetch(`${api}/api/items/${item.id}?key=${KEY}`)).json()) as { media: { src: string }[] };
-    assert.equal(one.media[0]!.src, `/api/media/${item.id}/0`);
+    assert.equal(one.media[0]!.src, item.media[0]!.src);
     // Missing index / item → 404.
     assert.equal((await fetch(`${api}/api/media/${item.id}/9?key=${KEY}`)).status, 404);
     assert.equal((await fetch(`${api}/api/media/99999/0?key=${KEY}`)).status, 404);

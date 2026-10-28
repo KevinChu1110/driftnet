@@ -18,7 +18,7 @@ export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/inde
 export { guard } from "./guard.ts";
 export { Pipeline, RefreshBusy, RefreshTooSoon } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, FOLDER_TEMPLATES, TEMPLATE_NAMES, isTemplate, loadCategories, applyFolderTemplate, TemplateError, type FolderTemplate } from "./categories.ts";
-export { normalizeMedia, publicItem, publicMedia, type PublicMedia } from "./media.ts";
+export { mediaSigOk, normalizeMedia, publicItem, publicMedia, setMediaSecret, type PublicMedia } from "./media.ts";
 export { safeFetch } from "./extractors/net.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";
