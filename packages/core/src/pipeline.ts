@@ -50,7 +50,14 @@ export class Pipeline {
   private readonly refreshing = new Set<number>();
   private readonly lastRefresh = new Map<number, number>();
 
+  /** Called (never awaited) whenever an item is finished: summarised, or stored without a model. One place for webhooks and the like. */
+  onItem?: (item: Item, event: "item.added" | "item.updated") => void;
+
   constructor(private readonly opts: PipelineOptions) {}
+
+  private done(item: Item, event: "item.added" | "item.updated"): void {
+    try { this.onItem?.(item, event); } catch (err) { console.warn(`[driftnet] item hook failed: ${(err as Error).message}`); }
+  }
 
   /** Swap the judge, model and rules in place; work already running finishes with the old ones. */
   configure(engines: Engines): void {
@@ -146,6 +153,8 @@ export class Pipeline {
       flags: a.flags, source: a.source, suggestions: a.suggestions,
     });
     store.recordShare(item.id, ctx);
+    // Stored without a model counts too (an agent's later summary is announced as item.updated by enrich()).
+    this.done(store.get(item.id)!, hit ? "item.updated" : "item.added");
     const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
     for (const r of related) store.linkFound(item.id, r.item.id);
     return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
@@ -217,10 +226,12 @@ export class Pipeline {
       // A page that is down or walled now must not wipe a good summary.
       if (!digest.text.trim() && old.summary) throw new Error("The page returned no content; kept the existing summary.");
       const a = await this.analyze(digest, store.notes(id, 1)[0]);
-      return store.refreshItem(id, {
+      const item = store.refreshItem(id, {
         title: a.summary?.name ?? a.digest.title, judgement: a.judgement, summary: a.summary,
         flags: a.flags, source: a.source, suggestions: a.suggestions,
       });
+      if (item) this.done(item, "item.updated");
+      return item;
     } finally {
       this.refreshing.delete(id);
     }
@@ -285,6 +296,7 @@ export class Pipeline {
     if (summary.primaryUrl && !(await urlExists(summary.primaryUrl))) delete summary.primaryUrl;
 
     const saved = this.opts.store.enrich(id, summary, agent, { ...(category ? { category } : {}), ...(worth ? { worth } : {}) });
+    this.done(saved, "item.updated");
     const digest: Digest = { url: saved.url, kind: saved.kind, title: saved.title, text: "", outlinks: [], meta: {} };
     const related = await this.resolveMentions(summary.mentions ?? [], digest, { platform: "agent", chatId: agent }, 0);
     for (const r of related) this.opts.store.linkFound(id, r.item.id);

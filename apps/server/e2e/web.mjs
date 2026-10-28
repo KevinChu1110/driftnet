@@ -741,6 +741,7 @@ try {
     const cards = await evaluate(s, `document.getElementById("cx-body").innerText`);
     assert.ok(cards.includes(`https://demo-tunnel.trycloudflare.com/mcp?key=${key}`), "cards carry the public URL and the share key");
     assert.ok(!cards.includes(pw), "the admin password is never printed on the cards");
+    assert.ok(cards.includes(`https://demo-tunnel.trycloudflare.com/feed.xml?key=${key}`), "the feed card carries the share key");
     await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
     await shoot(`web-connect-${LANG}.png`);
     console.log("✓ connect cards: public URL and share key filled in, password left out");

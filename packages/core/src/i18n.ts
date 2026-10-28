@@ -67,6 +67,22 @@ const CATEGORY_LABELS: Record<string, Record<Locale, string>> = {
   news: { en: "News", "zh-TW": "新聞動態" },
   learning: { en: "Learning", "zh-TW": "學習資源" },
   other: { en: "Other", "zh-TW": "其他" },
+  // Research template
+  papers: { en: "Papers", "zh-TW": "論文" },
+  articles: { en: "Articles", "zh-TW": "文章" },
+  datasets: { en: "Datasets", "zh-TW": "資料集" },
+  methods: { en: "Methods", "zh-TW": "方法" },
+  "research-tools": { en: "Tools", "zh-TW": "研究工具" },
+  "people-talks": { en: "People & talks", "zh-TW": "人物與演講" },
+  "to-read": { en: "To read", "zh-TW": "待讀" },
+  // Everyday template
+  cooking: { en: "Cooking", "zh-TW": "料理" },
+  travel: { en: "Travel", "zh-TW": "旅遊" },
+  health: { en: "Health", "zh-TW": "健康" },
+  money: { en: "Money", "zh-TW": "理財" },
+  home: { en: "Home", "zh-TW": "居家" },
+  entertainment: { en: "Entertainment", "zh-TW": "娛樂" },
+  shopping: { en: "Shopping", "zh-TW": "購物" },
 };
 
 export const LOCALES = Object.keys(MESSAGES) as Locale[];

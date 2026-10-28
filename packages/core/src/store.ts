@@ -288,6 +288,28 @@ export class Store {
     if (!("other" in seed)) insert.run("other", "Anything that fits none of the above", Object.keys(seed).length);
   }
 
+  /** Every item ever stored, trash included: a template may only replace the tree of an empty catalogue. */
+  itemCount(): number {
+    return (this.db.prepare("SELECT COUNT(*) AS n FROM items").get() as { n: number }).n;
+  }
+
+  /**
+   * Swap the whole folder tree for `seed`. Callers check it is safe (no items,
+   * untouched tree); this only does it, in one transaction.
+   */
+  replaceFolders(seed: Record<string, string>): void {
+    this.db.exec("BEGIN");
+    try {
+      this.db.exec("DELETE FROM folders");
+      this.seedFolders(seed);
+      this.db.exec("COMMIT");
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+    this.setState("folder_uses", "{}");
+  }
+
   folders(): Folder[] {
     const rows = this.db
       .prepare(
