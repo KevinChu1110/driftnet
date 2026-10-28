@@ -397,6 +397,16 @@ try {
     console.log("✓ mind map: expand, drag a card onto a folder (mouse), phone layout");
   }
 
+  // No password yet: another website's page must not write into (or read) the catalogue.
+  {
+    const res = await fetch(`http://127.0.0.1:${port}/api/ingest`, { method: "POST", headers: { origin: "https://evil.test", "content-type": "text/plain" },
+      body: JSON.stringify({ url: "https://evil.test/spam" }) });
+    assert.equal(res.status, 401, "cross-site write refused");
+    const read = await fetch(`http://127.0.0.1:${port}/api/items`, { headers: { origin: "https://evil.test" } });
+    assert.equal(read.headers.get("access-control-allow-origin"), null, "no CORS: a foreign page can't read responses");
+    console.log("✓ first run: a foreign website can't write, and gets no CORS to read");
+  }
+
   // Access: a password from the page, private reading, a share key, the public URL, the connect cards.
   {
     await viewport(1280, 820, false);

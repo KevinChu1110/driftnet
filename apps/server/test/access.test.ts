@@ -83,3 +83,11 @@ test("this machine on purpose is trusted; another site's page or a forwarded req
   assert.equal(role(req({ ...remote, auth: env.DRIFTNET_READ_KEY }), env), "reader");
   assert.equal(role(req(remote), env), "none");
 });
+
+test("another website's page is never trusted to write, even with no password", async () => {
+  const { foreignOrigin } = await import("../src/access.ts");
+  assert.ok(foreignOrigin(req({ headers: { origin: "https://evil.test" } })));
+  assert.ok(!foreignOrigin(req({ headers: { origin: "http://localhost:8787" } })), "the page itself");
+  assert.ok(!foreignOrigin(req({ headers: { origin: "chrome-extension://abcdef" } })), "the browser extension");
+  assert.ok(!foreignOrigin(req()), "curl, agents, chat platforms send no Origin");
+});

@@ -11,7 +11,7 @@ import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
-import { canRead, isAdmin, isLocal, isPrivate, isTrustedLocal, newKey, readKey, role, token, Tunnel } from "./access.ts";
+import { canRead, foreignOrigin, isAdmin, isLocal, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
 import { llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
@@ -43,7 +43,12 @@ const STATIC: Record<string, [Buffer, string]> = {
 };
 
 /** Writes (ingest, feedback, MCP tools that change things) need the admin password when one is set. */
-const authorized = (req: IncomingMessage) => isAdmin(req, env) || isTrustedLocal(req);
+/**
+ * Writes. Never for another website's page: with no password set everyone is
+ * "admin", so without this check any page you visit could write into (and,
+ * with open CORS, read) your catalogue.
+ */
+const authorized = (req: IncomingMessage) => !foreignOrigin(req) && (isAdmin(req, env) || isTrustedLocal(req));
 const tunnel = new Tunnel(PORT);
 process.on("exit", () => tunnel.stop());
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { tunnel.stop(); process.exit(0); });
@@ -103,8 +108,30 @@ async function readBody(req: IncomingMessage, limit = 1_000_000): Promise<string
   return Buffer.concat(chunks).toString("utf8");
 }
 
+/**
+ * Guessing passwords: after 20 refused attempts that carried a password or key,
+ * the same address waits 15 minutes.
+ */
+const misses = new Map<string, { n: number; since: number }>();
+const clientIp = (req: IncomingMessage) => ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() || req.socket.remoteAddress || "?");
+const triedCredentials = (req: IncomingMessage) => !!req.headers.authorization || /[?&]key=/.test(req.url ?? "");
+function throttled(req: IncomingMessage): boolean {
+  const m = misses.get(clientIp(req));
+  if (!m) return false;
+  if (Date.now() - m.since > 15 * 60_000) { misses.delete(clientIp(req)); return false; }
+  return m.n >= 20;
+}
+
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
-  res.writeHead(status, { "content-type": type, "access-control-allow-origin": "*" });
+  const req = res.req;
+  if ((status === 401 || status === 403) && req && triedCredentials(req)) {
+    const ip = clientIp(req);
+    const m = misses.get(ip) ?? { n: 0, since: Date.now() };
+    m.n++;
+    misses.set(ip, m);
+  }
+  // No CORS headers: the page is same-origin, and agents, the extension and chat platforms aren't browsers' pages.
+  res.writeHead(status, { "content-type": type });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 
@@ -119,6 +146,9 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "content-type": asset[1], "cache-control": "public, max-age=86400" });
       return res.end(asset[0]);
     }
+    // OAuth discovery probes (Claude.ai connectors): there is none, say so plainly instead of "unauthorized".
+    if (path.startsWith("/.well-known/")) return send(res, 404, { error: "not found" });
+    if (triedCredentials(req) && throttled(req)) return send(res, 429, { error: "too many wrong passwords; try again in 15 minutes" });
     if (req.method === "GET" && !canRead(req, env) && !isTrustedLocal(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL || `${url.protocol}//${url.host}`));
@@ -130,7 +160,10 @@ const server = createServer(async (req, res) => {
       );
       // First run: nothing configured yet, so the page opens the settings to get started.
       const setup = !envFile && dn.engines.summarizer === "off" && dn.engines.judge === "heuristic" && !dn.store.stats().items;
-      return send(res, 200, { locale: resolveLocale(), categories, setup, role: role(req, env), local: isLocal(req), passwordSet: !!token(env) });
+      return send(res, 200, {
+        locale: resolveLocale(), categories, setup, role: role(req, env), local: isLocal(req), passwordSet: !!token(env),
+        port: PORT, summaries: dn.engines.summarizer !== "off",
+      });
     }
 
     // ── The reader's folder tree ──────────────────────────────────────────
@@ -237,6 +270,9 @@ const server = createServer(async (req, res) => {
           const nextAccess = "DRIFTNET_ACCESS" in values ? values.DRIFTNET_ACCESS : env.DRIFTNET_ACCESS;
           if (nextAccess === "private" && !nextToken) throw new SettingsError("private access needs an admin password");
           if (values.DRIFTNET_TOKEN === null && tunnel.running) throw new SettingsError("turn the public URL off before removing the password");
+          if (typeof values.DRIFTNET_TOKEN === "string" && values.DRIFTNET_TOKEN.trim() && tunnel.running && strength(values.DRIFTNET_TOKEN.trim()) === "weak") {
+            throw new SettingsError("while the public URL is open, the password must not be weak");
+          }
           const changed = settings.update(values);
           if (changed.length) dn.reconfigure(env);
           return send(res, 200, { ...settings.view(), changed, engines: dn.engines });
@@ -268,6 +304,7 @@ const server = createServer(async (req, res) => {
           delete env.DRIFTNET_TUNNEL_URL;
         } else {
           if (!token(env)) throw new SettingsError("set an admin password first");
+          if (strength(token(env)!) === "weak") throw new SettingsError("choose a stronger password before opening a public URL");
           if (!tunnel.available()) throw new SettingsError("cloudflared is not installed");
           const lock: Record<string, string> = {};
           if (!isPrivate(env)) lock.DRIFTNET_ACCESS = "private";

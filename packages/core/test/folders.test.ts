@@ -79,3 +79,11 @@ test("found-in links are recorded once and recovered from old share notes", () =
   old.recordShare(c, { platform: "http", chatId: "x", note: "Mentioned in https://fb.test/p" });
   assert.deepEqual(new Store(file).foundLinks(), [{ parent: p, child: c }]);
 });
+
+test("two folders with the same name side by side are refused", () => {
+  const { store } = seed();
+  store.createFolder({ name: "Games" });
+  assert.throws(() => store.createFolder({ name: "games" }), FolderError);
+  const g = store.folders().find((f) => f.name === "Games")!;
+  assert.doesNotThrow(() => store.createFolder({ name: "Games", parent: g.id }), "the same name one level down is fine");
+});

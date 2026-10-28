@@ -51,6 +51,8 @@
   .stats { color: var(--muted); font-size: 13px; }
   .search { flex: 1; min-width: 180px; max-width: 420px; margin-left: auto; padding: 9px 12px; border: 1px solid var(--line);
             border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+  .skip { position: absolute; left: 8px; top: -60px; z-index: 50; background: var(--accent); color: #fff; padding: 10px 14px; border-radius: 10px; }
+  .skip:focus { top: 8px; }
   .lock { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--star); color: var(--text); background: var(--star-soft);
           border-radius: 99px; padding: 6px 12px; font-size: 13px; cursor: pointer; min-height: 40px; white-space: nowrap; }
   .lock[hidden] { display: none; }
@@ -66,6 +68,7 @@
   nav button .lbl .ico { color: var(--muted); }
   nav button[aria-pressed="true"] .lbl .ico { color: var(--accent); }
   nav .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+  nav .dot.sub { background: none; border: 1.5px solid var(--c); width: 7px; height: 7px; }
   nav button { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0;
                border-radius: 8px; background: none; text-align: left; cursor: pointer; }
   nav button:hover { background: var(--accent-soft); }
@@ -202,6 +205,10 @@
   .mnode.lift { transform: scale(1.08); box-shadow: 0 8px 22px rgba(0,0,0,.22); }
   .mnode.drop { transform: scale(1.1); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 40%, transparent); }
   .mnode.dragging { opacity: .35; }
+  .mnode.bump { animation: bump .6s ease; }
+  @keyframes bump { 30% { transform: scale(1.14); box-shadow: 0 0 0 6px color-mix(in srgb, var(--c) 35%, transparent); } }
+  .map-wrap.panning { cursor: grabbing; }
+  .map-wrap { user-select: none; -webkit-user-select: none; }
   .mghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -130%) rotate(-2deg); opacity: .95; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
   .peek h3 { margin: 0 0 8px; font-size: 18px; }
   .peek ul { color: var(--muted); padding-left: 20px; }
@@ -213,6 +220,14 @@
   #st-body section[data-tab] { display: none; }
   #st-body[data-tab="general"] section[data-tab="general"], #st-body[data-tab="access"] section[data-tab="access"],
   #st-body[data-tab="ai"] section[data-tab="ai"] { display: block; }
+  .set-row { overflow-wrap: anywhere; }
+  #st-body:not(.show-env) .envname { display: none; }
+  .tabs { background: var(--bg); box-shadow: 0 -8px 0 var(--panel); margin-bottom: 16px; }
+  main .link-btn { min-height: 44px; padding: 0 6px; }
+  .meta .link-btn { min-height: 32px; }
+  .tags { white-space: normal; } .tags .tag { white-space: nowrap; }
+  .btn:disabled, .btn[disabled] { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
+  @media (max-width: 720px) { .peek-actions { display: grid; grid-template-columns: 1fr 1fr; } .peek-actions .spacer { display: none; } }
   .set-row .envname { font-family: ui-monospace, Menlo, monospace; font-size: 11px; opacity: .6; }
   dialog::backdrop { backdrop-filter: blur(3px); }
   .act span { display: inline-flex; align-items: center; gap: 6px; }
@@ -308,11 +323,21 @@
            align-items: center; box-shadow: 0 6px 24px rgba(0,0,0,.25); transition: transform .25s ease; z-index: 5;
            width: max-content; max-width: min(520px, calc(100vw - 32px)); }
   .toast span { flex: 1; min-width: 0; }
-  .toast.show { transform: translate(-50%, 0); }
+  .toast { visibility: hidden; transform: translate(-50%, calc(100% + 40px)); }
+  .toast.show { transform: translate(-50%, 0); visibility: visible; }
   .toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 650; padding: 8px 10px; border-radius: 8px; cursor: pointer;
                   min-height: 40px; white-space: nowrap; flex-shrink: 0; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .toast button { color: var(--accent); } }
+  /* Dark mode: a dark toast with a light Undo, not a white slab. */
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .toast { background: #2c2c2a; color: var(--text); border: 1px solid #3a3a37; }
+                                        :root:not([data-theme="light"]) .toast button { color: var(--accent); } }
+  :root[data-theme="dark"] .toast { background: #2c2c2a; color: var(--text); border: 1px solid #3a3a37; }
   :root[data-theme="dark"] .toast button { color: var(--accent); }
+  /* Dark mode: light branch fills need dark text on the map. */
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mnode.folder.l1, :root:not([data-theme="light"]) .mnode.folder.l1 .tw,
+                                        :root:not([data-theme="light"]) .mnode.folder.l1 .opt { color: #121211; }
+                                        :root:not([data-theme="light"]) .mnode.folder.l1 .cnt { background: rgba(0,0,0,.18); color: #121211; } }
+  :root[data-theme="dark"] .mnode.folder.l1, :root[data-theme="dark"] .mnode.folder.l1 .tw, :root[data-theme="dark"] .mnode.folder.l1 .opt { color: #121211; }
+  :root[data-theme="dark"] .mnode.folder.l1 .cnt { background: rgba(0,0,0,.18); color: #121211; }
 
   @media (max-width: 720px) {
     header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); gap: 8px 10px; }
@@ -323,6 +348,7 @@
     /* The sidebar becomes a drawer behind the ☰ button. */
     .menu { display: grid; }
     nav { position: fixed; top: 0; bottom: 0; left: 0; z-index: 10; width: min(300px, 84vw); max-height: none; border-right: 1px solid var(--line);
+          align-self: stretch; height: 100dvh; overscroll-behavior: contain;
           background: var(--panel); padding: max(12px, env(safe-area-inset-top)) 10px calc(20px + env(safe-area-inset-bottom));
           transform: translateX(-102%); visibility: hidden; box-shadow: 8px 0 30px rgba(0,0,0,.18);
           transition: transform .25s ease, visibility 0s linear .25s; /* hide only after sliding out */ }
@@ -372,6 +398,7 @@
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   </defs>
 </svg>
+<a class="skip" href="#list">Skip to the cards</a>
 <header>
   <button id="menu" class="menu" type="button" aria-controls="nav" aria-expanded="false">
     <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -386,14 +413,14 @@
 <div class="scrim" id="scrim"></div>
 <div class="layout">
   <nav id="nav"></nav>
-  <main id="list" aria-live="polite"></main>
+  <main id="list" tabindex="-1"></main>
 </div>
-<dialog id="folder-dlg">
+<dialog id="folder-dlg" aria-labelledby="fd-title">
   <form id="folder-form" method="dialog">
     <h3 id="fd-title"></h3>
     <p class="dlg-error" id="fd-error"></p>
     <label><span id="fd-name-l"></span><input id="fd-name" maxlength="60" autocomplete="off"></label>
-    <label><span id="fd-desc-l"></span><textarea id="fd-desc" rows="2" maxlength="300"></textarea></label>
+    <label><span id="fd-desc-l"></span><textarea id="fd-desc" rows="3" maxlength="300"></textarea></label>
     <label><span id="fd-parent-l"></span><select id="fd-parent"></select></label>
     <div class="dlg-actions">
       <button class="btn danger" id="fd-delete" type="button"></button><span class="spacer"></span>
@@ -401,12 +428,13 @@
     </div>
   </form>
 </dialog>
-<dialog id="move-dlg">
+<dialog id="move-dlg" aria-labelledby="mv-title">
   <h3 id="mv-title"></h3>
-  <div class="pick" id="mv-list"></div>
+  <input id="mv-filter" class="search" style="max-width:none;width:100%;margin:0 0 8px" type="search" autocomplete="off">
+  <div class="pick" id="mv-list" role="listbox"></div>
   <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="mv-cancel" type="button"></button></div>
 </dialog>
-<dialog id="settings-dlg" class="wide">
+<dialog id="settings-dlg" aria-labelledby="st-title" class="wide">
   <form id="settings-form" method="dialog">
     <h3 id="st-title"></h3>
     <p class="dlg-error" id="st-error"></p>
@@ -424,7 +452,7 @@
     <span class="spacer"></span><button class="btn" type="button" id="pk-close"></button>
   </div>
 </dialog>
-<dialog id="login-dlg">
+<dialog id="login-dlg" aria-labelledby="lg-title">
   <form id="login-form" method="dialog">
     <h3 id="lg-title"></h3>
     <p class="dlg-error" id="lg-error"></p>
@@ -435,12 +463,12 @@
       <button class="btn" id="lg-cancel" type="button"></button><button class="btn primary" id="lg-ok" type="submit"></button></div>
   </form>
 </dialog>
-<dialog id="connect-dlg" class="wide">
+<dialog id="connect-dlg" aria-labelledby="cx-title" class="wide">
   <h3 id="cx-title"></h3>
   <div class="set-scroll" id="cx-body"></div>
   <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="cx-close" type="button"></button></div>
 </dialog>
-<dialog id="note-dlg">
+<dialog id="note-dlg" aria-labelledby="in-title">
   <form id="note-form" method="dialog">
     <h3 id="in-title"></h3>
     <label><span id="in-help"></span><textarea id="in-text" rows="5" maxlength="5000"></textarea></label>
@@ -465,13 +493,14 @@
     en: {
       search: "Search tools, tags, links…", all: "All", favorites: "Favorites", trash: "Trash", any: "Any",
       kind: "Kind", switchTo: "中文", nav: "Views and categories",
-      stats: (n, s) => `${n} items · shared ${s}×`, shared: (n) => `shared ${n}×`,
+      stats: (n, s) => `${n} ${n === 1 ? "item" : "items"} · shared ${s}×`, shared: (n) => `shared ${n}×`,
       empty: "Nothing here yet — drop a link in your chat.", emptyFav: "No favorites yet — swipe a card right, or tap the star.",
       emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
       kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
+      kind1: { repo: "Repo", product: "Product", video: "Video", article: "Article", post: "Post", other: "Other" },
       worth: { skip: "skip", low: "low", normal: "worth a look", "must-see": "must-see" },
       flags: { injection: "prompt injection", "hidden-chars": "hidden characters", "low-reputation": "low-reputation source" },
-      pending: "⏳ waiting for a summary", enrichedBy: (a) => `summary by ${a}`,
+      pending: "waiting for a summary", noModel: "no summary — no model set up", enrichedBy: (a) => `summary by ${a}`,
       favorite: "Add to favorites", unfavorite: "Remove from favorites", remove: "Move to trash", restore: "Restore",
       swipeFav: "Favorite", swipeUnfav: "Unfavorite", swipeTrash: "Remove", swipeRestore: "Restore",
       removed: (n) => `“${n}” moved to the trash`, restored: (n) => `“${n}” restored`, faved: (n) => `“${n}” added to favorites`,
@@ -480,23 +509,24 @@
       failed: "Couldn't save — check your connection.", menu: "Menu", close: "Close menu", showing: "Showing:",
       folders: "Folders", newFolder: "New folder", newSub: "New folder inside", editFolder: "Edit folder", folderName: "Name",
       folderDesc: "What goes here? (driftnet's AI reads this to sort new links)", folderParent: "Inside", topLevel: "— Top level —",
-      save: "Save", cancel: "Cancel", del: "Delete folder", delSure: "Delete — its links move up",
+      save: "Save", cancel: "Cancel", del: "Delete folder", delSure: "Delete? Links move up",
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
       map: "Mind map", mapHint: "Tap a folder to open it, tap a card to preview it. To file a card, drag it onto a folder (on a phone: hold it a moment first). ⋯ or a double-click renames a folder.",
+      a11yFolder: (n, c) => `Folder ${n}, ${c} cards`, a11yCard: (n) => `Card ${n}`,
       expandAll: "Expand all", collapseAll: "Collapse all", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", openCard: "Open card",
       gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", showInList: "Show in the list", close: "Close",
       needPassword: "Changing things needs the admin password.",
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
-      noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "＋ New note", noteTitle: "Title",
+      noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
       noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
       emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "Export Markdown", exportVault: "Export for Obsidian / Notion",
-      saved: "Saved", settings: "Settings",
+      saved: "Saved", settings: "Settings", filterFolders: "Type to find a folder…", undoHint: "z undoes",
       addLink: "Add", addPlaceholder: "Paste a link to a tool, post or video…", added: "Saved — sorting it now",
       shortcuts: "Keys: j / k next / previous · f favorite · m move · n note · # trash · / search · g m mind map",
       st: {
-        title: "Settings", save: "Save", welcome: "Welcome! Pick a model below (or none: Jev and the built-in rules still sort links), then drop a link in.",
+        title: "Settings", save: "Save", welcome: "Welcome! Pick a model below to get summaries — or none: links are still sorted into folders, just without a summary. Then paste a link.",
         display: "This browser", sort: "Order", sorts: { best: "Best first", newest: "Newest first", shared: "Most shared first" },
         compact: "Compact cards (one line each)", tags: "Show tags", said: "Show what people said in chat",
         theme: "Theme", themes: { auto: "Follow the system", light: "Light", dark: "Dark" },
@@ -504,16 +534,16 @@
         plugins: "Plugins", pluginsNone: (dir) => `No plugins. Put .js files in ${dir} — see examples/plugins in the repo.`,
         status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries by ${e.summarizer === "off" ? "nobody (off)" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
-        savedServer: "Saved — already in effect", chat: "Chat replies",
+        savedServer: "Saved — already in effect", chat: "Chat replies", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
-        accessStatus: (pw, key, url) => `Password ${pw} · Share key ${key} · Public URL ${url}`,
+        accessStatus: (pw, key, url) => `Password: ${pw === "✓" ? "set" : "not set"} · Share key: ${key === "✓" ? "made" : "none"} · Public URL: ${url === "—" ? "off" : url}`,
         access: "Access & connections",
-        password: "Admin password", passwordHelp: "Needed to add links, change settings and let agents write. At least 8 characters, no spaces.",
+        password: "Admin password", passwordHelp: "Once set, adding links, changing settings and agents that write all need it. At least 8 characters, no spaces.",
         generate: "Generate", show: "Show", hide: "Hide", copy: "Copy", copied: "Copied",
         strength: { weak: "Weak — easy to guess. Fine on this computer only; don't open a public URL with it.", ok: "OK", strong: "Strong" },
         passwordWarn: "Anyone with this password can add, move and delete in your catalogue. Don't reuse a password from elsewhere, and don't paste it into public chats.",
         accessMode: "Who can read", accessChoices: { "": "Anyone who can reach this page", public: "Anyone who can reach this page", private: "Only with the password or the share key" },
-        shareKey: "Read-only share key", shareKeyHelp: "For AIs that can only open links (ChatGPT, Grok, Claude.ai): they can read your catalogue, nothing more. If it leaks, make a new one.",
+        shareKey: "Read-only share key", shareKeyHelp: "For AIs that can only open links (ChatGPT, Grok, Claude.ai): they can read your catalogue (notes included), nothing more. If it leaks, make a new one.",
         newShareKey: "New key", noShareKey: "No share key yet.",
         tunnel: "Public URL for cloud AIs", tunnelHelp: "Claude.ai, ChatGPT, Grok and agents on other machines can't reach localhost. This opens a temporary https address through Cloudflare (no account). It changes every time and closes when driftnet stops.",
         tunnelOn: "Open a public URL", tunnelOff: "Close it", tunnelNeedsPassword: "Save an admin password first.",
@@ -523,7 +553,7 @@
         login: "Enter admin password", logout: "Log out on this device", loginTitle: "Unlock editing", loginOk: "Unlock",
         loginWrong: "That's not the admin password.", viewOnly: "View only · Unlock",
         loginHelp: "The password was set on the computer that runs driftnet. Don't know it? Open driftnet on that computer: ⚙ Settings there shows a field to set a new one — no old password needed.",
-        loginAdvanced: "driftnet runs on a server? From your computer run  ssh -L 8787:127.0.0.1:8787 <server>  and open http://localhost:8787.",
+        loginAdvanced: "driftnet runs on a server? From your computer run  ssh -L PORT:127.0.0.1:PORT <server>  and open http://localhost:PORT.",
         keyWrong: "That's neither the admin password nor a share key.",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["Model provider", "Summaries. None: links are still sorted, only without a summary."],
@@ -559,7 +589,7 @@
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
       worth: { skip: "略過", low: "普通", normal: "值得看", "must-see": "必看" },
       flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源" },
-      pending: "⏳ 等待摘要", enrichedBy: (a) => `由 ${a} 整理`,
+      pending: "等待摘要", noModel: "沒有摘要（未設定模型）", enrichedBy: (a) => `由 ${a} 整理`,
       favorite: "加入最愛", unfavorite: "移出最愛", remove: "移到垃圾桶", restore: "還原",
       swipeFav: "加入最愛", swipeUnfav: "移出最愛", swipeTrash: "移到垃圾桶", swipeRestore: "還原",
       removed: (n) => `已將「${n}」移到垃圾桶`, restored: (n) => `已還原「${n}」`, faved: (n) => `已將「${n}」加入最愛`,
@@ -568,23 +598,24 @@
       failed: "沒有存成功，請檢查網路。", menu: "選單", close: "關閉選單", showing: "目前顯示：",
       folders: "資料夾", newFolder: "新資料夾", newSub: "在裡面新增資料夾", editFolder: "編輯資料夾", folderName: "名稱",
       folderDesc: "放什麼？（driftnet 的 AI 會照這段說明把新連結分進來）", folderParent: "放在", topLevel: "— 最上層 —",
-      save: "儲存", cancel: "取消", del: "刪除資料夾", delSure: "確定刪除（內容會移到上一層）",
+      save: "儲存", cancel: "取消", del: "刪除資料夾", delSure: "確定刪除？內容移到上一層",
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
       map: "樹狀圖", mapHint: "點資料夾展開，點卡片預覽。要整理就把卡片拖到資料夾上（手機先按住一下再拖）。按 ⋯ 或連點兩下可以改資料夾名稱。",
+      a11yFolder: (n, c) => `資料夾 ${n}，${c} 張卡片`, a11yCard: (n) => `卡片 ${n}`,
       expandAll: "全部展開", collapseAll: "全部收合", zoomIn: "放大", zoomOut: "縮小", fit: "符合畫面", openCard: "開啟卡片",
       gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", showInList: "在清單中查看", close: "關閉",
       needPassword: "要修改需要管理密碼。",
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
-      noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "＋ 新筆記", noteTitle: "標題",
+      noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
       noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
       emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "匯出 Markdown", exportVault: "匯出到 Obsidian／Notion",
-      saved: "已儲存", settings: "設定",
+      saved: "已儲存", settings: "設定", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
       addLink: "收錄", addPlaceholder: "貼上工具、貼文或影片的連結…", added: "收到，正在整理",
       shortcuts: "快捷鍵：j／k 下一張／上一張 · f 最愛 · m 移動 · n 筆記 · # 垃圾桶 · / 搜尋 · g m 樹狀圖",
       st: {
-        title: "設定", save: "儲存", welcome: "歡迎！先在下面選一個模型（不選也可以：Jev 和內建規則一樣會分類），然後丟一個連結進來試試。",
+        title: "設定", save: "儲存", welcome: "歡迎！在下面選一個模型就會有摘要；不選也可以，連結一樣會分進資料夾，只是沒有摘要。接著貼一個連結試試看。",
         display: "這個瀏覽器", sort: "排序", sorts: { best: "值得看的在前", newest: "最新的在前", shared: "最多人分享的在前" },
         compact: "精簡卡片（每張一行）", tags: "顯示標籤", said: "顯示大家在聊天室說的話",
         theme: "外觀", themes: { auto: "跟系統一樣", light: "淺色", dark: "深色" },
@@ -592,16 +623,16 @@
         plugins: "外掛", pluginsNone: (dir) => `沒有外掛。把 .js 檔放進 ${dir}，範例在 repo 的 examples/plugins。`,
         status: (e) => `目前：分類用 ${({ jev: "Jev", llm: "模型", heuristic: "內建規則" })[e.judge] ?? e.judge}，摘要用 ${e.summarizer === "off" ? "（未開啟）" : e.summarizer}`, keep: "已設定，留空就不變", unset: "未設定",
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
-        savedServer: "已儲存，馬上生效", chat: "聊天室回覆",
+        savedServer: "已儲存，馬上生效", chat: "聊天室回覆", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
         tabGeneral: "一般", tabAccess: "存取", tabAi: "AI",
-        accessStatus: (pw, key, url) => `密碼 ${pw} · 分享碼 ${key} · 公開網址 ${url}`,
+        accessStatus: (pw, key, url) => `密碼：${pw === "✓" ? "已設定" : "未設定"} · 分享碼：${key === "✓" ? "已產生" : "沒有"} · 公開網址：${url === "—" ? "關閉" : url}`,
         access: "存取與連線",
-        password: "管理密碼", passwordHelp: "新增連結、改設定、讓 agent 寫入都需要它。至少 8 個字元，不能有空白。",
+        password: "管理密碼", passwordHelp: "設定之後，新增連結、改設定、agent 寫入都需要它。至少 8 個字元，不能有空白。",
         generate: "產生", show: "顯示", hide: "隱藏", copy: "複製", copied: "已複製",
         strength: { weak: "弱：很容易被猜到。只在這台電腦用還可以，不要拿它開公開網址。", ok: "普通", strong: "強" },
         passwordWarn: "知道這組密碼的人，可以新增、移動、刪除你清單裡的東西。不要沿用其他網站的密碼，也不要貼到公開的聊天室。",
         accessMode: "誰可以讀", accessChoices: { "": "連得到這個網頁的人都可以", public: "連得到這個網頁的人都可以", private: "要有密碼或分享碼才能讀" },
-        shareKey: "唯讀分享碼", shareKeyHelp: "給只會開連結的 AI（ChatGPT、Grok、Claude 網頁版）：只能讀你的清單，不能改。外流的話重產一組就好。",
+        shareKey: "唯讀分享碼", shareKeyHelp: "給只會開連結的 AI（ChatGPT、Grok、Claude 網頁版）：只能讀你的清單（包含筆記），不能改。外流的話重產一組就好。",
         newShareKey: "重新產生", noShareKey: "還沒有分享碼。",
         tunnel: "給雲端 AI 的公開網址", tunnelHelp: "Claude 網頁版、ChatGPT、Grok 和其他機器上的 agent 連不到 localhost。這會透過 Cloudflare（免帳號）開一個臨時的 https 網址；每次都不一樣，driftnet 關掉就跟著關。",
         tunnelOn: "開啟公開網址", tunnelOff: "關閉", tunnelNeedsPassword: "要先儲存管理密碼。",
@@ -611,7 +642,7 @@
         login: "輸入管理密碼", logout: "在這台裝置登出", loginTitle: "解鎖編輯", loginOk: "解鎖",
         loginWrong: "管理密碼不對。", viewOnly: "只能看 · 解鎖編輯",
         loginHelp: "密碼是在跑 driftnet 的那台電腦上設的。不知道的話，到那台電腦打開 driftnet，⚙ 設定裡可以直接設新密碼，不用舊密碼。",
-        loginAdvanced: "driftnet 跑在伺服器上？在你的電腦執行  ssh -L 8787:127.0.0.1:8787 <伺服器>  再打開 http://localhost:8787。",
+        loginAdvanced: "driftnet 跑在伺服器上？在你的電腦執行  ssh -L PORT:127.0.0.1:PORT <伺服器>  再打開 http://localhost:PORT。",
         keyWrong: "這不是管理密碼，也不是分享碼。",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要。選「不使用」也會分類，只是沒有摘要。"],
@@ -652,6 +683,8 @@
   let notes = [];
   /** admin: may change things; reader: browsing with a share key (see /api/ui). */
   let role = "admin";
+  let serverPort = 8787;
+  let summaries = true;
   /** Something needs the password: ask in a dialog that checks it, and keep whatever the user was doing. */
   function needAdmin() {
     toast(T().needPassword);
@@ -710,7 +743,7 @@
       <input id="token" class="search" style="max-width:none;width:100%" type="password" autocomplete="current-password">
       <p><button class="lang" type="submit">${esc(T().tokenSave)}</button>
       ${viewing ? `<button class="lang" type="button" id="token-back">${esc(T().back)}</button>` : ""}</p>
-      <p class="hint">${esc(T().st.loginHelp)}</p><p class="hint">${esc(T().st.loginAdvanced)}</p></form>`;
+      <p class="hint">${esc(T().st.loginHelp)}</p><p class="hint">${esc(T().st.loginAdvanced.replaceAll("PORT", String(serverPort)))}</p></form>`;
     if (viewing) $("token-back").onclick = () => load();
     $("token-form").onsubmit = async (e) => {
       e.preventDefault();
@@ -728,6 +761,7 @@
 
   function applyLocale() {
     document.documentElement.lang = locale;
+    document.querySelector(".skip").textContent = locale === "zh-TW" ? "跳到卡片" : "Skip to the cards";
     $("q").placeholder = T().search;
     $("q").setAttribute("aria-label", T().search);
     $("lang").textContent = T().switchTo;
@@ -740,6 +774,9 @@
   /** keyboard: move focus into the drawer and back (a tap doesn't need the focus ring). */
   function setMenu(open, keyboard = false) {
     document.body.classList.toggle("menu-open", open);
+    // Keyboard and screen-reader focus stay inside the drawer while it is open.
+    for (const id of ["list", "crumb"]) $(id).inert = open && isDrawer();
+    document.querySelector("header").inert = open && isDrawer();
     $("menu").setAttribute("aria-expanded", String(open));
     if (!keyboard) return;
     if (open) $("nav").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
@@ -775,6 +812,8 @@
     }
     catLabels = ui.categories;
     role = ui.role ?? "admin";
+    serverPort = ui.port ?? 8787;
+    summaries = ui.summaries ?? true;
     document.body.classList.toggle("readonly", role !== "admin");
     $("lock").hidden = role === "admin";
     if (ui.setup && !store.get("driftnet-setup-seen")) { store.set("driftnet-setup-seen", "1"); setTimeout(() => openSettings(true), 300); }
@@ -825,6 +864,8 @@
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
       if (field === "view") state.category = "";
+      // The map has its own folders: picking one in the sidebar shows its cards.
+      if (field === "category" && (state.view === "map" || state.view === "notes")) state.view = "all";
       state[field] = field !== "view" && state[field] === value ? "" : value;
       $("nav").querySelectorAll("button[data-field]").forEach((x) => x.setAttribute("aria-pressed", state[x.dataset.field] === x.dataset.value));
       if (isDrawer()) setMenu(false);
@@ -844,7 +885,7 @@
           <button type="button" class="icon twist ${hasKids ? "" : "leaf"}" ${hasKids ? `data-twist="${esc(f.id)}" aria-expanded="${open}"` : 'tabindex="-1" aria-hidden="true"'}
             aria-label="${esc(t.expand)}">${ic("chev")}</button>
           <button type="button" data-field="category" data-value="${esc(f.id)}" aria-pressed="${state.category === f.id}" title="${esc(f.description)}" style="--c:${folderColor(f.id)}">
-            <span class="lbl">${depth === 0 ? `<span class="dot"></span>` : ""}<span>${esc(catLabel(f.id))}</span></span><span class="count">${subtotal(f) || ""}</span></button>
+            <span class="lbl"><span class="dot ${depth ? "sub" : ""}"></span><span>${esc(catLabel(f.id))}</span></span><span class="count">${subtotal(f) || ""}</span></button>
           <button type="button" class="icon more" data-edit="${esc(f.id)}" title="${esc(t.editFolder)}" aria-label="${esc(t.editFolder)}: ${esc(catLabel(f.id))}">${ic("dots")}</button>
         </div>` + (open ? folderRows(f.id, depth + 1) : "");
     }).join("");
@@ -933,10 +974,31 @@
         aria-current="${f.id === item.category}"><span>${esc(catLabel(f.id))}</span><span class="count">${subtotal(f) || ""}</span></button>` + rows(f.id, depth + 1)).join("");
     $("mv-list").innerHTML = rows(null, 0);
     $("mv-cancel").textContent = t.cancel;
+    $("mv-filter").value = "";
+    $("mv-filter").placeholder = t.filterFolders;
+    $("mv-filter").setAttribute("aria-label", t.filterFolders);
     $("move-dlg").showModal();
-    $("mv-list").querySelector('[aria-current="true"]')?.focus();
+    // Type to narrow the folders; Enter files into the first match; arrows walk the list.
+    $("mv-filter").focus();
   }
   $("mv-cancel").onclick = () => $("move-dlg").close();
+  $("mv-filter").addEventListener("input", () => {
+    const q = $("mv-filter").value.trim().toLowerCase();
+    for (const b of $("mv-list").querySelectorAll("[data-to]")) b.hidden = !!q && !b.textContent.toLowerCase().includes(q) && !b.dataset.to.includes(q);
+  });
+  $("mv-filter").addEventListener("keydown", (e) => {
+    const visible = [...$("mv-list").querySelectorAll("[data-to]:not([hidden])")];
+    if (e.key === "Enter") { e.preventDefault(); visible[0]?.click(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); visible[0]?.focus(); }
+  });
+  $("mv-list").addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const visible = [...$("mv-list").querySelectorAll("[data-to]:not([hidden])")];
+    const at = visible.indexOf(document.activeElement);
+    if (e.key === "ArrowUp" && at <= 0) return $("mv-filter").focus();
+    visible[Math.min(visible.length - 1, at + (e.key === "ArrowDown" ? 1 : -1))]?.focus();
+  });
   $("move-dlg").addEventListener("click", (e) => { if (e.target === $("move-dlg")) $("move-dlg").close(); });
   $("folder-dlg").addEventListener("click", (e) => { if (e.target === $("folder-dlg")) $("folder-dlg").close(); });
   $("mv-list").onclick = (e) => {
@@ -964,6 +1026,9 @@
     if (el && !visible) dismiss(el);
     else if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); }
     refreshTree();
+    // The list and the map hold their own copies of the item: keep both in step.
+    const onMap = mapItems.find((x) => x.id === id);
+    if (onMap && onMap !== item) onMap.category = to;
     if (state.view === "map") drawMap();
     if (!quiet) toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); });
   }
@@ -1003,7 +1068,13 @@
         if (item && to) return moveItem(Number(item), to);
         if (folder && folder !== to && !(to && subtreeOf(folder).has(to))) {
           const ok = await folderWrite(`/api/folders/${encodeURIComponent(folder)}`, "PATCH", { parent: to });
-          if (ok) { toast(T().folderMoved(catLabel(folder), to ? folderPath(to) : T().topLevelShort)); load(); }
+          if (ok) {
+            const from = folderById(folder)?.parent ?? null;
+            toast(T().folderMoved(catLabel(folder), to ? folderPath(to) : T().topLevelShort), async () => {
+              if (await folderWrite(`/api/folders/${encodeURIComponent(folder)}`, "PATCH", { parent: from })) load();
+            });
+            load();
+          }
           else toast($("fd-error").textContent || T().failed);
         }
       };
@@ -1065,26 +1136,41 @@
     // Three tabs instead of one long scroll: what you see, who gets in, which AI.
     const tab = welcome ? "ai" : store.get("driftnet-settings-tab") || "general";
     const tabs = [["general", st.tabGeneral], ["access", st.tabAccess], ["ai", st.tabAi]];
-    const section = (k, html) => `<section data-tab="${k}" role="tabpanel">${html}</section>`;
+    const section = (k, html) => `<section data-tab="${k}" role="tabpanel" id="panel-${k}" aria-labelledby="tab-${k}">${html}</section>`;
     $("st-title").textContent = st.title;
     $("st-error").textContent = "";
     $("st-body").innerHTML = (welcome ? `<p class="welcome">${esc(st.welcome)}</p>` : "") +
-      `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" data-tab-btn="${k}" aria-selected="${k === tab}">${esc(l)}</button>`).join("")}</div>` +
+      `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" id="tab-${k}" aria-controls="panel-${k}" tabindex="${k === tab ? 0 : -1}" data-tab-btn="${k}" aria-selected="${k === tab}">${esc(l)}</button>`).join("")}</div>` +
       (typeof server === "string"
         ? section("general", local) + section("access", server) + section("ai", server)
         : section("general", local + server.general) + section("access", server.access) + section("ai", server.ai));
     $("st-body").dataset.tab = tab;
     $("st-cancel").textContent = t.cancel;
     $("st-save").textContent = st.save;
+    settingsOpener = document.activeElement;
     $("settings-dlg").showModal();
   }
+  let settingsOpener = null;
+  $("settings-dlg").addEventListener("close", () => { if (settingsOpener?.isConnected) settingsOpener.focus(); });
   $("st-cancel").onclick = () => $("settings-dlg").close();
   $("st-body").addEventListener("click", (e) => {
     const b = e.target.closest("[data-tab-btn]");
     if (!b) return;
+    selectTab(b);
+  });
+  function selectTab(b) {
     $("st-body").dataset.tab = b.dataset.tabBtn;
     store.set("driftnet-settings-tab", b.dataset.tabBtn);
-    $("st-body").querySelectorAll("[data-tab-btn]").forEach((x) => x.setAttribute("aria-selected", x === b));
+    $("st-body").querySelectorAll("[data-tab-btn]").forEach((x) => { x.setAttribute("aria-selected", x === b); x.tabIndex = x === b ? 0 : -1; });
+  }
+  $("st-body").addEventListener("keydown", (e) => {
+    const b = e.target.closest?.("[data-tab-btn]");
+    if (!b || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const all = [...$("st-body").querySelectorAll("[data-tab-btn]")];
+    const at = all.indexOf(b);
+    const next = e.key === "Home" ? all[0] : e.key === "End" ? all.at(-1) : all[(at + (e.key === "ArrowRight" ? 1 : all.length - 1)) % all.length];
+    selectTab(next); next.focus();
   });
 
   // ── Access panel: password, who can read, share key, public URL ───────────
@@ -1131,7 +1217,7 @@
     const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) }).catch(() => null);
     const data = await res?.json().catch(() => ({}));
-    if (!res?.ok) { $("st-error").textContent = data?.error ?? T().failed; return null; }
+    if (!res?.ok) { $("st-error").textContent = friendlyError(data?.error) ?? T().failed; return null; }
     return data;
   }
   $("st-body").addEventListener("input", (e) => {
@@ -1156,17 +1242,21 @@
     } else if (b.id === "ac-gen") {
       const i = $("ac-pw"); i.value = randomPassword(); i.type = "text"; $("ac-show").textContent = st.hide;
       i.dispatchEvent(new Event("input", { bubbles: true }));
+      await navigator.clipboard?.writeText(i.value).catch(() => {});
+      toast(st.genCopied);
     } else if (b.id === "ac-newkey") {
+      // Whatever was typed (a new password, private reading) is saved first, not thrown away.
+      if (!(await saveSettings())) return;
       if (await adminFetch("/api/read-key", "POST", {})) openSettings();
     } else if (b.id === "ac-tunnel") {
-      if (b.dataset.on === "1" && $("ac-pw")?.value) { $("st-error").textContent = st.saveFirst; return; }
+      if (b.dataset.on === "1" && !(await saveSettings())) return;
       b.disabled = true; b.textContent = b.dataset.on === "1" ? st.tunnelStarting : b.textContent;
       if (await adminFetch("/api/tunnel", "POST", { on: b.dataset.on === "1" })) openSettings();
       else b.disabled = false;
     }
   });
-  $("settings-form").onsubmit = async (e) => {
-    e.preventDefault();
+  /** Save what is typed in Settings. Returns false (and shows why) when the server refused. */
+  async function saveSettings() {
     const body = $("st-body");
     for (const el of body.querySelectorAll("[data-pref]")) prefs[el.dataset.pref] = el.type === "checkbox" ? el.checked : el.value;
     store.set("driftnet-prefs", JSON.stringify(prefs));
@@ -1183,16 +1273,40 @@
         const res = await fetch("/api/settings", { method: "PUT", body: JSON.stringify({ values }),
           headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
         const data = await res?.json().catch(() => ({}));
-        if (!res?.ok) { $("st-error").textContent = data?.error ?? T().failed; return; }
+        if (!res?.ok) { $("st-error").textContent = friendlyError(data?.error) ?? T().failed; return null; }
         serverSaved = true;
         // The page keeps working with the password it just set (or forgets a removed one).
         if ("DRIFTNET_TOKEN" in values) values.DRIFTNET_TOKEN ? store.set("driftnet-token", values.DRIFTNET_TOKEN.trim()) : store.set("driftnet-token", "");
       }
     }
+    return { serverSaved };
+  }
+  $("settings-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const saved = await saveSettings();
+    if (!saved) return;
     $("settings-dlg").close();
-    toast(serverSaved ? T().st.savedServer : T().saved);
+    toast(saved.serverSaved ? T().st.savedServer : T().saved);
     load();
   };
+  /** Server refusals in words a person reads, in the page's language. */
+  function friendlyError(msg) {
+    if (!msg) return null;
+    const zh = locale === "zh-TW";
+    const rules = [
+      [/DRIFTNET_TOKEN needs at least (\d+)/, (m) => zh ? `管理密碼至少要 ${m[1]} 個字元。` : `The admin password needs at least ${m[1]} characters.`],
+      [/password can't contain spaces/, () => zh ? "管理密碼不能有空白。" : "The admin password can't contain spaces."],
+      [/must not be weak|stronger password/, () => zh ? "開著公開網址時，密碼不能太弱：請按「產生」或換一組更長的。" : "With a public URL open, the password can't be weak — press Generate or use a longer one."],
+      [/private access needs an admin password/, () => zh ? "要設成私人，得先設管理密碼。" : "Private reading needs an admin password first."],
+      [/turn the public URL off/, () => zh ? "要先關掉公開網址，才能移除密碼。" : "Close the public URL before removing the password."],
+      [/set an admin password first|Save first/, () => zh ? "要先設定並儲存管理密碼。" : "Set and save an admin password first."],
+      [/cloudflared is not installed/, () => zh ? "這台電腦還沒安裝 cloudflared。" : "cloudflared isn't installed on this computer."],
+      [/set by the environment/, () => zh ? "這個設定由執行環境決定（例如 systemd），要在那裡改。" : "This one is set by the environment driftnet runs in; change it there."],
+      [/too many wrong passwords/, () => zh ? "密碼錯太多次，請 15 分鐘後再試。" : "Too many wrong passwords — try again in 15 minutes."],
+    ];
+    for (const [re, f] of rules) { const m = re.exec(msg); if (m) return f(m); }
+    return msg;
+  }
 
   // ── Mind map ─────────────────────────────────────────────────────────────
   const mapOpen = new Set((() => { try { return JSON.parse(store.get("driftnet-map-open") ?? "[]"); } catch { return []; } })());
@@ -1210,7 +1324,7 @@
       if (err.unauthorized) return askToken();
       throw err;
     }
-    const allOpen = folders.length > 0 && folders.every((f) => mapOpen.has(f.id));
+    const allOpen = mapOpen.size > 0;
     const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip">${esc(t.mapHint)} <button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
     $("list").innerHTML = `<div class="map-bar">
         <button class="btn" type="button" data-map="${allOpen ? "collapse" : "expand"}">${ic(allOpen ? "collapse" : "expand")} ${esc(allOpen ? t.collapseAll : t.expandAll)}</button>
@@ -1224,6 +1338,12 @@
           <button type="button" data-map="in" aria-label="${esc(t.zoomIn)}">${ic("plus")}</button></div></div>`;
     drawMap();
     sizeMap();
+    // On a phone the whole tree rarely fits: start zoomed to fit, once.
+    if (isDrawer() && !store.get("driftnet-map-zoom")) fitMap();
+  }
+  function fitMap() {
+    const wrap = $("map-wrap"), c = $("map-canvas");
+    if (wrap && c) mapZoomTo(Math.min(1.3, (wrap.clientWidth - 8) / c.offsetWidth, (wrap.clientHeight - 8) / c.offsetHeight));
   }
   /** The map fills the rest of the screen, so the page and the map don't scroll inside each other. */
   function sizeMap() {
@@ -1270,8 +1390,9 @@
       const tw = n.type === "folder" && n.hasKids ? `<span class="tw ${n.open ? "open" : ""}">${ic("chev")}</span>` : "";
       const cnt = (n.type === "folder" || n.type === "root") && n.count ? `<span class="cnt">${n.count}</span>` : "";
       const star = n.type === "item" && n.worth === "must-see" ? `<span class="w">${ic("star", "filled")}</span>` : "";
-      const more = n.type === "folder" ? `<span class="opt" data-edit="${esc(n.id)}" role="button" aria-label="${esc(T().editFolder)}">${ic("dots")}</span>` : "";
-      const aria = n.type === "folder" && n.hasKids ? ` aria-expanded="${!!n.open}"` : "";
+      const more = n.type === "folder" ? `<span class="opt" data-edit="${esc(n.id)}" aria-hidden="true" title="${esc(T().editFolder)}">${ic("dots")}</span>` : "";
+      const name = n.type === "folder" ? T().a11yFolder(n.label, n.count) : n.type === "item" ? T().a11yCard(n.label) : n.label;
+      const aria = ` aria-label="${esc(name)}" aria-level="${n.depth + 1}"` + (n.type === "folder" && n.hasKids ? ` aria-expanded="${!!n.open}"` : "");
       return `<div class="mnode ${n.type} ${level} ${n.type === "folder" && !n.hasKids ? "vacant" : ""} ${n.hit ? "hit" : ""}" role="button" tabindex="0"${aria}
         data-key="${esc(n.key)}" style="--c:${n.color}">${tw}${star}<span class="t">${esc(n.label)}</span>${cnt}${more}</div>`;
     }).join("");
@@ -1323,15 +1444,26 @@
     canvas.style.marginRight = `${width * mapZoom - width}px`;
     canvas.style.marginBottom = `${height * mapZoom - height}px`;
     const first = canvas.querySelector(".mnode.hit");
-    if (first && q) first.scrollIntoView({ block: "center", inline: "center" });
+    const wrap = $("map-wrap");
+    // Scroll only the map, never the page (the toolbar must stay reachable).
+    if (first && q && wrap) wrap.scrollTo({ left: first.offsetLeft * mapZoom - wrap.clientWidth / 2, top: first.offsetTop * mapZoom - wrap.clientHeight / 2 });
   }
 
   function mapZoomTo(z) {
-    mapZoom = Math.min(2, Math.max(0.5, Math.round(z * 10) / 10));
+    mapZoom = Math.min(2, Math.max(0.3, Math.round(z * 20) / 20));
     store.set("driftnet-map-zoom", String(mapZoom));
     drawMap();
   }
-  const toggleFolder = (id) => { mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); saveMapOpen(); drawMap(); };
+  const pulse = (key) => {
+    const n = $("map-canvas")?.querySelector(`.mnode[data-key="${CSS.escape(key)}"]`);
+    if (!n) return;
+    n.classList.remove("bump"); void n.offsetWidth; n.classList.add("bump");
+  };
+  const toggleFolder = (id) => {
+    const refocus = document.activeElement?.dataset?.key === `f:${id}`;
+    mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); saveMapOpen(); drawMap();
+    if (refocus) $("map-canvas").querySelector(`.mnode[data-key="f:${CSS.escape(id)}"]`)?.focus();
+  };
   /** The "+N" node: everything in that folder, as cards. */
   const showFolderList = (id) => { Object.assign(state, { view: "all", category: id, kind: "" }); load(); };
 
@@ -1341,20 +1473,19 @@
     const b = e.target.closest("[data-map]");
     if (!b) return;
     const a = b.dataset.map;
-    if (a === "expand") { folders.forEach((f) => mapOpen.add(f.id)); saveMapOpen(); renderMap(); }
+    if (a === "expand") { folders.forEach((f) => mapOpen.add(f.id)); saveMapOpen(); renderMap().then(() => { if (isDrawer()) fitMap(); }); }
     else if (a === "collapse") { mapOpen.clear(); saveMapOpen(); renderMap(); }
     else if (a === "new") openFolderDialog(null, null);
     else if (a === "tip") { store.set("driftnet-map-tip", "1"); b.closest(".map-tip").remove(); sizeMap(); }
     else if (a === "in") mapZoomTo(mapZoom + 0.1);
     else if (a === "out") mapZoomTo(mapZoom - 0.1);
-    else if (a === "fit") {
-      const wrap = $("map-wrap"), c = $("map-canvas");
-      mapZoomTo(Math.min(1.3, (wrap.clientWidth - 8) / c.offsetWidth, (wrap.clientHeight - 8) / c.offsetHeight));
-    }
+    else if (a === "fit") fitMap();
   });
   $("list").addEventListener("dblclick", (e) => {
     const node = e.target.closest(".mnode.folder");
-    if (node) openFolderDialog(node.dataset.key.slice(2));
+    if (!node) return;
+    clearTimeout(folderTap);
+    openFolderDialog(node.dataset.key.slice(2));
   });
 
   /**
@@ -1383,6 +1514,16 @@
       press.ghost.style.top = `${e.clientY}px`;
       document.body.append(press.ghost);
     };
+    // Mouse: drag the empty background to pan, like XMind.
+    let pan = null;
+    $("list").addEventListener("pointerdown", (e) => {
+      const wrap = e.target.closest?.("#map-wrap");
+      if (!wrap || e.pointerType !== "mouse" || e.button !== 0 || e.target.closest(".mnode, .map-zoom")) return;
+      pan = { x: e.clientX, y: e.clientY, l: wrap.scrollLeft, t: wrap.scrollTop, wrap };
+      wrap.classList.add("panning");
+    });
+    addEventListener("pointermove", (e) => { if (pan) { pan.wrap.scrollLeft = pan.l - (e.clientX - pan.x); pan.wrap.scrollTop = pan.t - (e.clientY - pan.y); } });
+    addEventListener("pointerup", () => { if (pan) { pan.wrap.classList.remove("panning"); pan = null; } });
     $("list").addEventListener("pointerdown", (e) => {
       const node = e.target.closest(".mnode");
       if (!node || e.button > 0 || e.target.closest("[data-edit]")) return;
@@ -1426,7 +1567,7 @@
       if (p.touch && p.armed && !p.drag) { endPress(); return; }   // held, then let go: nothing
       const target = p.drag ? document.querySelector(".mnode.drop") : null;
       endPress();
-      if (!p.drag) return tapNode(p.key);
+      if (!p.drag) return tapNode(p.key, !p.touch);
       if (!target) return;
       const to = target.dataset.key === "root" ? null : target.dataset.key.slice(2);
       if (p.key.startsWith("i:")) await mapMoveItem(Number(p.key.slice(2)), to);
@@ -1438,10 +1579,14 @@
       const node = e.target.closest?.(".mnode");
       if (!node) return;
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapNode(node.dataset.key); }
+      else if ((e.key === "F2" || e.key === "e") && node.dataset.key.startsWith("f:") && role === "admin") { e.preventDefault(); openFolderDialog(node.dataset.key.slice(2)); }
       else if (e.key === "m" && node.dataset.key.startsWith("i:") && role === "admin") { e.preventDefault(); openMovePicker(Number(node.dataset.key.slice(2))); }
     });
   })();
-  function tapNode(key) {
+  let folderTap = null;
+  function tapNode(key, viaMouse = false) {
+    // A mouse double-click edits the folder, so a single click waits a moment to be sure.
+    if (key.startsWith("f:") && viaMouse) { clearTimeout(folderTap); folderTap = setTimeout(() => toggleFolder(key.slice(2)), 230); return; }
     if (key.startsWith("f:")) toggleFolder(key.slice(2));
     else if (key.startsWith("i:")) openPeek(Number(key.slice(2)));
     else if (key.startsWith("m:")) showFolderList(key.slice(2));
@@ -1460,13 +1605,15 @@
       <p><span class="badge folder" style="--c:${folderColor(i.category)}">${esc(folderPath(i.category))}</span>
         <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span></p>
       ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
-      ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}`;
+      ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+      ${i.note ? `<div class="mynote">${ic("note")}<span>${esc(i.note)}</span></div>` : ""}`;
     $("pk-open").href = safeUrl(s?.primaryUrl || i.url);
     $("pk-open").innerHTML = `${ic("link")} ${esc(t.openLink)}`;
     $("pk-move").innerHTML = `${ic("move")} ${esc(t.moveTo)}`;
     $("pk-move").hidden = role !== "admin";
     $("pk-list").innerHTML = `${ic("list")} ${esc(t.showInList)}`;
     $("pk-close").textContent = t.close;
+    $("pk-close").hidden = matchMedia("(max-width: 720px)").matches;   // tap outside closes it on a phone
     $("peek-dlg").showModal();
   }
   $("pk-close").onclick = () => $("peek-dlg").close();
@@ -1494,10 +1641,11 @@
     const from = item.category;
     if (!(await mapWrite(`/api/items/${id}/move`, "POST", { folder: to }))) return;
     item.category = to;
-    mapOpen.add(to); saveMapOpen();
+    // Filing many cards in a row: the target stays as it was (no sudden expansion); its count pulses instead.
     drawMap();
+    pulse(`f:${to}`);
     toast(T().moved(nameOf(item), folderPath(to)), async () => {
-      if (await mapWrite(`/api/items/${id}/move`, "POST", { folder: from })) { item.category = from; drawMap(); }
+      if (await mapWrite(`/api/items/${id}/move`, "POST", { folder: from })) { item.category = from; drawMap(); refreshFolders(); }
     });
     refreshFolders();
   }
@@ -1511,7 +1659,7 @@
     if (to) { mapOpen.add(to); saveMapOpen(); }
     drawMap();
     toast(T().folderMoved(catLabel(id), to ? folderPath(to) : T().topLevelShort), async () => {
-      if (await mapWrite(`/api/folders/${encodeURIComponent(id)}`, "PATCH", { parent: from })) { f.parent = from; drawMap(); }
+      if (await mapWrite(`/api/folders/${encodeURIComponent(id)}`, "PATCH", { parent: from })) { f.parent = from; drawMap(); refreshFolders(); }
     });
     refreshFolders();
   }
@@ -1528,7 +1676,7 @@
     $("lg-label").textContent = st.password;
     $("lg-help").textContent = st.loginHelp;
     $("lg-adv-s").textContent = locale === "zh-TW" ? "進階" : "Advanced";
-    $("lg-adv").textContent = st.loginAdvanced;
+    $("lg-adv").textContent = st.loginAdvanced.replaceAll("PORT", String(serverPort));
     $("lg-ok").textContent = st.loginOk;
     $("lg-cancel").textContent = T().cancel;
     $("lg-error").textContent = "";
@@ -1567,8 +1715,11 @@
     const card = (id, title, desc, code) => `<div class="conn"><div class="conn-head"><h4>${esc(title)}</h4>
       <button class="btn copy" type="button" data-copy="#cx-${id}">${esc(st.copy)}</button></div><p>${esc(desc)}</p><pre id="cx-${id}">${esc(code)}</pre></div>`;
     const cards = [
-      card("cc", "Claude Code", zh ? "這台電腦上：裝插件（含 skill 和本機 MCP）。在別台電腦：連這個網址，可以讀也可以寫。" : "On this computer: the plugin (skill + local MCP). Elsewhere: connect to this URL, read and write.",
-        `/plugin install driftnet --marketplace KevinChu1110/driftnet\n\nclaude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer ${pw}"`),
+      card("ccp", zh ? "Claude Code：裝插件" : "Claude Code: the plugin", zh ? "在 Claude Code 裡輸入。會裝好 skill 和本機 MCP。" : "Type it inside Claude Code. Brings the skill and a local MCP server.",
+        `/plugin install driftnet --marketplace KevinChu1110/driftnet`),
+      card("cc", zh ? "Claude Code：連到這個 driftnet" : "Claude Code: connect to this driftnet",
+        zh ? "在終端機執行。先 export DRIFTNET_TOKEN=你的管理密碼，指令會自動帶入。" : "Run in a terminal. Export DRIFTNET_TOKEN=<your admin password> first; the command reads it.",
+        `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer $DRIFTNET_TOKEN"`),
       card("claude", zh ? "Claude 網頁版／桌面版（自訂 connector）" : "Claude.ai / Claude Desktop (custom connector)",
         zh ? "設定 → Connectors → 新增自訂 connector，貼上這個網址。用分享碼連線，只能搜尋和查看，不能改。" : "Settings → Connectors → Add custom connector, paste this URL. The share key makes it read-only: search and look, no changes.",
         withKey(`${base}/mcp`)),
@@ -1579,13 +1730,13 @@
         zh ? "只要 AI 會開網址就行，把這段貼進對話。唯讀。" : "Any AI that can open a link: paste this into the chat. Read-only.",
         zh ? `讀一下 ${withKey(`${base}/llms.txt`)} ，這是我收藏的 AI 工具清單。幫我找適合「（你的需求）」的工具。`
            : `Read ${withKey(`${base}/llms.txt`)} — it's my catalogue of AI tools. Find me one for: (your task).`),
-      card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。用管理密碼可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. With the admin password they can save, vote and work the queue.",
+      card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。把裡面的 <你的管理密碼> 換成真的密碼；有了它，agent 可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. Replace <your-admin-password> with the real one; with it they can save, vote and work the queue.",
         JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2)),
     ].join("");
     const warn = isLocalUrl
-      ? `<p class="warn danger">${esc(zh ? "這個網址只有這台電腦連得到。雲端的 AI（Claude 網頁版、ChatGPT、Grok、別台機器上的 agent）請先到「設定 → 存取與連線」開公開網址。"
-          : "This address only works on this computer. For cloud AIs (Claude.ai, ChatGPT, Grok, agents on other machines), open a public URL first: Settings → Access & connections.")}</p>` : "";
-    const noKey = a && !a.readKey ? `<p class="warn">${esc(zh ? "還沒有唯讀分享碼：到「設定 → 存取與連線」產生一組。" : "No share key yet: make one in Settings → Access & connections.")}</p>` : "";
+      ? `<p class="warn">${esc(zh ? "這個網址只有這台電腦連得到。雲端的 AI（Claude 網頁版、ChatGPT、Grok、別台機器上的 agent）請先到「設定 → 存取」開公開網址。"
+          : "This address only works on this computer. For cloud AIs (Claude.ai, ChatGPT, Grok, agents on other machines), open a public URL first: Settings → Access.")}</p>` : "";
+    const noKey = a && !a.readKey ? `<p class="warn">${esc(zh ? "還沒有唯讀分享碼：到「設定 → 存取」產生一組。" : "No share key yet: make one in Settings → Access.")}</p>` : "";
     $("cx-title").textContent = st.connect;
     $("cx-body").innerHTML = warn + noKey + cards;
     $("cx-close").textContent = t.close;
@@ -1672,8 +1823,8 @@
   async function renderNotes() {
     const t = T();
     notes = await api(`/api/notes${state.q ? `?q=${encodeURIComponent(state.q)}` : ""}`);
-    $("list").innerHTML = `<div class="bar"><span class="hint">${esc(t.noteBody)}</span><span class="spacer"></span>
-        <button class="btn primary" type="button" id="new-note">${esc(t.newNote)}</button></div>` +
+    $("list").innerHTML = `<div class="bar"><span class="hint">${notes.length ? esc(t.noteBody) : ""}</span><span class="spacer"></span>
+        <button class="btn primary" type="button" id="new-note">${ic("plus")} ${esc(t.newNote)}</button></div>` +
       (notes.length
         ? notes.map((n) => `<button type="button" class="note-card" data-note="${n.id}"><h3>${esc(n.title || t.untitled)}</h3>
             <div class="md">${md(n.body)}</div><div class="meta"><span>${esc(n.updatedAt.slice(0, 10))}</span></div></button>`).join("")
@@ -1792,12 +1943,12 @@
     return `<div class="swipe" id="item-${i.id}" data-id="${i.id}">
       <div class="act right ${inTrash ? "restore" : ""}"><span>${ic(inTrash ? "undo" : "star", inTrash || i.favorite ? "" : "filled")} ${esc(inTrash ? t.swipeRestore : i.favorite ? t.swipeUnfav : t.swipeFav)}</span></div>
       <div class="act left"><span>${inTrash ? "" : `${esc(t.swipeTrash)} ${ic("trash")}`}</span></div>
-      <article class="card" tabindex="0">
+      <article class="card" tabindex="0" aria-labelledby="name-${i.id}">
         <div class="top">
-          <a class="name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
+          <a class="name" id="name-${i.id}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
           <span class="badge folder" style="--c:${folderColor(i.category)}">${esc(catLabel(i.category))}</span>
           <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span>
-          ${i.pending ? `<span class="badge">${esc(t.pending)}</span>` : ""}
+          ${i.pending ? `<span class="rating">${esc(summaries ? t.pending : t.noModel)}</span>` : ""}
         </div>
         ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
         ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
@@ -1806,10 +1957,10 @@
         ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
         ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
         <div class="meta">
-          <span>#${i.id}</span><span>${esc(t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
+          <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
           <span>${esc(i.createdAt.slice(0, 10))}</span>
           ${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}
-          ${s?.tags?.length ? `<span class="tags">${s.tags.map((x) => "#" + esc(x)).join(" ")}</span>` : ""}
+          ${s?.tags?.length ? `<span class="tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</span>` : ""}
           ${inTrash ? "" : `<button class="link-btn" type="button" data-act="note">${ic("note")} ${esc(i.note ? t.editNote : t.addNote)}</button>`}
         </div>
         <div class="tools">${tools}</div>
@@ -1848,6 +1999,8 @@
     if (action === "trash" || action === "restore") {
       // Only once the server agreed: a refused change must not look done.
       if (!(await act(id, action))) { el.querySelector(".card").style.transform = ""; delete el.dataset.dir; return; }
+      // Keyboard users stay in the list: focus moves to the next card.
+      if (el.contains(document.activeElement)) (el.nextElementSibling ?? el.previousElementSibling)?.querySelector?.(".card")?.focus();
       el.querySelector(".card").style.transform = `translateX(${action === "trash" ? "-110%" : "110%"})`;
       dismiss(el);
       const back = action === "trash" ? "restore" : "trash";
@@ -1856,8 +2009,9 @@
       const on = !item.favorite;
       if (!(await act(id, on ? "favorite" : "unfavorite"))) return;
       item.favorite = on;
+      const hadFocus = el.contains(document.activeElement);
       if (state.view === "favorites" && !on) dismiss(el);
-      else el.outerHTML = card(item), attachSwipe(document.getElementById(`item-${id}`));
+      else { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); if (hadFocus) document.querySelector(`#item-${id} .card`)?.focus(); }
       if (on) toast(t.faved(nameOf(item)));
     }
     refreshCounts();
@@ -1947,12 +2101,15 @@
 
   // ── Toast with undo ──────────────────────────────────────────────────────
   let toastTimer;
+  /** The newest undoable action, so z (or ⌘/Ctrl+Z) can undo it from the keyboard. */
+  let lastUndo = null;
   function toast(text, undo) {
     $("toast-text").textContent = text;
     const u = $("toast-undo");
     u.hidden = !undo;
     u.textContent = T().undo;
-    u.onclick = async () => { $("toast").classList.remove("show"); await undo?.(); };
+    lastUndo = undo ?? null;
+    u.onclick = async () => { clearTimeout(toastTimer); $("toast").classList.remove("show"); lastUndo = null; await undo?.(); };
     $("toast").classList.add("show");
     toastMs = Math.min(9000, 4500 + text.length * 45);
     clearTimeout(toastTimer);
@@ -1961,16 +2118,21 @@
   let toastMs = 5000;
   // Reading or reaching for Undo keeps the toast up.
   for (const ev of ["pointerenter", "focusin"]) $("toast").addEventListener(ev, () => clearTimeout(toastTimer));
-  for (const ev of ["pointerleave", "focusout"]) $("toast").addEventListener(ev, () => { toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2500); });
+  for (const ev of ["pointerleave", "focusout"]) $("toast").addEventListener(ev, () => {
+    clearTimeout(toastTimer);
+    if ($("toast").classList.contains("show")) toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2500);
+  });
 
   // ── Keyboard: j/k to step through cards, then act on the focused one ─────
   let lastKey = "";
   addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "z" && lastUndo && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? "")) { e.preventDefault(); $("toast-undo").click(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "")) return;
     const k = e.key, prev = lastKey;
     lastKey = k;
     if (k === "/") { e.preventDefault(); $("q").focus(); return; }
+    if ((k === "z" || k === "u") && lastUndo) { e.preventDefault(); $("toast-undo").click(); return; }
     if (k === "?") { toast(T().shortcuts); return; }
     if (prev === "g" && k === "m") { Object.assign(state, { view: "map", category: "" }); load(); return; }
     if (prev === "g" && k === "a") { Object.assign(state, { view: "all", category: "" }); load(); return; }
@@ -1986,6 +2148,8 @@
     }
     if (!cur || role !== "admin") return;
     const swipe = cur.closest(".swipe");
+    if (!["f", "#", "Delete", "m", "n"].includes(k)) return;
+    e.preventDefault();   // or the letter lands in the dialog that opens
     if (k === "f") run(swipe, "favorite");
     else if (k === "#" || k === "Delete") run(swipe, state.view === "trash" ? "restore" : "trash");
     else if (k === "m") openMovePicker(Number(swipe.dataset.id));

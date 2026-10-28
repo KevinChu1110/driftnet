@@ -76,6 +76,19 @@ export function isTrustedLocal(req: IncomingMessage): boolean {
   return !origin || origin === `http://${host}` || origin === `https://${host}`;
 }
 
+/**
+ * A request another website's page made the browser send. Browsers always add
+ * Origin to cross-site POSTs; the page itself sends its own origin, the Chrome
+ * extension sends chrome-extension://…, and curl, MCP clients and chat
+ * platforms send none.
+ */
+export function foreignOrigin(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin || origin.startsWith("chrome-extension://")) return false;
+  const host = req.headers.host ?? "";
+  return origin !== `http://${host}` && origin !== `https://${host}`;
+}
+
 /** What the page may offer: admin (change things), reader (look only), none (asks for a key). */
 export function role(req: IncomingMessage, env: NodeJS.ProcessEnv): "admin" | "reader" | "none" {
   if (isTrustedLocal(req) || (token(env) ? isAdmin(req, env) : true)) return "admin";

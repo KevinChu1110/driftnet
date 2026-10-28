@@ -237,6 +237,10 @@ export class Store {
     if (!name) throw new FolderError("a folder needs a name");
     const parent = input.parent || null;
     if (parent && !this.folderExists(parent)) throw new FolderError(`no folder ${parent}`);
+    // Two folders with the same name side by side can't be told apart (in the tree, or by the classifier).
+    if (this.folders().some((f) => (f.parent ?? null) === parent && (f.name ?? f.id).toLowerCase() === name.toLowerCase())) {
+      throw new FolderError(`there is already a folder called “${name}” here`);
+    }
     const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
     let id = base.length >= 2 ? base : `f-${Math.random().toString(36).slice(2, 8)}`;
     while (this.folderExists(id)) id = `${base || "f"}-${Math.random().toString(36).slice(2, 6)}`;
