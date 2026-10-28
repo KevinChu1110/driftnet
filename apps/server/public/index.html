@@ -1075,19 +1075,16 @@
 
   // ── Move a card: picker (phones) or drag onto the sidebar (desktop) ───────
   let moving = null, movingMany = null;
-  /** The nine folders cards were filed into most often (this browser), in tree order on a tie: keys 1–9 file a card there. */
+  /** The nine folders cards were filed into most often (the server counts moves and undoes), in tree order on a tie: keys 1–9 file a card there. */
   function quickFolders() {
-    let counts = {};
-    try { counts = JSON.parse(store.get("driftnet-quick") ?? "{}") || {}; } catch {}
     const order = []; (function walk(p) { for (const f of kids(p)) { order.push(f.id); walk(f.id); } })(null);
-    return order.map((id, at) => ({ id, at, n: Number(counts[id]) || 0 })).filter((f) => f.n > 0)
+    return order.map((id, at) => ({ id, at, n: folders.find((f) => f.id === id)?.uses ?? 0 })).filter((f) => f.n > 0)
       .sort((a, b) => b.n - a.n || a.at - b.at).slice(0, 9).map((f) => f.id);
   }
-  function bumpQuick(folder, by = 1) {
-    let counts = {};
-    try { counts = JSON.parse(store.get("driftnet-quick") ?? "{}") || {}; } catch {}
-    counts[folder] = (Number(counts[folder]) || 0) + by;
-    store.set("driftnet-quick", JSON.stringify(counts));
+  /** Mirror the server's counter on the folders already loaded, so keys 1–9 stay current without a refetch. */
+  function bumpUse(folder, by = 1) {
+    const f = folders.find((x) => x.id === folder);
+    if (f) f.uses = Math.max(0, (f.uses ?? 0) + by);
   }
   function openMovePicker(id) {
     const item = find(id);
@@ -1174,7 +1171,8 @@
     const onMap = mapItems.find((x) => x.id === id);
     if (onMap && onMap !== item) onMap.category = to;
     if (state.view === "map") drawMap();
-    if (!quiet) { bumpQuick(to); toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); }); }
+    bumpUse(to);
+    if (!quiet) { toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); }); }
   }
   const subtreeOf = (id) => { const out = new Set([id]); for (const q = [id]; q.length;) for (const k of kids(q.pop())) { out.add(k.id); q.push(k.id); } return out; };
   /** Re-draw just the tree's counts after a move. */
@@ -1962,7 +1960,7 @@
     // Filing many cards in a row: the target stays as it was (no sudden expansion); its count pulses instead.
     drawMap();
     pulse(`f:${to}`);
-    bumpQuick(to);
+    bumpUse(to);
     toast(T().moved(nameOf(item), folderPath(to)), async () => {
       if (await mapWrite(`/api/items/${id}/move`, "POST", { folder: from })) { item.category = from; drawMap(); refreshFolders(); }
     });
@@ -2441,14 +2439,13 @@
     else if (a === "all") { for (const id of visibleIds()) selected.add(id); syncSelection(); }
     else clearSelection();
   });
-  /** One request for the whole batch; Undo sends back what the server said was there before. */
+  /** One request for the whole batch; Undo hands back the id the server kept the snapshot under. */
   async function bulkApply(action, ids, folder) {
     if (!ids.length) return;
     const t = T(), n = ids.length;
     const r = await mapWrite("/api/items/bulk", "POST", { action, ids, ...(action === "move" ? { folder } : {}) });
     if (!r) return;
     clearSelection();
-    if (action === "move") bumpQuick(folder, n);
     await refreshFolders();
     await render();
     refreshCounts();
@@ -2456,7 +2453,7 @@
     const text = { move: () => t.bulkMoved(n, folderPath(folder)), trash: () => t.bulkRemoved(n), restore: () => t.bulkRestored(n),
                    favorite: () => t.bulkFaved(n), unfavorite: () => t.bulkUnfaved(n) }[action]();
     toast(text, async () => {
-      if (!(await mapWrite("/api/items/bulk/undo", "POST", { previous: r.previous }))) return;
+      if (!(await mapWrite("/api/items/bulk/undo", "POST", { undo: r.undo }))) return;
       await refreshFolders();
       await render();
       refreshCounts();

@@ -29,6 +29,8 @@ export interface Folder {
   position: number;
   /** Items directly in this folder (not counting sub-folders), trash excluded. */
   count: number;
+  /** How often items were filed here by hand or by an agent (moves minus undone moves): higher = filed into more often. */
+  uses: number;
 }
 
 export class FolderError extends Error {}
@@ -250,7 +252,32 @@ export class Store {
          FROM folders f ORDER BY f.position, f.id`,
       )
       .all() as unknown as Folder[];
-    return rows.map((r) => ({ id: r.id, parent: r.parent ?? null, name: r.name ?? null, description: r.description, position: r.position, count: r.count }));
+    const uses = this.folderUses();
+    return rows.map((r) => ({ id: r.id, parent: r.parent ?? null, name: r.name ?? null, description: r.description, position: r.position, count: r.count, uses: uses[r.id] ?? 0 }));
+  }
+
+  /** The move counter per folder: one JSON object in the state table. */
+  private folderUses(): Record<string, number> {
+    try { return JSON.parse(this.getState("folder_uses") ?? "{}") || {}; } catch { return {}; }
+  }
+
+  /** Count a move into (or, with a negative `by`, an undone move out of) a folder. Never goes below 0. */
+  bumpFolderUse(folderId: string, by = 1): void {
+    const uses = this.folderUses();
+    const n = Math.max(0, (uses[folderId] ?? 0) + by);
+    if (n > 0) uses[folderId] = n; else delete uses[folderId];
+    this.setState("folder_uses", JSON.stringify(uses));
+  }
+
+  /** The folders filed into most often (at most `limit`), ties in tree order. Folders never used are left out. */
+  topFolders(limit = 9): Folder[] {
+    const all = this.folders();
+    const order = new Map<string, number>();
+    const walk = (parent: string | null) => {
+      for (const f of all) if (f.parent === parent && !order.has(f.id)) { order.set(f.id, order.size); walk(f.id); }
+    };
+    walk(null);
+    return all.filter((f) => f.uses > 0).sort((a, b) => b.uses - a.uses || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)).slice(0, limit);
   }
 
   /** A folder and every folder below it. */
@@ -313,6 +340,7 @@ export class Store {
       this.db.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ?").run(row.parent, id);
       this.db.prepare("DELETE FROM folders WHERE id = ?").run(id);
       this.db.exec("COMMIT");
+      if (this.folderUses()[id]) this.bumpFolderUse(id, -Infinity);
     } catch (err) {
       this.db.exec("ROLLBACK");
       throw err;
@@ -322,16 +350,20 @@ export class Store {
   /** The reader put this item here; classification won't touch it again. */
   moveItem(itemId: number, folderId: string, actor?: string): boolean {
     if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
-    return this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, itemId).changes > 0;
+    const moved = this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, itemId).changes > 0;
+    if (moved) this.bumpFolderUse(folderId);
+    return moved;
   }
 
   /** Move many items at once, all or nothing. Returns each item's earlier folder so the whole batch can be undone. */
   moveItems(ids: number[], folderId: string, actor?: string): { id: number; category: string; user_placed: number }[] {
     if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
-    return this.inTransaction(ids, "category, user_placed", (id, before) => {
+    const before = this.inTransaction(ids, "category, user_placed", (id, before) => {
       this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, id);
       return { id, category: String(before.category), user_placed: Number(before.user_placed) };
     });
+    this.bumpFolderUse(folderId, ids.length);
+    return before;
   }
 
   /** Put items back exactly as an earlier bulk action found them (folder and placement, trash, star). */
@@ -339,13 +371,17 @@ export class Store {
     const ids = rows.map((r) => r.id);
     for (const r of rows) if (r.category !== undefined && !this.folderExists(r.category)) throw new FolderError(`no folder ${r.category}`);
     const byId = new Map(rows.map((r) => [r.id, r]));
-    this.inTransaction(ids, "id", (id) => {
+    const undone = new Map<string, number>();
+    this.inTransaction(ids, "category", (id, before) => {
       const r = byId.get(id)!;
+      if (r.category !== undefined) undone.set(String(before.category), (undone.get(String(before.category)) ?? 0) + 1);
       if (r.category !== undefined) this.db.prepare("UPDATE items SET category = ?, user_placed = ? WHERE id = ?").run(r.category, r.user_placed ?? 0, id);
       if (r.trashed_at !== undefined) this.db.prepare("UPDATE items SET trashed_at = ? WHERE id = ?").run(r.trashed_at, id);
       if (r.favorite !== undefined) this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(r.favorite ? 1 : 0, id);
       return undefined;
     });
+    // Undoing a move takes back the count it added to the folder the items were sitting in.
+    for (const [folder, n] of undone) this.bumpFolderUse(folder, -n);
   }
 
   /** Run `fn` for every id in one transaction; an unknown id rolls the whole batch back. `cols` are read first and passed in. */
@@ -559,6 +595,10 @@ export class Store {
 
   setState(key: string, value: string): void {
     this.db.prepare("INSERT INTO state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+  }
+
+  deleteState(key: string): void {
+    this.db.prepare("DELETE FROM state WHERE key = ?").run(key);
   }
 
   /**
