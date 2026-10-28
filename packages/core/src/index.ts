@@ -17,7 +17,7 @@ export { Store, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
 export { Summarizer } from "./summarize.ts";
 export { renderText } from "./render.ts";
-export { messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
+export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
 export type { Judge, JudgeResult } from "./judge/index.ts";
 
 export interface Driftnet {

@@ -19,6 +19,7 @@
   header { display: flex; gap: 16px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
   header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
   header .stats { color: var(--muted); font-size: 13px; }
+  .lang { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
   header input { flex: 1; min-width: 180px; max-width: 420px; margin-left: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
   .layout { display: grid; grid-template-columns: 220px 1fr; max-width: 1200px; margin: 0 auto; }
   nav { padding: 16px 12px; border-right: 1px solid var(--line); position: sticky; top: 61px; align-self: start; max-height: calc(100vh - 61px); overflow: auto; }
@@ -54,31 +55,70 @@
 <header>
   <h1>driftnet</h1>
   <span class="stats" id="stats"></span>
-  <input id="q" type="search" placeholder="Search tools, tags, links…" aria-label="Search">
+  <input id="q" type="search">
+  <button id="lang" class="lang" type="button"></button>
 </header>
 <div class="layout">
   <nav id="nav" aria-label="Categories"></nav>
   <main id="list" aria-live="polite"></main>
 </div>
 <script>
+  const STRINGS = {
+    en: {
+      title: "driftnet", search: "Search tools, tags, links…", all: "All", any: "Any",
+      categories: "Categories", kind: "Kind", switchTo: "中文",
+      stats: (n, s) => `${n} items · shared ${s}×`, shared: (n) => `shared ${n}×`,
+      empty: "Nothing here yet — drop a link in your chat.",
+      kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
+      worth: { skip: "skip", low: "low", normal: "normal", "must-see": "★ must-see" },
+      flags: { injection: "prompt injection", "hidden-chars": "hidden characters", "low-reputation": "low-reputation source" },
+    },
+    "zh-TW": {
+      title: "driftnet", search: "搜尋工具、標籤、連結…", all: "全部", any: "不限",
+      categories: "分類", kind: "類型", switchTo: "EN",
+      stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
+      empty: "還沒有內容，把連結丟進聊天室吧。",
+      kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
+      worth: { skip: "略過", low: "普通", normal: "值得看", "must-see": "★ 必看" },
+      flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源" },
+    },
+  };
   const state = { category: "", kind: "", q: "" };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const safeUrl = (u) => (/^https?:\/\//.test(u) ? u : "#");
-  const KINDS = { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" };
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+
+  let locale = "en";
+  let catLabels = {};
+  const T = () => STRINGS[locale] ?? STRINGS.en;
+  const catLabel = (id) => catLabels[id]?.[locale] ?? id;
+
+  function applyLocale() {
+    document.documentElement.lang = locale;
+    $("q").placeholder = T().search;
+    $("q").setAttribute("aria-label", T().search);
+    $("lang").textContent = T().switchTo;
+  }
 
   async function load() {
-    const [stats, cats] = await Promise.all([fetch("/api/stats").then((r) => r.json()), fetch("/api/categories").then((r) => r.json())]);
-    $("stats").textContent = `${stats.items} items · shared ${stats.shares}×`;
+    const [stats, ui] = await Promise.all([fetch("/api/stats").then((r) => r.json()), fetch("/api/ui").then((r) => r.json())]);
+    catLabels = ui.categories;
+    // The viewer's choice wins over the server default.
+    const saved = store.get("driftnet-locale");
+    locale = STRINGS[saved] ? saved : STRINGS[ui.locale] ? ui.locale : "en";
+    applyLocale();
+    $("stats").textContent = T().stats(stats.items, stats.shares);
     const btn = (key, label, n, field) =>
       `<button data-field="${field}" data-value="${esc(key)}" aria-pressed="${state[field] === key}">
          <span>${esc(label)}</span><span class="count">${n ?? ""}</span></button>`;
     $("nav").innerHTML =
-      btn("", "All", stats.items, "category") +
-      "<h2>Categories</h2>" +
-      Object.keys(cats).filter((k) => stats.byCategory[k]).map((k) => btn(k, k, stats.byCategory[k], "category")).join("") +
-      "<h2>Kind</h2>" + btn("", "Any", "", "kind") +
-      Object.entries(KINDS).map(([k, v]) => btn(k, v, "", "kind")).join("");
+      btn("", T().all, stats.items, "category") +
+      `<h2>${esc(T().categories)}</h2>` +
+      Object.keys(catLabels).filter((k) => stats.byCategory[k]).map((k) => btn(k, catLabel(k), stats.byCategory[k], "category")).join("") +
+      `<h2>${esc(T().kind)}</h2>` + btn("", T().any, "", "kind") +
+      Object.entries(T().kinds).map(([k, v]) => btn(k, v, "", "kind")).join("");
     $("nav").onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -93,7 +133,7 @@
     const p = new URLSearchParams({ limit: "300" });
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
     const items = await fetch(`/api/items?${p}`).then((r) => r.json());
-    $("list").innerHTML = items.length ? items.map(card).join("") : `<div class="empty">Nothing here yet — drop a link in your chat.</div>`;
+    $("list").innerHTML = items.length ? items.map(card).join("") : `<div class="empty">${esc(T().empty)}</div>`;
     if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
   }
 
@@ -103,20 +143,25 @@
     return `<article class="card" id="item-${i.id}">
       <div class="top">
         <a class="name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
-        <span class="badge">${esc(i.category)}</span>
-        <span class="badge worth-${esc(i.worth)}">${i.worth === "must-see" ? "★ must-see" : esc(i.worth)}</span>
+        <span class="badge">${esc(catLabel(i.category))}</span>
+        <span class="badge worth-${esc(i.worth)}">${esc(T().worth[i.worth] ?? i.worth)}</span>
       </div>
       ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
       ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-      ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.join(", "))}</div>` : ""}
+      ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => T().flags[f] ?? f).join(", "))}</div>` : ""}
       <div class="meta">
-        <span>#${i.id}</span><span>${esc(i.kind)}</span><span>shared ${i.shareCount}×</span>
+        <span>#${i.id}</span><span>${esc(T().kinds[i.kind] ?? i.kind)}</span><span>${esc(T().shared(i.shareCount))}</span>
         <span>${esc(i.createdAt.slice(0, 10))}</span>
         ${s?.tags?.length ? `<span>${s.tags.map((t) => "#" + esc(t)).join(" ")}</span>` : ""}
       </div>
     </article>`;
   }
 
+  $("lang").onclick = () => {
+    locale = locale === "en" ? "zh-TW" : "en";
+    store.set("driftnet-locale", locale);
+    load();
+  };
   let t;
   $("q").oninput = (e) => { clearTimeout(t); t = setTimeout(() => {
     state.q = e.target.value.trim();

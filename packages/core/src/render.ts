@@ -1,4 +1,4 @@
-import { messages, type Messages } from "./i18n.ts";
+import { categoryLabel, messages, type Messages } from "./i18n.ts";
 import type { IngestResult } from "./types.ts";
 
 const WORTH_MARK = { skip: "🗑", low: "·", normal: "📌", "must-see": "⭐" } as const;
@@ -10,7 +10,7 @@ const WORTH_MARK = { skip: "🗑", low: "·", normal: "📌", "must-see": "⭐" 
 export function renderText(r: IngestResult, baseUrl?: string, t: Messages = messages()): string {
   const { item } = r;
   const s = item.summary;
-  const lines = [`${WORTH_MARK[item.worth]} ${s?.name ?? item.title}｜${item.category}`];
+  const lines = [`${WORTH_MARK[item.worth]} ${s?.name ?? item.title}｜${categoryLabel(item.category, t.locale)}`];
   if (s) {
     lines.push(s.oneLiner);
     for (const h of s.highlights) lines.push(`• ${h}`);

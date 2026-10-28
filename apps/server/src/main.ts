@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createDriftnet, WORTH, type Kind, type Worth } from "@driftnet/core";
+import { categoryLabels, createDriftnet, resolveLocale, WORTH, type Kind, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack } from "./adapters/slack.ts";
@@ -49,6 +49,9 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
+    if (req.method === "GET" && path === "/api/ui") {
+      return send(res, 200, { locale: resolveLocale(), categories: categoryLabels(Object.keys(dn.categories)) });
+    }
     if (req.method === "GET" && path === "/api/stats") return send(res, 200, { ...dn.store.stats(), engines: dn.engines });
 
     if (req.method === "GET" && path === "/api/items") {
