@@ -224,7 +224,7 @@ driftnet asks a model for one thing: fill in a JSON schema. Pick who answers.
 | `openai` | Anything OpenAI-compatible: OpenAI, Gemini, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio** | `DRIFTNET_LLM_API_KEY` (none for local) |
 | `claude-cli` | **Your Claude subscription**, via Claude Code logged in on the same machine | none |
 | `gemini-cli` | **Your Google account**, via Gemini CLI logged in on the same machine | none |
-| *(empty)* | No model. Links are still extracted, judged and listed, and wait in the [agent queue](#let-your-agent-do-the-reading) | none |
+| *(empty)* | No model. Links are still extracted and listed (judged too if Jev is on), and wait in the [agent queue](#let-your-agent-do-the-reading) | none |
 
 ```bash
 DRIFTNET_LLM_PROVIDER=openai

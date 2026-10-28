@@ -193,7 +193,7 @@ driftnet 只要模型做一件事：把 JSON schema 填好。由你決定誰來�
 | `openai` | 所有相容 OpenAI 格式的服務：OpenAI、Gemini、Grok、DeepSeek、OpenRouter、LiteLLM、**Ollama／LM Studio** | `DRIFTNET_LLM_API_KEY`（本機不用） |
 | `claude-cli` | **你的 Claude 訂閱**，透過同一台機器上已登入的 Claude Code | 不用 |
 | `gemini-cli` | **你的 Google 帳號**，透過同一台機器上已登入的 Gemini CLI | 不用 |
-| *（不填）* | 不用模型：照樣擷取、判斷、列出，並排進 [agent 佇列](#讓你的-agent-來讀) | 不用 |
+| *（不填）* | 不用模型：照樣擷取、列出（有開 Jev 也會判斷），並排進 [agent 佇列](#讓你的-agent-來讀) | 不用 |
 
 ```bash
 DRIFTNET_LLM_PROVIDER=openai
