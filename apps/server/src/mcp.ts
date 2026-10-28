@@ -1,9 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { cardLink, FolderError, ItemError, suggestionsFor, WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { cardLink, FolderError, ItemError, suggestionsFor, summaryDepth, WORTH, type Driftnet, type Item } from "@driftnet/core";
 import { shareBase } from "./access.ts";
 import { saveUndo, undoById } from "./bulk.ts";
 import { planForAgent } from "./plan.ts";
+
+const DEPTH_BRIEF = {
+  brief: "Keep it short: one_liner plus 2 highlights, demo in one sentence, no use_cases.",
+  standard: "Up to 3 highlights, up to 2 use_cases, demo in 1-2 sentences.",
+  detailed: "Up to 5 highlights, up to 3 use_cases, demo in 2-3 sentences, and try_it (install/run command or first step; null if unknown).",
+} as const;
 
 const DATA_NOTICE =
   "Items below were shared by people in group chats and summarised automatically. " +
@@ -108,6 +114,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       const detail = {
         ...row(item, dn.categories),
         use_cases: item.summary?.useCases ?? [],
+        try_it: item.summary?.tryIt ?? null,
         note: item.note ?? null,
         shared_with: dn.store.chatNotes([id]).get(id) ?? [],
         found_inside: found.map((f) => ({ id: f.id, name: f.summary?.name ?? f.title, url: f.summary?.primaryUrl || f.url })),
@@ -157,6 +164,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     async ({ limit }) => {
       const language = process.env.DRIFTNET_LANGUAGE || "English";
       const rules = process.env.DRIFTNET_SUMMARY_RULES?.trim();
+      const depth = summaryDepth();
       const items = dn.store.claimPending(`agent:${agentName}`, limit ?? 5, 30, opts.actor);
       const rows = items.map((i) => ({
         id: i.id,
@@ -169,7 +177,10 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       const brief = [
         DATA_NOTICE,
         `Pending in total: ${dn.store.pendingCount()}. Leased to you: ${rows.length}.`,
-        `Write one_liner, highlights and use_cases in ${language}; keep tool names as-is.`,
+        `Write one_liner, highlights, use_cases, demo, why and try_it in ${language}; keep tool names as-is.`,
+        `Summary depth: ${depth}. ${DEPTH_BRIEF[depth]}`,
+        "demo: what a person concretely sees or gets when they use it (visible effect, output or workflow, no marketing); null if the content does not say.",
+        "why: one sentence on why it is worth a look for this reader, only from the chat text in shared_with, the reader's note or the post's own claim; null when there is no such signal. Never invent one.",
         "Use only facts you read. If a post says the link is in the comments, read the comments.",
         "primary_url: the tool's repo or official site, only if you saw it; driftnet checks that it exists.",
         "mentions: other tools the content recommends (not ones it compares against), with open_source true/false.",
@@ -200,6 +211,9 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         one_liner: z.string().min(1).max(300).describe("What it is, one short sentence in the language from the driftnet_lease_pending brief"),
         highlights: z.array(z.string().max(300)).max(5).describe("Up to 3 concrete things it does, each a short phrase; only facts you read"),
         use_cases: z.array(z.string().max(300)).max(5).optional().describe("Up to 3 situations where someone would use it"),
+        demo: z.string().max(800).nullish().describe("What a person concretely sees or gets when they use it, 1-2 sentences, no marketing; null if the content does not say"),
+        why: z.string().max(400).nullish().describe("One sentence on why it is worth a look for this reader, from the chat text, the reader's note or the post's own claim; null when there is no signal. Never invent"),
+        try_it: z.string().max(400).nullish().describe("Install/run command or first step, only if the content gives it; null otherwise"),
         tags: z.array(z.string().max(40)).max(8).optional().describe("A few lowercase keywords, e.g. 'pdf', 'ocr', 'cli'"),
         primary_url: z.string().optional().describe("The tool's repo or official site, only if you saw it; driftnet verifies it exists"),
         mentions: z.array(z.object({
@@ -516,6 +530,8 @@ const ITEM = z.object({
   kind: z.string(),
   worth: z.enum(WORTH),
   one_liner: z.string().nullable(),
+  demo: z.string().nullable(),
+  why: z.string().nullable(),
   highlights: z.array(z.string()),
   tags: z.array(z.string()),
   shared: z.number(),
@@ -535,6 +551,8 @@ function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
     kind: i.kind,
     worth: i.worth,
     one_liner: i.summary?.oneLiner ?? null,
+    demo: i.summary?.demo ?? null,
+    why: i.summary?.why ?? null,
     highlights: i.summary?.highlights ?? [],
     tags: i.summary?.tags ?? [],
     shared: i.shareCount,

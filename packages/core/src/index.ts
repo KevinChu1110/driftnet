@@ -7,7 +7,7 @@ import { Pipeline, type Engines } from "./pipeline.ts";
 import { Store } from "./store.ts";
 import { createProvider } from "./llm/index.ts";
 import type { LlmProvider } from "./llm/types.ts";
-import { Summarizer } from "./summarize.ts";
+import { Summarizer, summaryDepth } from "./summarize.ts";
 import { categoryLabel, resolveLocale, type Locale } from "./i18n.ts";
 import { sendWebhook } from "./webhook.ts";
 import { defaultDbPath } from "./home.ts";
@@ -22,7 +22,7 @@ export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";
 export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
-export { Summarizer } from "./summarize.ts";
+export { Summarizer, summaryDepth, DEPTHS, type Depth } from "./summarize.ts";
 export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
@@ -98,7 +98,7 @@ function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { jud
   const jevKey = env.TYPESAFE_API_KEY || readKeyFile(join(homedir(), ".typesafe", "api_key"));
   const judge = jevKey && env.DRIFTNET_JUDGE !== "off" ? new JevJudge(jevKey) : undefined;
   const llm = createProvider(env);
-  const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "") : undefined;
+  const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "", summaryDepth(env)) : undefined;
   const blockedDomains = (env.DRIFTNET_BLOCK_DOMAINS ?? "").split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^\*?\./, "")).filter(Boolean);
   const minConfidence = env.DRIFTNET_MIN_CONFIDENCE ? Number(env.DRIFTNET_MIN_CONFIDENCE) : undefined;
   return {

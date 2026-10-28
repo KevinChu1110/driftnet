@@ -31,8 +31,11 @@ function itemBody(i: Item, chat: string[]): string {
   const s = i.summary;
   const out: string[] = [];
   if (s?.oneLiner) out.push(s.oneLiner, "");
+  if (s?.demo) out.push(`**Demo:** ${s.demo}`, "");
+  if (s?.why) out.push(`**Why:** ${s.why}`, "");
   if (s?.highlights.length) out.push(...s.highlights.map((h) => `- ${h}`), "");
   if (s?.useCases.length) out.push("Use cases:", ...s.useCases.map((u) => `- ${u}`), "");
+  if (s?.tryIt) out.push(`**Try it:** ${s.tryIt}`, "");
   for (const c of chat) out.push(...c.split("\n").map((l) => `> ${l}`), "");
   if (i.note) out.push("**Note:** " + i.note, "");
   return out.join("\n");

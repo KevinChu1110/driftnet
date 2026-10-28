@@ -8,7 +8,8 @@ export function llmsTxt(dn: Driftnet): string {
   const items = dn.store.list({ minWorth: "normal", limit: 300 });
   const byCat = new Map<string, string[]>();
   for (const i of items) {
-    const line = `- [${i.summary?.name ?? i.title}](${i.summary?.primaryUrl || i.url})${i.summary ? `: ${i.summary.oneLiner}` : ""}`;
+    const demo = i.summary?.demo ? ` Demo: ${i.summary.demo.length > 140 ? i.summary.demo.slice(0, 139) + "…" : i.summary.demo}` : "";
+    const line = `- [${i.summary?.name ?? i.title}](${i.summary?.primaryUrl || i.url})${i.summary ? `: ${i.summary.oneLiner}${demo}` : ""}`;
     const shelf = dn.folderLabel(i.category);
     byCat.set(shelf, [...(byCat.get(shelf) ?? []), line]);
   }
@@ -38,7 +39,7 @@ export function atomFeed(dn: Driftnet, opts: { self: string; pageBase?: string |
   const entries = items.map((i) => {
     const name = i.summary?.name ?? i.title;
     const link = opts.pageBase ? cardLink(opts.pageBase, i.id) : i.summary?.primaryUrl || i.url;
-    const text = [i.summary?.oneLiner, ...(i.summary?.highlights ?? []).map((h) => `• ${h}`)].filter(Boolean).join("\n");
+    const text = [i.summary?.oneLiner, i.summary?.demo, ...(i.summary?.highlights ?? []).map((h) => `• ${h}`)].filter(Boolean).join("\n");
     return [
       "  <entry>",
       `    <id>${xml(`urn:driftnet:item:${i.id}`)}</id>`,
@@ -123,6 +124,9 @@ export function openApi(serverUrl: string) {
                     one_liner: { type: "string" },
                     highlights: { type: "array", items: { type: "string" } },
                     use_cases: { type: "array", items: { type: "string" } },
+                    demo: { type: "string", nullable: true },
+                    why: { type: "string", nullable: true },
+                    try_it: { type: "string", nullable: true },
                     tags: { type: "array", items: { type: "string" } },
                     primary_url: { type: "string" },
                     mentions: { type: "array", items: { type: "object", properties: { name: { type: "string" }, open_source: { type: "boolean" } } } },

@@ -35,6 +35,12 @@ export interface Summary {
   highlights: string[];
   useCases: string[];
   tags: string[];
+  /** What a person sees or gets when using it; null/absent when unknown (older cards have neither). */
+  demo?: string | null;
+  /** Why it is worth a look for this reader, from the chat/note/post; null when there is no signal. */
+  why?: string | null;
+  /** Install/run command or first step (detailed depth only). */
+  tryIt?: string | null;
   /** The canonical link to send people to, if better than the shared one. */
   primaryUrl?: string;
   /** Other tools the content talks about — roundup posts mention several. */

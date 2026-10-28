@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createDriftnet } from "@driftnet/core";
-import { atomFeed } from "../src/feeds.ts";
+import { atomFeed, llmsTxt } from "../src/feeds.ts";
 
 function setup() {
   const dn = createDriftnet({ DRIFTNET_DB: ":memory:", DRIFTNET_HOME: "/nonexistent-driftnet-home" } as NodeJS.ProcessEnv);
-  const add = (n: number, over: { worth?: "skip" | "low" | "normal" | "must-see"; flags?: string[]; category?: string; name?: string; one?: string } = {}) =>
+  const add = (n: number, over: { worth?: "skip" | "low" | "normal" | "must-see"; flags?: string[]; category?: string; name?: string; one?: string; demo?: string } = {}) =>
     dn.store.upsert({
       url: `https://e.com/${n}`, aliases: [], title: `T${n}`,
       judgement: { isAiTool: 1, category: over.category ?? "other", kind: "repo", worth: over.worth ?? "normal", engine: "llm", confidence: 1 },
-      summary: { name: over.name ?? `Tool ${n}`, oneLiner: over.one ?? `one ${n}`, highlights: [`hi ${n}`], useCases: [], tags: [] },
+      summary: { name: over.name ?? `Tool ${n}`, oneLiner: over.one ?? `one ${n}`, ...(over.demo ? { demo: over.demo } : {}), highlights: [`hi ${n}`], useCases: [], tags: [] },
       flags: over.flags ?? [], source: "e.com",
     });
   return { dn, add };
@@ -55,4 +55,11 @@ test("feed: page links when a public URL exists, folder filter, 50 newest", () =
   const only = atomFeed(dn, { self: "s", folder: "learning" });
   assert.equal((only.match(/<entry>/g) ?? []).length, 28 > 50 ? 50 : 28);
   assertWellFormed(only);
+});
+
+test("llms.txt and the feed carry the demo line", () => {
+  const { dn, add } = setup();
+  add(1, { demo: "Draws ASCII sharks on a canvas." });
+  assert.ok(llmsTxt(dn).includes(": one 1 Demo: Draws ASCII sharks on a canvas."));
+  assert.ok(atomFeed(dn, { self: "https://dn.example/feed.xml" }).includes("one 1\nDraws ASCII sharks on a canvas."));
 });

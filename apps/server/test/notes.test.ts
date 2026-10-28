@@ -9,7 +9,7 @@ import { collect, toMarkdown, toVault, zip } from "../src/export.ts";
 
 const dn = createDriftnet({ DRIFTNET_HOME: mkdtempSync(join(tmpdir(), "driftnet-notes-")), DRIFTNET_JUDGE: "off", DRIFTNET_LOCALE: "en" });
 const judgement = { isAiTool: 1, category: "coding-agent", kind: "repo" as const, worth: "normal" as const, engine: "jev" as const, confidence: 1 };
-const summary = { name: "Tool: A/B", oneLiner: "Does a thing.", highlights: ["fast"], useCases: [], tags: ["cli tool"], primaryUrl: "https://notes.test/a" };
+const summary = { name: "Tool: A/B", oneLiner: "Does a thing.", demo: "Shows a thing on screen.", why: "Asked for in chat", highlights: ["fast"], useCases: [], tags: ["cli tool"], primaryUrl: "https://notes.test/a" };
 const a = dn.store.upsert({ url: "https://notes.test/a", aliases: [], title: "a", judgement, summary, flags: [], source: "s" });
 const b = dn.store.upsert({ url: "https://notes.test/b", aliases: [], title: "b", judgement, summary: null, flags: ["injection"], source: "s" });
 dn.store.recordShare(a.id, { platform: "line", chatId: "c", note: "could power our LINE bot" });
@@ -38,6 +38,8 @@ test("export: Markdown and an Obsidian/Notion vault, without flagged items", () 
   const md = toMarkdown(data);
   assert.match(md, /## Coding agents/);
   assert.match(md, /### \[Tool: A\/B\]\(https:\/\/notes\.test\/a\)/);
+  assert.match(md, /\*\*Demo:\*\* Shows a thing on screen\./);
+  assert.match(md, /\*\*Why:\*\* Asked for in chat/);
   assert.match(md, /> could power our LINE bot/);
   assert.match(md, /\*\*Note:\*\* tried it, needs Docker/);
   const files = toVault(data);

@@ -11,7 +11,9 @@ import { decodeEntities } from "./extractors/http.ts";
 /** Default token budget for the content part of a digest. */
 export function digestBudget(env: NodeJS.ProcessEnv = process.env): number {
   const n = Number(env.DRIFTNET_DIGEST_TOKENS);
-  return Number.isFinite(n) && n >= 100 ? n : 350;
+  const base = Number.isFinite(n) && n >= 100 ? n : 350;
+  // Detailed summaries get twice the page to read.
+  return env.DRIFTNET_SUMMARY_DEPTH?.trim().toLowerCase() === "detailed" ? base * 2 : base;
 }
 
 const CJK = /[぀-ヿ㐀-鿿가-힯豈-﫿＀-￯]/g;
