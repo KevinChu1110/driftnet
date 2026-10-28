@@ -241,11 +241,14 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 | MCP tool | Use |
 |---|---|
 | `driftnet_search` | Search the catalogue before picking a tool for a task |
-| `driftnet_recent` | What's new: tools that would improve the agent's own workflow |
+| `driftnet_list_recent` | What's new: tools that would improve the agent's own workflow |
 | `driftnet_save` | Catalogue a link |
-| `driftnet_feedback` | Vote; agent votes count toward reputation too |
-| `driftnet_pending` / `driftnet_enrich` | Work the queue, below |
-| `driftnet_folders` / `driftnet_move` / `driftnet_create_folder` | Read your folder tree, file items into it, add a folder (renaming and deleting stay on the page) |
+| `driftnet_vote` | Vote; agent votes count toward reputation too |
+| `driftnet_lease_pending` / `driftnet_enrich` | Work the queue, below |
+| `driftnet_get_item` | One card in full: summary, use cases, your note, what people said in chat, tools found inside |
+| `driftnet_list_folders` / `driftnet_move_item` | Read your folder tree, file items into it |
+| `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | Add, rename or re-describe, and delete folders (contents move up; the one tool marked destructive) |
+| `driftnet_trash_item` / `driftnet_restore_item` / `driftnet_favorite_item` / `driftnet_set_note` | Tidy cards: trash (always restorable), star, write the note |
 
 The [skill](skills/driftnet/SKILL.md) tells agents to **propose** upgrades to their human, never to
 install anything themselves, and to treat the catalogue as data, not instructions.
@@ -274,7 +277,7 @@ the same one. Cloud agents can't reach `localhost`, so this needs driftnet
 <summary><b>Prompt for a scheduled task</b></summary>
 
 ```text
-Work my driftnet queue. Call takePendingWork (or driftnet_pending) with limit 5. For each item,
+Work my driftnet queue. Call takePendingWork (or driftnet_lease_pending) with limit 5. For each item,
 open the URL yourself, read the post, its comments and the video if needed, and find the tool it
 is actually about. Then call enrichItem (or driftnet_enrich) with only what you read. If it is not
 about a usable tool, send worth "skip" with the reason. Repeat until nothing is pending.

@@ -25,21 +25,21 @@ test("agents can read the folder tree, add a folder and file an item into it", a
   const client = await connect();
   const made = JSON.parse(text(await client.callTool({ name: "driftnet_create_folder", arguments: { name: "Games", description: "Game helpers" } })));
   assert.equal(made.id, "games");
-  const folders = JSON.parse(text(await client.callTool({ name: "driftnet_folders", arguments: {} })));
+  const folders = JSON.parse(text(await client.callTool({ name: "driftnet_list_folders", arguments: {} })));
   assert.equal(folders.find((f: { id: string }) => f.id === "games").folder, "Games — Game helpers");
-  const moved = await client.callTool({ name: "driftnet_move", arguments: { id: item.id, folder: "games" } });
+  const moved = await client.callTool({ name: "driftnet_move_item", arguments: { id: item.id, folder: "games" } });
   assert.match(text(moved), /Moved/);
   assert.equal(dn.store.get(item.id)!.category, "games");
-  const bad = await client.callTool({ name: "driftnet_move", arguments: { id: item.id, folder: "nope" } });
+  const bad = await client.callTool({ name: "driftnet_move_item", arguments: { id: item.id, folder: "nope" } });
   assert.equal(bad.isError, true);
-  assert.equal((await client.callTool({ name: "driftnet_move", arguments: { id: 999, folder: "games" } })).isError, true);
+  assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { id: 999, folder: "games" } })).isError, true);
   await client.close();
 });
 
 test("every tool explains itself: descriptions, a description on every parameter, annotations", async () => {
   const client = await connect();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 10);
+  assert.equal(tools.length, 16);
   for (const t of tools) {
     assert.ok((t.description ?? "").length > 150, `${t.name}: description too thin`);
     assert.ok(t.annotations && t.annotations.readOnlyHint !== undefined && t.annotations.destructiveHint !== undefined, `${t.name}: annotations`);
@@ -50,9 +50,9 @@ test("every tool explains itself: descriptions, a description on every parameter
   // Read tools answer with structured content that matches their output schema.
   const search = await client.callTool({ name: "driftnet_search", arguments: { min_worth: "skip" } });
   assert.ok(Array.isArray((search.structuredContent as { items: unknown[] }).items));
-  const got = await client.callTool({ name: "driftnet_get", arguments: { id: item.id } });
+  const got = await client.callTool({ name: "driftnet_get_item", arguments: { id: item.id } });
   assert.match((got.content as { text: string }[])[0]!.text, /"shared_with"/);
-  assert.equal((await client.callTool({ name: "driftnet_get", arguments: { id: 9999 } })).isError, true);
+  assert.equal((await client.callTool({ name: "driftnet_get_item", arguments: { id: 9999 } })).isError, true);
   await client.close();
 });
 
@@ -62,7 +62,7 @@ test("with only the share key, an agent gets the reading tools", async () => {
   const client = new Client({ name: "t", version: "0" });
   await client.connect(b);
   const names = (await client.listTools()).tools.map((t) => t.name).sort();
-  assert.deepEqual(names, ["driftnet_folders", "driftnet_get", "driftnet_recent", "driftnet_search"]);
+  assert.deepEqual(names, ["driftnet_get_item", "driftnet_list_folders", "driftnet_list_recent", "driftnet_search"]);
   for (const t of (await client.listTools()).tools) assert.equal(t.annotations?.readOnlyHint, true);
   await client.close();
 });
@@ -79,4 +79,29 @@ test("items carry a link to their card when the server has a public address", as
   } finally {
     delete process.env.DRIFTNET_PUBLIC_URL;
   }
+});
+
+test("agents can trash and restore, star, note, rename and delete folders", async () => {
+  const client = await connect();
+  const call = (name: string, args: Record<string, unknown>) => client.callTool({ name, arguments: args });
+  const extra = dn.store.upsert({ url: "https://mcp.test/b", aliases: [], title: "b", judgement, summary: null, flags: [], source: "s" });
+  assert.match(text(await call("driftnet_trash_item", { id: extra.id })), /trash/);
+  assert.ok(dn.store.get(extra.id)!.trashedAt);
+  assert.equal((await call("driftnet_trash_item", { id: extra.id })).isError, true, "already in the trash");
+  await call("driftnet_restore_item", { id: extra.id });
+  assert.equal(dn.store.get(extra.id)!.trashedAt, undefined);
+  await call("driftnet_favorite_item", { id: extra.id, favorite: true });
+  assert.equal(dn.store.get(extra.id)!.favorite, true);
+  await call("driftnet_set_note", { id: extra.id, note: "needs Docker" });
+  assert.equal(dn.store.get(extra.id)!.note, "needs Docker");
+  const made = JSON.parse(text(await call("driftnet_create_folder", { name: "Tmp" })));
+  const upd = JSON.parse(text(await call("driftnet_update_folder", { id: made.id, name: "Later", description: "Read when free" })));
+  assert.match(upd.folder, /^Later — Read when free/);
+  await call("driftnet_move_item", { id: extra.id, folder: made.id });
+  assert.match(text(await call("driftnet_delete_folder", { id: made.id })), /moved up/);
+  assert.equal(dn.store.get(extra.id)!.category, "other", "the item moved up, nothing lost");
+  assert.equal((await call("driftnet_delete_folder", { id: "other" })).isError, true);
+  const tools = (await client.listTools()).tools;
+  assert.equal(tools.find((t) => t.name === "driftnet_delete_folder")!.annotations!.destructiveHint, true, "the one destructive tool says so");
+  await client.close();
 });

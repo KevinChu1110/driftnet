@@ -16,7 +16,7 @@ const DATA_NOTICE =
 export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readOnly?: boolean } = {}): McpServer {
   const mcp = new McpServer({ name: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev" });
   // With only the read-only share key, an agent gets the reading tools and nothing that changes the catalogue.
-  const READ_TOOLS = new Set(["driftnet_search", "driftnet_recent", "driftnet_get", "driftnet_folders"]);
+  const READ_TOOLS = new Set(["driftnet_search", "driftnet_list_recent", "driftnet_get_item", "driftnet_list_folders"]);
   const server = {
     registerTool: ((name: string, ...rest: unknown[]) => {
       if (opts.readOnly && !READ_TOOLS.has(name)) return undefined;
@@ -26,7 +26,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   const categories = Object.keys(dn.categories) as [string, ...string[]];
 
   const worthHelp = "Rating floor: skip < low < normal < must-see. Defaults to 'normal', which hides skipped and low-value items";
-  const categoryHelp = "A folder id from driftnet_folders; includes everything in its sub-folders. Omit for all folders";
+  const categoryHelp = "A folder id from driftnet_list_folders; includes everything in its sub-folders. Omit for all folders";
   const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
   server.registerTool(
@@ -40,7 +40,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "an empty query lists the best items. Results are ranked best first (must-see before normal), then most recent, " +
         "and exclude trashed, down-voted and prompt-injection-flagged items. Each item has id, name, url, folder, kind, worth, " +
         "one_liner, highlights, tags, times shared, date added and page_url (its card on the reader's web page, or null when the server " +
-        "has no public address) — share page_url with your human when they want to look. Read-only. Use driftnet_recent instead for a time-window feed.",
+        "has no public address) — share page_url with your human when they want to look. Read-only. Use driftnet_list_recent instead for a time-window feed.",
       inputSchema: {
         query: z.string().max(200).optional().describe("Free text, e.g. 'pdf to markdown' or a tool name. Omit to list the best items"),
         category: z.enum(categories).optional().describe(categoryHelp),
@@ -60,7 +60,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   );
 
   server.registerTool(
-    "driftnet_recent",
+    "driftnet_list_recent",
     {
       title: "What's new",
       description:
@@ -86,15 +86,15 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   );
 
   server.registerTool(
-    "driftnet_get",
+    "driftnet_get_item",
     {
       title: "Get one item",
       description:
         "Fetch a single catalogue item by id, with everything driftnet knows about it: the summary fields, use cases, " +
         "the reader's own note, what people wrote in chat when they shared it, and the tools found inside it " +
-        "(e.g. the repos a post linked). Use it after driftnet_search or driftnet_recent when you need the details. " +
+        "(e.g. the repos a post linked). Use it after driftnet_search or driftnet_list_recent when you need the details. " +
         "Read-only. Fails if no item has that id.",
-      inputSchema: { id: z.number().int().positive().describe("Item id, as returned by driftnet_search, driftnet_recent or driftnet_save") },
+      inputSchema: { id: z.number().int().positive().describe("Item id, as returned by driftnet_search, driftnet_list_recent or driftnet_save") },
       annotations: readOnly,
     },
     async ({ id }) => {
@@ -122,7 +122,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "rates it and, when a model is configured, writes a summary; this can take 5–30 seconds. " +
         "Saving a link that is already catalogued (including share-link and tracking-parameter variants) does not duplicate it: " +
         "it counts one more share and returns the existing item. Links to private or local addresses are refused. " +
-        "Without a model, the item comes back without a summary and waits in the queue (see driftnet_pending). " +
+        "Without a model, the item comes back without a summary and waits in the queue (see driftnet_lease_pending). " +
         "Returns the saved item with the same fields as driftnet_search; send your human its page_url so they can open the card.",
       inputSchema: {
         url: z.string().url().describe("The http(s) link to save, exactly as shared; tracking parameters are stripped automatically"),
@@ -138,7 +138,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   );
 
   server.registerTool(
-    "driftnet_pending",
+    "driftnet_lease_pending",
     {
       title: "Take work from the queue",
       description:
@@ -184,16 +184,16 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     {
       title: "Return a summary for a queued item",
       description:
-        "Store the summary you wrote for an item you leased with driftnet_pending; this ends your lease and takes the item off the queue. " +
+        "Store the summary you wrote for an item you leased with driftnet_lease_pending; this ends your lease and takes the item off the queue. " +
         "driftnet validates the fields, rejects text containing prompt-injection patterns, drops primary_url if the address does not exist, " +
         "and looks up open-source tools listed in mentions on GitHub and catalogues them as items of their own. " +
         "On rejection it returns an error with the reason and the item stays leased to you, so fix the fields and call again. " +
         "Only items that are still pending can be enriched: a second call for an item that already has a summary is refused. " +
         "If the reader placed the item in a folder themselves, category is ignored.",
       inputSchema: {
-        id: z.number().int().positive().describe("The item id from driftnet_pending"),
+        id: z.number().int().positive().describe("The item id from driftnet_lease_pending"),
         name: z.string().min(1).max(120).describe("The tool's own name, untranslated, as people would search for it (e.g. its GitHub repo name)"),
-        one_liner: z.string().min(1).max(300).describe("What it is, one short sentence in the language from the driftnet_pending brief"),
+        one_liner: z.string().min(1).max(300).describe("What it is, one short sentence in the language from the driftnet_lease_pending brief"),
         highlights: z.array(z.string().max(300)).max(5).describe("Up to 3 concrete things it does, each a short phrase; only facts you read"),
         use_cases: z.array(z.string().max(300)).max(5).optional().describe("Up to 3 situations where someone would use it"),
         tags: z.array(z.string().max(40)).max(8).optional().describe("A few lowercase keywords, e.g. 'pdf', 'ocr', 'cli'"),
@@ -221,7 +221,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   );
 
   server.registerTool(
-    "driftnet_feedback",
+    "driftnet_vote",
     {
       title: "Vote on an item",
       description:
@@ -243,16 +243,16 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     },
   );
 
-  // The folder tree is the reader's: agents can read it, file items into it and
-  // add a folder, but renaming and deleting stay on the web page.
+  // The folder tree: agents can read it, file items into it, and change it. Deleting a
+  // folder is the one destructive tool (its contents move up a level, nothing is lost).
   server.registerTool(
-    "driftnet_folders",
+    "driftnet_list_folders",
     {
       title: "List folders",
       description:
         "List the reader's folder tree, which is also the set of categories driftnet sorts into. " +
         "Each folder has an id, its parent id (null at the top level), its path with the reader's description of what belongs there, " +
-        "and how many items it holds directly. Use the ids with driftnet_move, driftnet_search and driftnet_recent. Read-only.",
+        "and how many items it holds directly. Use the ids with driftnet_move_item, driftnet_search and driftnet_list_recent. Read-only.",
       outputSchema: { folders: z.array(z.object({ id: z.string(), parent: z.string().nullable(), folder: z.string(), items: z.number() })) },
       annotations: readOnly,
     },
@@ -264,7 +264,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   );
 
   server.registerTool(
-    "driftnet_move",
+    "driftnet_move_item",
     {
       title: "Move an item to a folder",
       description:
@@ -273,7 +273,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "Moving an item to the folder it is already in changes nothing. Fails if the item or the folder does not exist.",
       inputSchema: {
         id: z.number().int().positive().describe("Item id to move"),
-        folder: z.string().describe("Target folder id from driftnet_folders"),
+        folder: z.string().describe("Target folder id from driftnet_list_folders"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -296,12 +296,12 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       description:
         "Add a folder to the reader's tree; new links will be sorted into it from then on. " +
         "The description is what the classifier reads, so write it as a short rule (e.g. 'MapleStory and Artale helper tools'). " +
-        "Existing items are not re-sorted. Returns the new folder's id and parent. Fails if the parent does not exist or the name is empty. " +
-        "Renaming and deleting folders are left to the reader, on the web page.",
+        "Existing items are not re-sorted. Returns the new folder's id and parent. Fails if the parent does not exist, the name is empty, " +
+        "or a folder with that name already sits there. Use driftnet_update_folder to rename or re-describe one.",
       inputSchema: {
         name: z.string().min(1).max(60).describe("Folder name as the reader will see it"),
         description: z.string().max(300).optional().describe("What belongs here, as a rule the classifier can follow"),
-        parent: z.string().optional().describe("Parent folder id from driftnet_folders; omit for the top level"),
+        parent: z.string().optional().describe("Parent folder id from driftnet_list_folders; omit for the top level"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -311,6 +311,119 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         return { content: [{ type: "text", text: JSON.stringify({ id: f.id, parent: f.parent }) }] };
       } catch (err) {
         if (err instanceof FolderError) return { content: [{ type: "text", text: err.message }], isError: true };
+        throw err;
+      }
+    },
+  );
+
+  const item = (id: number) => { const i = dn.store.get(id); return i && !i.trashedAt ? i : null; };
+  const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
+  const done = (text: string) => ({ content: [{ type: "text" as const, text }] });
+  const writes = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
+
+  server.registerTool(
+    "driftnet_trash_item",
+    {
+      title: "Move an item to the trash",
+      description:
+        "Move an item to the trash: it disappears from search, the list, llms.txt and other agents, but nothing is deleted — " +
+        "driftnet_restore_item (or the reader, on the web page) brings it back. Use it for junk the reader asked to remove; " +
+        "for a wrong or low-quality summary prefer driftnet_vote with \"down\". Fails if the item does not exist or is already in the trash.",
+      inputSchema: { id: z.number().int().positive().describe("Item id to move to the trash") },
+      annotations: writes,
+    },
+    async ({ id }) => (item(id) && dn.store.setTrashed(id, true) ? done(`Moved ${id} to the trash (restorable).`) : fail(`No item ${id} outside the trash.`)),
+  );
+
+  server.registerTool(
+    "driftnet_restore_item",
+    {
+      title: "Restore an item from the trash",
+      description:
+        "Bring an item back from the trash, exactly as it was: same folder, note and favorite, and it shows up in search and for agents again. " +
+        "Use it to undo driftnet_trash_item. Fails if no trashed item has that id.",
+      inputSchema: { id: z.number().int().positive().describe("Id of the trashed item to restore") },
+      annotations: writes,
+    },
+    async ({ id }) => (dn.store.get(id)?.trashedAt && dn.store.setTrashed(id, false) ? done(`Restored ${id}.`) : fail(`No trashed item ${id}.`)),
+  );
+
+  server.registerTool(
+    "driftnet_favorite_item",
+    {
+      title: "Star or unstar an item",
+      description:
+        "Add an item to the reader's favorites (favorite: true) or take it out (false). Favorites have their own view on the web page. " +
+        "Setting the same value twice changes nothing. Fails if the item does not exist.",
+      inputSchema: {
+        id: z.number().int().positive().describe("Item id"),
+        favorite: z.boolean().describe("true to add to favorites, false to remove"),
+      },
+      annotations: writes,
+    },
+    async ({ id, favorite }) => (item(id) && dn.store.setFavorite(id, favorite) ? done(`${favorite ? "Starred" : "Unstarred"} ${id}.`) : fail(`No item ${id}.`)),
+  );
+
+  server.registerTool(
+    "driftnet_set_note",
+    {
+      title: "Write the note on an item",
+      description:
+        "Replace the reader's note on an item (shown on its card, searchable), e.g. \"tried it: needs Docker\". An empty note removes it. " +
+        "Write it for the reader, in their language. Fails if the item does not exist.",
+      inputSchema: {
+        id: z.number().int().positive().describe("Item id"),
+        note: z.string().max(5000).describe("The whole note (replaces the old one); empty to clear"),
+      },
+      annotations: writes,
+    },
+    async ({ id, note }) => (item(id) && dn.store.setNote(id, note) ? done(note.trim() ? `Saved the note on ${id}.` : `Cleared the note on ${id}.`) : fail(`No item ${id}.`)),
+  );
+
+  server.registerTool(
+    "driftnet_update_folder",
+    {
+      title: "Rename, re-describe or move a folder",
+      description:
+        "Change a folder's name, its description (what the classifier reads to sort new links into it), or its parent. Only the fields " +
+        "you pass change. A folder can't be moved inside itself or its own sub-folders. Items in it stay where they are. " +
+        "Fails if the folder does not exist or the change is refused (empty name, a loop).",
+      inputSchema: {
+        id: z.string().describe("Folder id from driftnet_list_folders"),
+        name: z.string().min(1).max(60).optional().describe("New name"),
+        description: z.string().max(300).optional().describe("New description: a short rule for what belongs here"),
+        parent: z.string().nullable().optional().describe("New parent folder id; null for the top level; omit to keep"),
+      },
+      annotations: writes,
+    },
+    async ({ id, name, description, parent }) => {
+      try {
+        const f = dn.store.updateFolder(id, { ...(name ? { name } : {}), ...(description !== undefined ? { description } : {}), ...(parent !== undefined ? { parent } : {}) });
+        return done(JSON.stringify({ id: f.id, parent: f.parent, folder: dn.categories[f.id] ?? f.id }));
+      } catch (err) {
+        if (err instanceof FolderError) return fail(err.message);
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    "driftnet_delete_folder",
+    {
+      title: "Delete a folder",
+      description:
+        "Delete a folder. Nothing inside is lost: its items and sub-folders move up to its parent (or to \"other\" at the top level). " +
+        "\"other\" itself can't be deleted. This changes how the reader's tree looks, so only do it when they asked. " +
+        "Fails if the folder does not exist.",
+      inputSchema: { id: z.string().describe("Folder id from driftnet_list_folders") },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ id }) => {
+      try {
+        dn.store.deleteFolder(id);
+        return done(`Deleted folder ${id}; its contents moved up a level.`);
+      } catch (err) {
+        if (err instanceof FolderError) return fail(err.message);
         throw err;
       }
     },
