@@ -611,6 +611,38 @@ try {
     await evaluate(s, `document.getElementById("st-cancel").click()`);
     console.log("✓ agent tokens: made from a card and from Settings, scoped, shown once, revoked at once");
 
+    // Unlock a phone: Settings shows a QR for a one-time link; a fresh browser (nothing stored) opens it and is in.
+    await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
+    await waitFor(s, `document.getElementById("settings-dlg").open && !!document.getElementById("pr-create")`, "pairing panel");
+    await evaluate(s, `(() => { document.getElementById("pr-name").value = "Test phone"; document.getElementById("pr-scope").value = "write"; document.getElementById("pr-create").click(); return 1; })()`);
+    await waitFor(s, `!!document.getElementById("pair-link")?.value && !!document.querySelector("#pair-out svg")`, "QR and link shown");
+    const pairLink = await evaluate(s, `document.getElementById("pair-link").value`);
+    assert.ok(pairLink.startsWith("https://demo-tunnel.trycloudflare.com/#pair="), "the link uses the public URL, code in the fragment");
+    assert.ok((await evaluate(s, `document.getElementById("pair-time").textContent`)).length > 0, "a countdown is shown");
+    await evaluate(s, `document.getElementById("pair-panel").scrollIntoView({ block: "start" })`);
+    await shoot(`web-pair-${LANG}.png`);
+    const { browserContextId } = await cdp("Target.createBrowserContext");
+    const { targetId: t2 } = await cdp("Target.createTarget", { url: "about:blank", browserContextId });
+    const { sessionId: s2 } = await cdp("Target.attachToTarget", { targetId: t2, flatten: true });
+    await cdp("Page.navigate", { url: `http://remote.test:${port}/${pairLink.slice(pairLink.indexOf("#"))}` }, s2);
+    await waitFor(s2, `document.querySelectorAll(".swipe").length > 1`, "phone unlocked by the code");
+    assert.equal(await evaluate(s2, `location.hash`), "", "the code is taken out of the address bar");
+    assert.match(await evaluate(s2, `localStorage.getItem("driftnet-token")`), /^dn_/, "the phone holds its own token, not the password");
+    assert.equal(await evaluate(s2, `document.getElementById("lock").hidden`), true, "write scope: no unlock chip");
+    const phoneToken = await evaluate(s2, `localStorage.getItem("driftnet-token")`);
+    assert.equal((await asAgent(phoneToken, "/api/ingest", { method: "POST", body: "{}" })).status, 200, "the phone writes");
+    assert.equal((await asAgent(phoneToken, "/api/pair", { method: "POST", body: JSON.stringify({ name: "x", scope: "write" }) })).status, 403, "a device can't pair more devices");
+    const code = pairLink.split("#pair=")[1];
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/pair/claim`, { method: "POST", headers: { ...remote, "content-type": "application/json" }, body: JSON.stringify({ code }) })).status, 404, "a code works once");
+    // Back on the computer: the device is listed by name and can be revoked.
+    await waitFor(s, `[...document.querySelectorAll("#agent-tokens .tok")].some((r) => r.innerText.includes("Test phone"))`, "device listed after pairing");
+    await evaluate(s, `[...document.querySelectorAll("#agent-tokens .tok")].find((r) => r.innerText.includes("Test phone")).querySelector("[data-revoke]").click()`);
+    await waitFor(s, `[...document.querySelectorAll("#agent-tokens .tok.revoked")].some((r) => r.innerText.includes("Test phone"))`, "device revoked");
+    assert.equal((await asAgent(phoneToken, "/api/items")).status, 401, "a revoked phone is locked out");
+    await evaluate(s, `document.getElementById("st-cancel").click()`);
+    await cdp("Target.disposeBrowserContext", { browserContextId });
+    console.log("✓ pairing: QR for a one-time link, a clean browser unlocked with its own revocable token");
+
     // A phone that got a link from a bot: no password stored, only ?key= in the link.
     await evaluate(s, `(() => { localStorage.removeItem("driftnet-token"); localStorage.removeItem("driftnet-key"); return 1; })()`);
     await cdp("Page.navigate", { url: `http://remote.test:${port}/?key=${key}#item-1` }, s);

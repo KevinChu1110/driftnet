@@ -302,6 +302,9 @@
   .meter[data-s="strong"] i { width: 100%; background: var(--ok); }
   .tok { justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
   .tok.revoked { opacity: .55; }
+  .pair-out { display: grid; gap: 8px; justify-items: start; }
+  .pair-qr svg { display: block; max-width: 100%; height: auto; border-radius: 8px; }
+  .pair-time { margin: 0; font-variant-numeric: tabular-nums; }
   .tok-name { display: grid; gap: 2px; min-width: 0; justify-items: start; }
   .tok .btn { flex: none; }
   /* The create-token row: the name takes the room, the scope and button only what they need (the set-row rules below would stretch them). */
@@ -637,6 +640,11 @@
         tokCardName: "Token name", tokCardCreate: "Create a token for this agent",
         tokCardDone: "Token “{name}” created and filled in above. Copy it now: it will not be shown again. Revoke it in Settings → Access when you no longer need it.",
         tokNameNeeded: "Give the token a name.", tokPasswordOnly: "Set an admin password first: tokens are what you give agents instead of it.",
+        pairTitle: "Unlock a phone", pairHelp: "Scan this code with the phone's camera: it opens driftnet already unlocked, with its own revocable token. The code works once, for 5 minutes.",
+        pairName: "Device name", pairCreate: "Show QR code", pairExpires: "Expires in {t}", pairExpired: "This code has expired. Make a new one.",
+        pairLink: "Or open this link on the phone", pairDone: "“{name}” is paired.", pairNameNeeded: "Name the device first.",
+        pairLocal: "This address only works on this computer. A phone needs a public URL (below) or this computer's network address.",
+        pairOk: "This device is unlocked.", pairFailed: "That pairing code didn't work. It may have expired or been used: make a new one on your computer.",
         tunnel: "Public URL for cloud AIs", tunnelHelp: "Claude.ai, ChatGPT, Grok and agents on other machines can't reach localhost. This opens a temporary https address through Cloudflare (no account). It changes every time and closes when driftnet stops.",
         tunnelOn: "Open a public URL", tunnelOff: "Close it", tunnelNeedsPassword: "Save an admin password first.",
         tunnelInstall: "Needs cloudflared (driftnet never downloads it for you):", tunnelPrivate: "Opening it switches reading to “only with the password or the share key”.",
@@ -744,6 +752,11 @@
         tokCardName: "金鑰名稱", tokCardCreate: "幫這個 agent 建一把專用金鑰",
         tokCardDone: "已建立「{name}」專用金鑰，已填進上面的設定。請現在複製：之後不會再顯示。不用時到「設定 → 存取」撤銷。",
         tokNameNeeded: "請幫金鑰取個名字。", tokPasswordOnly: "請先設定管理密碼：金鑰就是用來取代它交給 agent 的。",
+        pairTitle: "用 QR code 解鎖手機", pairHelp: "用手機相機掃描這個圖形碼：會直接開啟已解鎖的 driftnet，並取得專屬、可隨時撤銷的金鑰。圖形碼只能用一次，5 分鐘內有效。",
+        pairName: "裝置名稱", pairCreate: "顯示 QR code", pairExpires: "剩餘 {t}", pairExpired: "這個圖形碼已過期，請重新產生。",
+        pairLink: "或在手機上開啟這個連結", pairDone: "「{name}」已配對完成。", pairNameNeeded: "請先為裝置命名。",
+        pairLocal: "這個位址只有這台電腦連得到。手機需要公開網址（見下方）或這台電腦的區域網路位址。",
+        pairOk: "這台裝置已解鎖。", pairFailed: "配對碼無法使用，可能已過期或已被使用，請在電腦上重新產生。",
         tunnel: "給雲端 AI 的公開網址", tunnelHelp: "Claude 網頁版、ChatGPT、Grok 和其他機器上的 agent 連不到 localhost。這會透過 Cloudflare（免帳號）開一個臨時的 https 網址；每次都不一樣，driftnet 關掉就跟著關。",
         tunnelOn: "開啟公開網址", tunnelOff: "關閉", tunnelNeedsPassword: "要先儲存管理密碼。",
         tunnelInstall: "需要 cloudflared（driftnet 不會自動幫你下載）：", tunnelPrivate: "開啟後，「誰可以讀」會改成要有密碼或分享碼。",
@@ -1280,7 +1293,7 @@
       const accessStatus = `<p class="set-status">${esc(st.accessStatus(yes(a.passwordSet), yes(a.readKey), a.tunnel.running ? a.tunnel.url : "—"))}</p>`;
       server = {
         general: group("language") + group("chat"),
-        access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) : ""),
+        access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) + pairPanel(serverSettings.access) : ""),
         ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,
       };
@@ -1386,6 +1399,56 @@
       <small>${esc(st.agentTokensHelp)}</small>${box}
       <div class="set-row">${rows}</div><div class="set-row">${form}</div></fieldset>`;
   }
+  function pairPanel(a) {
+    const st = T().st;
+    if (!a.passwordSet) return "";
+    return `<fieldset class="set-group" id="pair-panel"><legend>${esc(st.pairTitle)}</legend>
+      <small>${esc(st.pairHelp)}</small>
+      <div class="keyrow"><input id="pr-name" maxlength="56" placeholder="${esc(st.pairName)}" autocomplete="off" aria-label="${esc(st.pairName)}">
+        <select id="pr-scope" aria-label="${esc(st.tokScope)}">${["write", "read"].map((c) => `<option value="${c}">${esc(st.tokScopes[c])}</option>`).join("")}</select>
+        <button class="btn primary" type="button" id="pr-create">${esc(st.pairCreate)}</button></div>
+      <div id="pair-out" class="pair-out" aria-live="polite"></div></fieldset>`;
+  }
+  let pairTimer = null;
+  /** Show the QR for a fresh code, count down, and notice when the phone has claimed it. */
+  async function showPairing(made, name) {
+    const st = T().st;
+    clearInterval(pairTimer);
+    const base = (serverSettings?.access?.publicUrl || location.origin).replace(/\/$/, "");
+    const link = `${base}/#pair=${made.code}`;
+    const { qrSvg } = await import("/qr.js");
+    const out = $("pair-out");
+    out.innerHTML = `<div class="pair-qr">${qrSvg(link, { scale: 6 })}</div>
+      <p class="pair-time" id="pair-time"></p>
+      ${/\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(base) ? `<small class="dlg-error">${esc(st.pairLocal)}</small>` : ""}
+      <small>${esc(st.pairLink)}</small>
+      <div class="keyrow"><input id="pair-link" readonly value="${esc(link)}"><button class="btn" type="button" data-copy="#pair-link">${esc(st.copy)}</button></div>`;
+    const known = new Set(knownTokens.map((k) => k.id));
+    const until = Date.parse(made.expiresAt);
+    let polling = false;
+    pairTimer = setInterval(async () => {
+      if (!document.body.contains(out)) return clearInterval(pairTimer);
+      const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+      if (!left) {
+        clearInterval(pairTimer);
+        out.innerHTML = `<small>${esc(st.pairExpired)}</small>`;
+        return;
+      }
+      $("pair-time").textContent = st.pairExpires.replace("{t}", `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`);
+      if (polling || left % 3) return;
+      polling = true;
+      const token = store.get("driftnet-token");
+      const res = await fetch("/api/agent-tokens", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
+      const list = res?.ok ? await res.json() : [];
+      polling = false;
+      if (list.some((k) => !known.has(k.id) && !k.revokedAt && k.name === `📱 ${name}`)) {
+        clearInterval(pairTimer);
+        toast(st.pairDone.replace("{name}", name));
+        openSettings();
+      }
+    }, 1000);
+    $("pair-time").textContent = st.pairExpires.replace("{t}", "5:00");
+  }
   async function adminFetch(path, method, body) {
     const token = store.get("driftnet-token");
     const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
@@ -1397,6 +1460,7 @@
   // Enter in the token name creates the token; it must not submit the whole settings form.
   $("st-body").addEventListener("keydown", (e) => {
     if (e.target.id === "at-name" && e.key === "Enter") { e.preventDefault(); $("at-create").click(); }
+    if (e.target.id === "pr-name" && e.key === "Enter") { e.preventDefault(); $("pr-create").click(); }
   });
   $("st-body").addEventListener("input", (e) => {
     if (e.target.id !== "ac-pw") return;
@@ -1434,6 +1498,12 @@
       const duplicate = nameTaken(knownTokens, name);
       const made = await adminFetch("/api/agent-tokens", "POST", { name, scope: $("at-scope").value });
       if (made) { justMinted = { ...made, duplicate }; openSettings(); }
+    } else if (b.id === "pr-create") {
+      const name = $("pr-name").value.trim();
+      if (!name) { $("st-error").textContent = st.pairNameNeeded; return; }
+      $("st-error").textContent = "";
+      const made = await adminFetch("/api/pair", "POST", { name, scope: $("pr-scope").value });
+      if (made) showPairing(made, name);
     } else if (b.dataset.remove) {
       if (await adminFetch(`/api/agent-tokens/${encodeURIComponent(b.dataset.remove)}?purge=1`, "DELETE")) openSettings();
     } else if (b.dataset.revoke) {
@@ -2679,7 +2749,20 @@
   };
   let timer;
   $("q").oninput = (e) => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 200); };
-  load();
+  // A scanned pairing link (#pair=<code>): take the code out of the address bar at once, swap it for this device's token.
+  async function claimPairing() {
+    const m = /^#pair=([\w-]{16,128})$/.exec(location.hash);
+    if (!m) return;
+    history.replaceState(null, "", location.pathname + location.search);
+    const res = await fetch("/api/pair/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: m[1] }) }).catch(() => null);
+    if (!res?.ok) { toast(T().st.pairFailed); return; }
+    const dev = await res.json();
+    // A write token works like the password everywhere the page uses it, a read token like the share key.
+    store.set(dev.scope === "write" ? "driftnet-token" : "driftnet-key", dev.token);
+    store.set(dev.scope === "write" ? "driftnet-key" : "driftnet-token", "");
+    toast(T().st.pairOk);
+  }
+  claimPairing().finally(load);
 </script>
 </body>
 </html>
