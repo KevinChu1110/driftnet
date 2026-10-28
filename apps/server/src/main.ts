@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { canonicalize, categoryLabels, createDriftnet, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, canonicalize, categoryLabels, createDriftnet, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
@@ -42,12 +42,24 @@ function authorized(req: IncomingMessage): boolean {
   return given.length === want.length && timingSafeEqual(given, want);
 }
 
+class BadRequest extends Error {}
+
+/** JSON request body; malformed input is the client's error (400), not ours. */
+async function readJson<T>(req: IncomingMessage): Promise<T> {
+  const raw = await readBody(req);
+  try {
+    return (raw ? JSON.parse(raw) : {}) as T;
+  } catch {
+    throw new BadRequest("body is not valid JSON");
+  }
+}
+
 async function readBody(req: IncomingMessage, limit = 1_000_000): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const c of req) {
     size += (c as Buffer).length;
-    if (size > limit) throw new Error("body too large");
+    if (size > limit) throw new BadRequest("body too large");
     chunks.push(c as Buffer);
   }
   return Buffer.concat(chunks).toString("utf8");
@@ -99,9 +111,9 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/api/ingest") {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
-      const body = JSON.parse(await readBody(req)) as {
+      const body = await readJson<{
         text?: string; url?: string; note?: string; chat?: string; platform?: string; page?: PageContent;
-      };
+      }>(req);
       const ctx = {
         platform: /^[a-z0-9-]{1,32}$/.test(body.platform ?? "") ? body.platform! : "http",
         chatId: String(body.chat ?? "api").slice(0, 64),
@@ -115,7 +127,12 @@ const server = createServer(async (req, res) => {
           ...(Array.isArray(body.page!.links) ? { links: body.page!.links.filter((l) => typeof l === "string").slice(0, 50) } : {}),
         };
         const note = body.note?.slice(0, 1000);
-        return send(res, 200, [await dn.pipeline.ingest(url, { ...ctx, ...(note ? { note } : {}) }, 0, page)]);
+        try {
+          return send(res, 200, [await dn.pipeline.ingest(url, { ...ctx, ...(note ? { note } : {}) }, 0, page)]);
+        } catch (err) {
+          if (err instanceof BlockedUrl) return send(res, 422, { error: err.message });
+          throw err;
+        }
       }
       const text = [body.url, body.text, body.note].filter(Boolean).join(" ");
       return send(res, 200, await dn.pipeline.ingestMessage(text, ctx));
@@ -124,7 +141,7 @@ const server = createServer(async (req, res) => {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const id = Number(itemMatch[1]);
       if (!dn.store.get(id)) return send(res, 404, { error: "not found" });
-      const body = JSON.parse(await readBody(req)) as { vote: "up" | "down"; reason?: string; voter?: string };
+      const body = await readJson<{ vote: "up" | "down"; reason?: string; voter?: string }>(req);
       dn.store.vote(id, body.vote === "up" ? 1 : -1, body.voter ?? "http", body.reason);
       return send(res, 200, { ok: true });
     }
@@ -156,14 +173,14 @@ const server = createServer(async (req, res) => {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on("close", () => { void transport.close(); void mcp.close(); });
       await mcp.connect(transport);
-      const body = req.method === "POST" ? JSON.parse(await readBody(req)) : undefined;
+      const body = req.method === "POST" ? await readJson(req) : undefined;
       return await transport.handleRequest(req, res, body);
     }
 
     // The agent queue. Always needs the token: taking work leases items.
     if (req.method === "POST" && path === "/api/pending") {
       if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
-      const body = JSON.parse((await readBody(req)) || "{}") as { limit?: number; agent?: string };
+      const body = await readJson<{ limit?: number; agent?: string }>(req);
       const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
       const items = dn.store.claimPending(agent, Number(body.limit ?? 5));
       return send(res, 200, {
@@ -176,7 +193,7 @@ const server = createServer(async (req, res) => {
     const enrichMatch = /^\/api\/items\/(\d+)\/enrich$/.exec(path);
     if (req.method === "POST" && enrichMatch) {
       if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
-      const body = JSON.parse(await readBody(req)) as Record<string, unknown>;
+      const body = await readJson<Record<string, unknown>>(req);
       const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
       delete body.agent;
       const r = await dn.pipeline.enrich(Number(enrichMatch[1]), body, agent);
@@ -186,7 +203,8 @@ const server = createServer(async (req, res) => {
     // Plain-text endpoint for scripts and bots we don't have an adapter for yet.
     if (req.method === "POST" && path === "/api/chat") {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
-      const body = JSON.parse(await readBody(req)) as { text: string; platform?: string; chat?: string; user?: string };
+      const body = await readJson<{ text: string; platform?: string; chat?: string; user?: string }>(req);
+      if (typeof body.text !== "string") throw new BadRequest("text is required");
       const reply = await handleChatText(dn, body.text, {
         platform: body.platform ?? "http", chatId: body.chat ?? "api", ...(body.user ? { userId: body.user } : {}),
       });
@@ -195,8 +213,12 @@ const server = createServer(async (req, res) => {
 
     send(res, 404, { error: "not found" });
   } catch (err) {
+    if (err instanceof BadRequest) {
+      if (!res.headersSent) send(res, 400, { error: err.message });
+      return;
+    }
     console.error(`[http] ${req.method} ${path}:`, err);
-    if (!res.headersSent) send(res, 500, { error: (err as Error).message });
+    if (!res.headersSent) send(res, 500, { error: "internal error" });
   }
 });
 

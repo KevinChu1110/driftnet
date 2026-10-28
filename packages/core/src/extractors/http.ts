@@ -1,3 +1,5 @@
+import { BlockedUrl, safeFetch } from "./net.ts";
+
 const UA =
   "Mozilla/5.0 (compatible; driftnet/0.1; +https://github.com/KevinChu1110/driftnet)";
 const MAX_BYTES = 1_500_000;
@@ -6,9 +8,21 @@ export async function fetchText(
   url: string,
   init: { headers?: Record<string, string>; timeoutMs?: number } = {},
 ): Promise<{ status: number; url: string; body: string }> {
-  const res = await fetch(url, {
+  try {
+    return await fetchOnce(url, init);
+  } catch (err) {
+    // Links are canonicalised to https; some sites still only speak http.
+    if (err instanceof BlockedUrl || !url.startsWith("https://")) throw err;
+    return fetchOnce("http://" + url.slice("https://".length), init);
+  }
+}
+
+async function fetchOnce(
+  url: string,
+  init: { headers?: Record<string, string>; timeoutMs?: number },
+): Promise<{ status: number; url: string; body: string }> {
+  const res = await safeFetch(url, {
     headers: { "user-agent": UA, "accept-language": "zh-TW,en;q=0.8", ...init.headers },
-    redirect: "follow",
     signal: AbortSignal.timeout(init.timeoutMs ?? 10_000),
   });
   // Read at most MAX_BYTES; some "articles" are 20 MB single-page apps.

@@ -1,5 +1,6 @@
-import { extract, isSocial } from "./extractors/index.ts";
+import { BlockedUrl, extract, isSocial } from "./extractors/index.ts";
 import { findGithubRepo, matchGithub } from "./extractors/github.ts";
+import { safeFetch } from "./extractors/net.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
@@ -36,7 +37,14 @@ export class Pipeline {
     const urls = extractUrls(text);
     const note = urls.reduce((t, u) => t.replace(u, ""), text).replace(/https?:\/\/\S+/g, "").trim() || undefined;
     const results: IngestResult[] = [];
-    for (const url of urls) results.push(await this.ingest(url, { ...ctx, ...(note ? { note } : {}) }));
+    for (const url of urls) {
+      try {
+        results.push(await this.ingest(url, { ...ctx, ...(note ? { note } : {}) }));
+      } catch (err) {
+        if (!(err instanceof BlockedUrl)) throw err;
+        console.warn(`[driftnet] refused ${url}: ${err.message}`);
+      }
+    }
     return results;
   }
 
@@ -225,14 +233,15 @@ async function urlExists(url: string): Promise<boolean> {
   try {
     const gh = matchGithub(canonicalize(url) ?? url);
     if (gh) {
-      const res = await fetch(`https://api.github.com/repos/${gh.owner}/${gh.repo}`, {
+      const res = await safeFetch(`https://api.github.com/repos/${gh.owner}/${gh.repo}`, {
         method: "HEAD",
         headers: process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {},
         signal: AbortSignal.timeout(8000),
       });
       return res.status === 200;
     }
-    const res = await fetch(url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(8000) });
+    // Agents choose this URL: it gets the same SSRF guard as any shared link.
+    const res = await safeFetch(url, { method: "HEAD", signal: AbortSignal.timeout(8000) });
     return res.status < 400 || res.status === 405;
   } catch {
     return false;

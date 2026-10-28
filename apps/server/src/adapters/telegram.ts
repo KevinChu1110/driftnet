@@ -14,7 +14,8 @@ export function startTelegram(dn: Driftnet, token: string): () => void {
       body: JSON.stringify(body),
     }).then((r) => r.json() as Promise<{ ok: boolean; result: any }>);
 
-  let offset = 0;
+  // Persisted so a restart doesn't hand the last batch out again (double replies).
+  let offset = Number(dn.store.getState("telegram:offset") ?? 0);
   let running = true;
   (async () => {
     while (running) {
@@ -22,6 +23,7 @@ export function startTelegram(dn: Driftnet, token: string): () => void {
         const res = await api("getUpdates", { offset, timeout: 50, allowed_updates: ["message"] });
         for (const u of res.ok ? res.result : []) {
           offset = u.update_id + 1;
+          dn.store.setState("telegram:offset", String(offset));
           const msg = u.message;
           const text: string | undefined = msg?.text ?? msg?.caption;
           if (!text) continue;

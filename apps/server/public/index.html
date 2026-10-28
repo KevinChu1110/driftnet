@@ -172,7 +172,8 @@
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
     const items = await api(`/api/items?${p}`);
     $("list").innerHTML = items.length ? items.map(card).join("") : `<div class="empty">${esc(T().empty)}</div>`;
-    if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+    // Only #item-<n> is ours; anything else in the hash must not break the page.
+    if (/^#item-\d+$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   }
 
   function card(i) {

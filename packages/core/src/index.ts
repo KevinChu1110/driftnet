@@ -11,7 +11,7 @@ import { defaultDbPath } from "./home.ts";
 
 export * from "./types.ts";
 export { canonicalize, extractUrls } from "./url.ts";
-export { registerExtractor, type Extractor } from "./extractors/index.ts";
+export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/index.ts";
 export { guard } from "./guard.ts";
 export { Pipeline } from "./pipeline.ts";
 export { Store, type ListQuery, type Reputation } from "./store.ts";

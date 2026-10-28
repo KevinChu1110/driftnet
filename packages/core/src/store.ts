@@ -28,6 +28,12 @@ export interface ListQuery {
   limit?: number;
 }
 
+/** Untrusted numbers (query strings, JSON bodies) → an integer in range, never NaN. */
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
+}
+
 const WORTH_ORDER = "CASE worth WHEN 'skip' THEN 0 WHEN 'low' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END";
 
 export class Store {
@@ -188,7 +194,7 @@ export class Store {
            ORDER BY share_count DESC, created_at ASC LIMIT ?)
          RETURNING *`,
       )
-      .all(agent, `-${leaseMinutes} minutes`, Math.min(Math.max(limit, 1), 20)) as unknown as ItemRow[];
+      .all(agent, `-${clampInt(leaseMinutes, 0, 1440, 30)} minutes`, clampInt(limit, 1, 20, 5)) as unknown as ItemRow[];
     return rows.map(toItem).sort((a, b) => b.shareCount - a.shareCount || a.createdAt.localeCompare(b.createdAt));
   }
 
@@ -240,7 +246,7 @@ export class Store {
     }
     const sql = `SELECT * FROM items ${where.length ? "WHERE " + where.join(" AND ") : ""}
                  ORDER BY ${WORTH_ORDER} DESC, updated_at DESC LIMIT ?`;
-    args.push(Math.min(query.limit ?? 50, 500));
+    args.push(clampInt(query.limit, 1, 500, 50));
     return (this.db.prepare(sql).all(...args) as unknown as ItemRow[]).map(toItem);
   }
 

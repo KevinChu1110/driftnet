@@ -2,6 +2,9 @@ import type { Digest } from "../types.ts";
 import { extractGithub, matchGithub } from "./github.ts";
 import { extractWeb } from "./web.ts";
 import { extractYoutube, matchYoutube } from "./youtube.ts";
+import { BlockedUrl } from "./net.ts";
+
+export { BlockedUrl } from "./net.ts";
 
 export { isSocial } from "./web.ts";
 export { cleanReadme } from "./github.ts";
@@ -34,6 +37,8 @@ export async function extract(url: string): Promise<Digest> {
       const digest = await ex.extract(url);
       if (digest) return digest;
     } catch (err) {
+      // A private/local target is refused outright, not catalogued as an empty item.
+      if (err instanceof BlockedUrl) throw err;
       console.warn(`[driftnet] extractor ${ex.name} failed for ${url}:`, (err as Error).message);
     }
   }
