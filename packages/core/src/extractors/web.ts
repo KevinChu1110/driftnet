@@ -23,6 +23,11 @@ export function isSocial(url: string): boolean {
 export async function extractWeb(url: string): Promise<Digest | null> {
   const page = await fetchText(url);
   if (page.status >= 400) return null;
+  // Redirected to a login wall: the page tells us nothing, and its URL is not
+  // the item's URL. Keep the shared one so a browser capture can fill it in.
+  if (isLoginWall(page.url)) {
+    return { url, kind: isSocial(url) ? "post" : "other", title: hostOf(url), text: "", outlinks: [], meta: { site: hostOf(url) } };
+  }
   const meta = metaTags(page.body);
   const social = isSocial(url);
   // Facebook/Instagram put the full caption in og:title (prefixed with view counts)
@@ -47,6 +52,14 @@ export async function extractWeb(url: string): Promise<Digest | null> {
     outlinks: extractUrls(text).filter((u) => hostOf(u) !== hostOf(url)).slice(0, 10),
     meta: { site: meta["og:site_name"] ?? hostOf(url) },
   };
+}
+
+export function isLoginWall(url: string): boolean {
+  try {
+    return /^\/(login|signin|sign-in|accounts\/login|i\/flow\/login|checkpoint)(\.php)?(\/|$)/i.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
 }
 
 function firstLine(s: string): string {

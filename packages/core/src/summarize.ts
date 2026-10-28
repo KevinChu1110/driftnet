@@ -64,7 +64,8 @@ export class Summarizer {
           user: judgeState(digest, note) + linkList(digest),
           schema,
           schemaName: "link_summary",
-          maxTokens: 1024,
+          // Thinking models (Gemini 3, Claude) count reasoning against this cap.
+          maxTokens: 4096,
         })) as Parsed;
         return normalize(out);
       } catch (err) {

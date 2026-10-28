@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { canonicalize, extractUrls, guard, messages, renderText, resolveLocale, Store } from "../src/index.ts";
 import { cleanReadme } from "../src/extractors/github.ts";
+import { isLoginWall } from "../src/extractors/web.ts";
 
 test("canonicalize strips tracking and unifies hosts", () => {
   assert.equal(canonicalize("https://youtu.be/abc123XYZ?si=foo"), "https://youtube.com/watch?v=abc123XYZ");
@@ -66,4 +67,11 @@ test("bot strings follow DRIFTNET_LANGUAGE unless DRIFTNET_LOCALE is set", () =>
   assert.match(zh, /提到：P、Q/);
   assert.match(zh, /已收錄過 · 分享 2 次/);
   assert.match(renderText({ item, cached: true }, undefined, messages("en")), /Mentions: P, Q/);
+});
+
+test("login walls are recognised", () => {
+  assert.ok(isLoginWall("https://www.facebook.com/login?next=https%3A%2F%2Fwww.facebook.com%2Fphoto.php"));
+  assert.ok(isLoginWall("https://www.instagram.com/accounts/login/?next=/p/x/"));
+  assert.ok(isLoginWall("https://x.com/i/flow/login"));
+  assert.ok(!isLoginWall("https://example.com/blog/login-flows-explained"));
 });
