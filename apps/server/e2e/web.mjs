@@ -307,7 +307,7 @@ try {
 
   // Swipe left: to the trash, with an undo toast.
   await swipe(first, -230);
-  assert.ok(!(await ids()).includes(first), "card left the list");
+  await waitFor(s, `![...document.querySelectorAll(".swipe")].some((e) => e.dataset.id === "${first}")`, "card left the list");
   assert.ok((await api(`/api/items/${first}`)).trashedAt, "server has it in the trash");
   assert.ok(await waitFor(s, `document.getElementById("toast").classList.contains("show")`, "undo toast"));
   await shoot(`web-phone-trash-toast-${LANG}.png`);
@@ -325,7 +325,7 @@ try {
   assert.equal((await api(`/api/items/${second}`)).favorite, false, "a short swipe does nothing");
   await swipe(second, 230);
   assert.equal((await api(`/api/items/${second}`)).favorite, true);
-  assert.ok(await evaluate(s, `document.querySelector('#item-${second} [data-act="favorite"]').textContent === "★"`));
+  assert.ok(await evaluate(s, `document.querySelector('#item-${second} [data-act="favorite"]').classList.contains("on")`));
   console.log("✓ swipe right added a favorite (and a short swipe did nothing)");
 
   // Favorites view shows it.
@@ -427,6 +427,7 @@ try {
     assert.equal((await fetch(`http://127.0.0.1:${port}/api/ingest`, { method: "POST", headers: { ...remote, authorization: `Bearer ${key}`, "content-type": "application/json" }, body: "{}" })).status, 401, "the share key can't write");
     await evaluate(s, `document.getElementById("ac-tunnel").click()`);
     await waitFor(s, `document.getElementById("ac-url")?.value === "https://demo-tunnel.trycloudflare.com"`, "public URL shown");
+    await evaluate(s, `document.querySelector('[data-tab-btn="access"]').click()`);
     await evaluate(s, `document.getElementById("ac").scrollIntoView({ block: "start" })`);
     await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
     await shoot(`web-access-${LANG}.png`);
@@ -450,19 +451,19 @@ try {
     assert.equal(await evaluate(s, `location.search`), "", "the key is taken out of the address bar");
     assert.equal(await evaluate(s, `location.hash`), "#item-1");
     assert.equal(await evaluate(s, `localStorage.getItem("driftnet-key")`), key);
-    // Changing something asks for the password, with a way back to browsing.
-    await evaluate(s, `document.querySelector('#item-1 [data-act="favorite"]').click()`);
-    await waitFor(s, `!!document.getElementById("token-back")`, "password asked only to edit");
-    await evaluate(s, `document.getElementById("token-back").click()`);
-    await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "back to browsing");
-    console.log("✓ a share-key link opens on a phone without a password; editing asks for it");
-    // The 🔑 entry: unlock with the admin password from the same phone.
-    await evaluate(s, `document.querySelector("#nav [data-login]").click()`);
+    // A reader sees no edit controls, and a chip that unlocks editing.
+    assert.equal(await evaluate(s, `getComputedStyle(document.querySelector('#item-1 .tools')).display`), "none", "no edit buttons for a reader");
+    assert.equal(await evaluate(s, `document.getElementById("lock").hidden`), false, "the unlock chip is shown");
+    await shoot(`web-phone-reader-${LANG}.png`);
+    console.log("✓ a share-key link opens without a password, read-only, with an unlock chip");
+    // The unlock chip: a wrong password is refused, the right one unlocks editing.
+    await evaluate(s, `document.getElementById("lock").click()`);
     await waitFor(s, `document.getElementById("login-dlg").open`, "login dialog");
     await evaluate(s, `(() => { document.getElementById("lg-pw").value = "wrong-password"; document.getElementById("lg-ok").click(); return 1; })()`);
     await waitFor(s, `document.getElementById("lg-error").textContent.length > 0`, "wrong password refused");
     await evaluate(s, `(() => { document.getElementById("lg-pw").value = ${JSON.stringify(pw)}; document.getElementById("lg-ok").click(); return 1; })()`);
-    await waitFor(s, `!document.getElementById("login-dlg").open && !document.querySelector("#nav [data-login]")`, "unlocked");
+    await waitFor(s, `!document.getElementById("login-dlg").open && document.getElementById("lock").hidden`, "unlocked");
+    await waitFor(s, `getComputedStyle(document.querySelector('#item-1 .tools')).display !== "none"`, "edit buttons back");
     console.log("✓ 🔑 entry: a wrong password is refused, the right one unlocks editing");
   }
 
