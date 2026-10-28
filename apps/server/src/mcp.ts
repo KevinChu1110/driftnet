@@ -12,8 +12,16 @@ const DATA_NOTICE =
  * "what's new" to find upgrades for itself, save links, and vote — votes from
  * agents feed the same reputation that keeps junk out.
  */
-export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
-  const server = new McpServer({ name: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev" });
+export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readOnly?: boolean } = {}): McpServer {
+  const mcp = new McpServer({ name: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev" });
+  // With only the read-only share key, an agent gets the reading tools and nothing that changes the catalogue.
+  const READ_TOOLS = new Set(["driftnet_search", "driftnet_recent", "driftnet_get", "driftnet_folders"]);
+  const server = {
+    registerTool: ((name: string, ...rest: unknown[]) => {
+      if (opts.readOnly && !READ_TOOLS.has(name)) return undefined;
+      return (mcp.registerTool as (...a: unknown[]) => unknown)(name, ...rest);
+    }) as McpServer["registerTool"],
+  };
   const categories = Object.keys(dn.categories) as [string, ...string[]];
 
   const worthHelp = "Rating floor: skip < low < normal < must-see. Defaults to 'normal', which hides skipped and low-value items";
@@ -306,7 +314,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
     },
   );
 
-  return server;
+  return mcp;
 }
 
 const ITEM = z.object({

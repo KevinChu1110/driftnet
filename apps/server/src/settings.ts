@@ -11,11 +11,12 @@ import { driftnetHome } from "@driftnet/core";
  */
 export interface Setting {
   key: string;
-  group: "model" | "language" | "chat" | "rules";
+  group: "model" | "language" | "chat" | "rules" | "access";
   secret?: boolean;
   choices?: readonly string[];
   multiline?: boolean;
   max?: number;
+  min?: number;
 }
 
 export const SETTINGS: readonly Setting[] = [
@@ -33,6 +34,10 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_PUBLIC_URL", group: "chat" },
   { key: "DRIFTNET_SUMMARY_RULES", group: "rules", multiline: true, max: 1000 },
   { key: "DRIFTNET_BLOCK_DOMAINS", group: "rules", max: 2000 },
+  // Access: the page shows these in their own panel (password strength, share key, public URL).
+  { key: "DRIFTNET_TOKEN", group: "access", secret: true, min: 8, max: 200 },
+  { key: "DRIFTNET_READ_KEY", group: "access", min: 16, max: 200 },
+  { key: "DRIFTNET_ACCESS", group: "access", choices: ["", "public", "private"] },
 ];
 
 export class SettingsError extends Error {}
@@ -85,6 +90,8 @@ export class Settings {
       if (value !== null) {
         if (s.choices && !s.choices.includes(value)) throw new SettingsError(`${key} must be one of ${s.choices.filter(Boolean).join(", ")}`);
         if (value.length > (s.max ?? 500)) throw new SettingsError(`${key} is too long`);
+        if (s.min && value.length < s.min) throw new SettingsError(`${key} needs at least ${s.min} characters`);
+        if (s.key === "DRIFTNET_TOKEN" && /\s/.test(value)) throw new SettingsError("the password can't contain spaces");
         if (value.includes("`")) throw new SettingsError(`${key} can't contain a backtick`);
         if (!s.multiline && /[\r\n]/.test(value)) throw new SettingsError(`${key} must be one line`);
         if (/URL$/.test(key) && !/^https?:\/\/\S+$/.test(value)) throw new SettingsError(`${key} must be an http(s) URL`);

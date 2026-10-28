@@ -24,7 +24,7 @@ export async function handleChatText(
 
   if (extractUrls(text).length === 0) return null;
   const results = await dn.pipeline.ingestMessage(text, ctx);
-  const base = process.env.DRIFTNET_PUBLIC_URL;
+  const base = process.env.DRIFTNET_TUNNEL_URL || process.env.DRIFTNET_PUBLIC_URL;
   // DRIFTNET_REPLY: link (one line + where to read it), full (the summary in chat), off.
   const mode = process.env.DRIFTNET_REPLY ?? "link";
   if (mode === "off" || !results.length) return null;

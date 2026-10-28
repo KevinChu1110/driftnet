@@ -318,8 +318,10 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
 | `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of extractor plugins (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
-| `DRIFTNET_TOKEN` | — | Required for writes, MCP and the agent queue once others can reach the server |
-| `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the token too |
+| `DRIFTNET_TOKEN` | — | Admin password: writes, settings, MCP with every tool, the agent queue. Settable on the page |
+| `DRIFTNET_READ_KEY` | — | Read-only share key (header or `?key=`): reading and the read-only MCP tools |
+| `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the password or the share key |
+| `DRIFTNET_CLOUDFLARED` | `cloudflared` | Path to `cloudflared`, for the page's public-URL button |
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
 | `DRIFTNET_HOME` | `~/.driftnet` | Folder for `.env`, the database and the service log |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite file |
@@ -342,21 +344,33 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 
 ## Putting it online (optional)
 
-Only needed to reach the catalogue from a phone, receive LINE around the clock, or let cloud agents
-work the queue. The server listens on `127.0.0.1`; put HTTPS in front and choose who may read:
+Only needed when something outside this computer should reach it: your phone, LINE around the clock,
+or AIs that run in the cloud (Claude.ai, ChatGPT, Grok, Hermes or OpenClaw on a server). The server
+listens on `127.0.0.1`. Everything below is on the page under **⚙ Settings → Access & connections**:
 
-```bash
-DRIFTNET_TOKEN=$(openssl rand -hex 24)
-DRIFTNET_ACCESS=private        # or public: an open catalogue; writes still need the token
-```
+1. **Admin password.** Pick your own or press *Generate*; a meter says how strong it is. It can only
+   be set from this computer. Anyone who knows it can add, move and delete, so don't reuse one.
+2. **Who can read.** *Private* means the password or the share key is needed to read anything.
+3. **Read-only share key.** For AIs that can only open links: `…/llms.txt?key=…` reads the catalogue
+   and nothing more. If it leaks, press *New key*. The admin password is never accepted in a URL.
+4. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
+   Cloudflare (no account; install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+   yourself, driftnet never downloads it). It needs the password, turns reading private, and closes
+   when driftnet stops.
+
+Then **🔌 Connect an AI** in the sidebar has a ready-to-paste card for Claude Code, Claude.ai / Claude
+Desktop (custom connector, read-only), ChatGPT custom GPTs, any chat that can open a link, and
+Hermes / OpenClaw / pi, with the URL and the share key filled in.
+
+<p align="center"><img src="assets/access-connect-en.jpg" alt="Access & connections in Settings, and the Connect an AI cards" width="100%"></p>
+
+For a permanent address, put HTTPS in front instead, e.g. Caddy:
 
 ```caddyfile
 driftnet.example.com {
 	reverse_proxy 127.0.0.1:8787
 }
 ```
-
-From a laptop, `cloudflared tunnel --url http://localhost:8787` gives a temporary public URL.
 
 ## Where your data goes
 

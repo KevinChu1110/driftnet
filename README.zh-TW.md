@@ -293,8 +293,10 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 擷取器外掛（`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
-| `DRIFTNET_TOKEN` | — | 別人連得到伺服器時，寫入、MCP 和 agent 佇列都需要它 |
-| `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取也要 token |
+| `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
+| `DRIFTNET_READ_KEY` | — | 唯讀分享碼（放 header 或 `?key=`）：只能讀，MCP 也只有讀取類工具 |
+| `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取要密碼或分享碼 |
+| `DRIFTNET_CLOUDFLARED` | `cloudflared` | `cloudflared` 的路徑，給網頁上的「公開網址」按鈕用 |
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
 | `DRIFTNET_HOME` | `~/.driftnet` | 放 `.env`、資料庫和服務日誌的資料夾 |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite 檔案位置 |
@@ -317,21 +319,29 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 
 ## 放上網路（選用）
 
-只有想用手機看清單、24 小時收 LINE 訊息，或讓雲端 agent 整理佇列時才需要。伺服器只聽 `127.0.0.1`；
-在前面加上 HTTPS，並選擇誰可以讀：
+只有當這台電腦以外的東西要連進來時才需要：你的手機、24 小時收 LINE，或是跑在雲端的 AI（Claude 網頁版、
+ChatGPT、Grok、架在伺服器上的 Hermes 或 OpenClaw）。伺服器只聽 `127.0.0.1`。以下全部都在網頁的
+**⚙ 設定 →「存取與連線」**：
 
-```bash
-DRIFTNET_TOKEN=$(openssl rand -hex 24)
-DRIFTNET_ACCESS=private        # 或 public：清單公開，寫入照樣要 token
-```
+1. **管理密碼。**自己取一組，或按「產生」；旁邊會顯示強弱。只能在這台電腦上設定。知道它的人可以新增、移動、刪除，所以不要沿用其他網站的密碼。
+2. **誰可以讀。**選「要有密碼或分享碼才能讀」，沒有就什麼都看不到。
+3. **唯讀分享碼。**給只會開連結的 AI：`…/llms.txt?key=…` 只能讀清單。外流就按「重新產生」。管理密碼永遠不能放在網址裡。
+4. **公開網址。**按一下就透過 Cloudflare 開一個臨時的 `https://….trycloudflare.com`（免帳號；
+   [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+   要自己裝，driftnet 不會幫你下載）。必須先設密碼，開啟後讀取會改成私人，driftnet 關掉就跟著關。
+
+接著側邊欄的 **🔌 連接 AI** 會列出 Claude Code、Claude 網頁版／桌面版（自訂 connector，唯讀）、ChatGPT 自訂 GPT、
+任何會開連結的聊天 AI，以及 Hermes／OpenClaw／pi 的設定，網址和分享碼都已經填好，複製貼上就能用。
+
+<p align="center"><img src="assets/access-connect-zh-TW.jpg" alt="設定裡的「存取與連線」，和「連接 AI」的卡片" width="100%"></p>
+
+想要固定網址的話，改在前面加 HTTPS，例如 Caddy：
 
 ```caddyfile
 driftnet.example.com {
 	reverse_proxy 127.0.0.1:8787
 }
 ```
-
-在筆電上，`cloudflared tunnel --url http://localhost:8787` 可以拿到一個臨時的公開網址。
 
 ## 資料去哪裡
 

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
@@ -12,6 +11,7 @@ import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
+import { canRead, isAdmin, isLocal, isPrivate, newKey, readKey, token, Tunnel } from "./access.ts";
 import { llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
@@ -24,13 +24,12 @@ const settings = new Settings(env, fromEnvironment);
 const PORT = Number(env.PORT ?? 8787);
 // Loopback by default: put a reverse proxy (Caddy, nginx, a tunnel) in front to expose it.
 const HOST = env.DRIFTNET_HOST ?? "127.0.0.1";
-const TOKEN = env.DRIFTNET_TOKEN;
 /**
  * public  — anyone can read the catalogue; writes need DRIFTNET_TOKEN.
- * private — every read needs the token too (the web page asks for it once).
+ * private — every read needs the token or the read-only key (the page asks once).
+ * Both are read per request (see access.ts), so ⚙ Settings can change them live.
  */
-const PRIVATE = env.DRIFTNET_ACCESS === "private";
-if (PRIVATE && !TOKEN) {
+if (isPrivate(env) && !token(env)) {
   console.error("DRIFTNET_ACCESS=private needs DRIFTNET_TOKEN to be set");
   process.exit(1);
 }
@@ -43,13 +42,11 @@ const STATIC: Record<string, [Buffer, string]> = {
   "/manifest.webmanifest": [readFileSync(new URL("../public/manifest.webmanifest", import.meta.url)), "application/manifest+json"],
 };
 
-/** Writes (ingest, feedback, MCP) need DRIFTNET_TOKEN when it is set; reads are public. */
-function authorized(req: IncomingMessage): boolean {
-  if (!TOKEN) return true;
-  const given = Buffer.from((req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""));
-  const want = Buffer.from(TOKEN);
-  return given.length === want.length && timingSafeEqual(given, want);
-}
+/** Writes (ingest, feedback, MCP tools that change things) need the admin password when one is set. */
+const authorized = (req: IncomingMessage) => isAdmin(req, env);
+const tunnel = new Tunnel(PORT);
+process.on("exit", () => tunnel.stop());
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { tunnel.stop(); process.exit(0); });
 
 /**
  * The settings page can point the model at another URL with your key, so it
@@ -61,10 +58,26 @@ function authorized(req: IncomingMessage): boolean {
 function settingsAllowed(req: IncomingMessage): boolean {
   if (!authorized(req)) return false;
   const host = req.headers.host ?? "";
-  if (!TOKEN && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host)) return false;
+  // No password yet: only this machine itself, never something a tunnel or proxy forwarded.
+  if (!token(env) && !isLocal(req)) return false;
   const origin = req.headers.origin;
   if (origin && origin !== `http://${host}` && origin !== `https://${host}`) return false;
   return req.method === "GET" || /^application\/json\b/.test(req.headers["content-type"] ?? "");
+}
+
+/** What the settings page needs to show the access panel and the "Connect an AI" cards. */
+function accessView(req: IncomingMessage) {
+  const t = token(env);
+  return {
+    access: {
+      local: isLocal(req),
+      private: isPrivate(env),
+      passwordSet: !!t,
+      readKey: readKey(env) ?? null,
+      publicUrl: env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL || null,
+      tunnel: { available: tunnel.available(), running: tunnel.running, url: tunnel.url, error: tunnel.error },
+    },
+  };
 }
 
 class BadRequest extends Error {}
@@ -106,9 +119,9 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "content-type": asset[1], "cache-control": "public, max-age=86400" });
       return res.end(asset[0]);
     }
-    if (PRIVATE && req.method === "GET" && !authorized(req)) return send(res, 401, { error: "unauthorized" });
+    if (req.method === "GET" && !canRead(req, env)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
-    if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
+    if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL || `${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
     if (req.method === "GET" && path === "/api/ui") {
       // Folder names in every locale, for clients that switch language themselves (web page, extension).
@@ -214,11 +227,17 @@ const server = createServer(async (req, res) => {
     // ── Settings page ─────────────────────────────────────────────────────
     if (path === "/api/settings" && (req.method === "GET" || req.method === "PUT")) {
       if (!settingsAllowed(req)) {
-        return send(res, 403, { error: TOKEN ? "unauthorized" : "settings can only be changed from this machine; set DRIFTNET_TOKEN to change them remotely" });
+        return send(res, 403, { error: token(env) ? "unauthorized" : "settings can only be changed from this machine; set an admin password to change them remotely" });
       }
       if (req.method === "PUT") {
         try {
-          const changed = settings.update((await readJson<{ values?: Record<string, unknown> }>(req)).values ?? {});
+          const values = (await readJson<{ values?: Record<string, unknown> }>(req)).values ?? {};
+          // Private needs a password to exist afterwards, or nobody could read anything.
+          const nextToken = "DRIFTNET_TOKEN" in values ? values.DRIFTNET_TOKEN : token(env);
+          const nextAccess = "DRIFTNET_ACCESS" in values ? values.DRIFTNET_ACCESS : env.DRIFTNET_ACCESS;
+          if (nextAccess === "private" && !nextToken) throw new SettingsError("private access needs an admin password");
+          if (values.DRIFTNET_TOKEN === null && tunnel.running) throw new SettingsError("turn the public URL off before removing the password");
+          const changed = settings.update(values);
           if (changed.length) dn.reconfigure(env);
           return send(res, 200, { ...settings.view(), changed, engines: dn.engines });
         } catch (err) {
@@ -226,7 +245,42 @@ const server = createServer(async (req, res) => {
           throw err;
         }
       }
-      return send(res, 200, { ...settings.view(), engines: dn.engines, plugins });
+      return send(res, 200, { ...settings.view(), engines: dn.engines, plugins, ...accessView(req) });
+    }
+    // A fresh read-only key; the old one stops working at once.
+    if (req.method === "POST" && path === "/api/read-key") {
+      if (!settingsAllowed(req)) return send(res, 403, { error: "unauthorized" });
+      try {
+        settings.update({ DRIFTNET_READ_KEY: newKey() });
+        return send(res, 200, { ...settings.view(), ...accessView(req) });
+      } catch (err) {
+        if (err instanceof SettingsError) return send(res, 400, { error: err.message });
+        throw err;
+      }
+    }
+    // The public URL: a Cloudflare quick tunnel, only with a password, and the catalogue goes private.
+    if (req.method === "POST" && path === "/api/tunnel") {
+      if (!settingsAllowed(req)) return send(res, 403, { error: "unauthorized" });
+      const { on } = await readJson<{ on?: boolean }>(req);
+      try {
+        if (!on) {
+          tunnel.stop();
+          delete env.DRIFTNET_TUNNEL_URL;
+        } else {
+          if (!token(env)) throw new SettingsError("set an admin password first");
+          if (!tunnel.available()) throw new SettingsError("cloudflared is not installed");
+          const lock: Record<string, string> = {};
+          if (!isPrivate(env)) lock.DRIFTNET_ACCESS = "private";
+          if (!readKey(env)) lock.DRIFTNET_READ_KEY = newKey();
+          settings.update(lock);
+          env.DRIFTNET_TUNNEL_URL = await tunnel.start();
+          console.log(`[tunnel] public URL: ${env.DRIFTNET_TUNNEL_URL}`);
+        }
+        return send(res, 200, { ...settings.view(), ...accessView(req) });
+      } catch (err) {
+        if (err instanceof SettingsError) return send(res, 400, { error: err.message });
+        return send(res, 502, { error: (err as Error).message });
+      }
     }
 
     // ── Export: one Markdown file, or a zip vault for Obsidian / Notion ───
@@ -305,9 +359,11 @@ const server = createServer(async (req, res) => {
 
     // MCP over Streamable HTTP, stateless: a fresh server per request.
     if (path === "/mcp") {
-      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      // The admin password gets every tool; the read-only key (header or ?key=) only the reading ones.
+      const admin = authorized(req);
+      if (!admin && !canRead(req, env)) return send(res, 401, { error: "unauthorized" });
       const agent = (req.headers["x-driftnet-agent"] as string | undefined)?.slice(0, 40) ?? "agent";
-      const mcp = createMcpServer(dn, agent);
+      const mcp = createMcpServer(dn, agent, { readOnly: !admin });
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on("close", () => { void transport.close(); void mcp.close(); });
       await mcp.connect(transport);
@@ -317,7 +373,7 @@ const server = createServer(async (req, res) => {
 
     // The agent queue. Always needs the token: taking work leases items.
     if (req.method === "POST" && path === "/api/pending") {
-      if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
+      if (!token(env) || !authorized(req)) return send(res, 401, { error: "unauthorized (set an admin password)" });
       const body = await readJson<{ limit?: number; agent?: string }>(req);
       const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
       const items = dn.store.claimPending(agent, Number(body.limit ?? 5));
@@ -345,7 +401,7 @@ const server = createServer(async (req, res) => {
 
     const enrichMatch = /^\/api\/items\/(\d+)\/enrich$/.exec(path);
     if (req.method === "POST" && enrichMatch) {
-      if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
+      if (!token(env) || !authorized(req)) return send(res, 401, { error: "unauthorized (set an admin password)" });
       const body = await readJson<Record<string, unknown>>(req);
       const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
       delete body.agent;

@@ -57,7 +57,10 @@ await new Promise((resolve, reject) => {
   });
   p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error("seeding failed"))));
 });
-const server = spawn(join(SERVER, "../../node_modules/.bin/tsx"), ["src/main.ts"], { cwd: SERVER, env: { ...process.env, DRIFTNET_HOME: home }, stdio: "ignore" });
+// A stand-in for cloudflared: prints a quick-tunnel URL and stays up, like the real one.
+const fakeCf = join(home, "cloudflared");
+writeFileSync(fakeCf, `#!/bin/sh\nif [ "$1" = "--version" ]; then exit 0; fi\necho "INF |  https://demo-tunnel.trycloudflare.com  |" >&2\nexec sleep 600\n`, { mode: 0o755 });
+const server = spawn(join(SERVER, "../../node_modules/.bin/tsx"), ["src/main.ts"], { cwd: SERVER, env: { ...process.env, DRIFTNET_HOME: home, DRIFTNET_CLOUDFLARED: fakeCf }, stdio: "ignore" });
 for (let i = 0; i < 50; i++) {
   if (await fetch(`http://127.0.0.1:${port}/api/stats`).then(() => true, () => false)) break;
   await sleep(200);
@@ -354,6 +357,50 @@ try {
   assert.equal((await api("/api/stats")).trash, before, "scrolling must not trash a card");
   console.log("✓ a vertical drag is a scroll, not a swipe");
   void box;
+  // Access: a password from the page, private reading, a share key, the public URL, the connect cards.
+  {
+    await viewport(1280, 820, false);
+    await open();
+    await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
+    await waitFor(s, `document.getElementById("settings-dlg").open && !!document.getElementById("ac-pw")`, "access panel");
+    await evaluate(s, `(() => { const i = document.getElementById("ac-pw"); i.value = "1234"; i.dispatchEvent(new Event("input", { bubbles: true })); return 1; })()`);
+    assert.equal(await evaluate(s, `document.getElementById("ac-meter").dataset.s`), "weak");
+    await evaluate(s, `document.getElementById("ac-gen").click()`);
+    const pw = await evaluate(s, `document.getElementById("ac-pw").value`);
+    assert.equal(await evaluate(s, `document.getElementById("ac-meter").dataset.s`), "strong");
+    await evaluate(s, `(() => { document.querySelector('[data-key="DRIFTNET_ACCESS"]').value = "private"; document.getElementById("st-save").click(); return 1; })()`);
+    await waitFor(s, `!document.getElementById("settings-dlg").open`, "saved password");
+    assert.equal(await evaluate(s, `localStorage.getItem("driftnet-token")`), pw, "the page keeps the password it set");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`)).status, 401, "private now");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`, { headers: { authorization: `Bearer ${pw}` } })).status, 200);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "page still works with the saved password");
+
+    await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
+    await waitFor(s, `document.getElementById("settings-dlg").open && !!document.getElementById("ac-newkey")`, "access panel again");
+    await evaluate(s, `document.getElementById("ac-newkey").click()`);
+    await waitFor(s, `!!document.getElementById("ac-key")?.value`, "share key");
+    const key = await evaluate(s, `document.getElementById("ac-key").value`);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/llms.txt?key=${key}`)).status, 200, "the share key reads by URL");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/llms.txt?key=${pw}`)).status, 401, "the admin password never works in a URL");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/ingest`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" }, body: "{}" })).status, 401, "the share key can't write");
+    await evaluate(s, `document.getElementById("ac-tunnel").click()`);
+    await waitFor(s, `document.getElementById("ac-url")?.value === "https://demo-tunnel.trycloudflare.com"`, "public URL shown");
+    await evaluate(s, `document.getElementById("ac").scrollIntoView({ block: "start" })`);
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    await shoot(`web-access-${LANG}.png`);
+    await evaluate(s, `document.getElementById("st-cancel").click()`);
+    console.log("✓ access: password from the page, private reads, a URL-safe share key, the public URL");
+
+    await evaluate(s, `document.querySelector("#nav [data-connect]").click()`);
+    await waitFor(s, `document.getElementById("connect-dlg").open`, "connect dialog");
+    const cards = await evaluate(s, `document.getElementById("cx-body").innerText`);
+    assert.ok(cards.includes(`https://demo-tunnel.trycloudflare.com/mcp?key=${key}`), "cards carry the public URL and the share key");
+    assert.ok(!cards.includes(pw), "the admin password is never printed on the cards");
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    await shoot(`web-connect-${LANG}.png`);
+    console.log("✓ connect cards: public URL and share key filled in, password left out");
+  }
+
   console.log("\nall web checks passed");
 } catch (err) {
   failed = true;

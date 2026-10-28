@@ -129,6 +129,21 @@
   .set-row small { color: var(--muted); }
   .set-status { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; }
   .set-scroll { max-height: min(70vh, 640px); overflow: auto; margin: 0 -18px; padding: 0 18px; }
+  .keyrow { display: flex; gap: 6px; align-items: center; }
+  .keyrow input { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+  .keyrow .btn { min-height: 38px; padding: 6px 10px; white-space: nowrap; }
+  .meter { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 2px; }
+  .meter i { display: block; height: 100%; width: 0; transition: width .2s ease, background .2s ease; }
+  .meter[data-s="weak"] i { width: 33%; background: var(--danger); }
+  .meter[data-s="ok"] i { width: 66%; background: var(--star); }
+  .meter[data-s="strong"] i { width: 100%; background: var(--ok); }
+  .warn { background: var(--star-soft); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 4px 0 10px; }
+  .warn.danger { background: var(--danger-soft); }
+  .conn { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .conn h4 { margin: 0 0 4px; font-size: 15px; }
+  .conn p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .conn pre { margin: 0; background: var(--bg); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; }
+  .conn .copy { float: right; margin: -2px 0 6px 8px; min-height: 32px; padding: 4px 10px; font-size: 13px; }
   .welcome { background: var(--accent-soft); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 14px; }
   .tool.grip { cursor: grab; display: none; }
   @media (hover: hover) and (pointer: fine) { .tool.grip { display: grid; } }
@@ -258,6 +273,11 @@
       <button class="btn" id="st-cancel" type="button"></button><button class="btn primary" id="st-save" type="submit"></button></div>
   </form>
 </dialog>
+<dialog id="connect-dlg" class="wide">
+  <h3 id="cx-title"></h3>
+  <div class="set-scroll" id="cx-body"></div>
+  <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="cx-close" type="button"></button></div>
+</dialog>
 <dialog id="note-dlg">
   <form id="note-form" method="dialog">
     <h3 id="in-title"></h3>
@@ -293,7 +313,7 @@
       favorite: "Add to favorites", unfavorite: "Remove from favorites", remove: "Move to trash", restore: "Restore",
       swipeFav: "☆ Favorite", swipeUnfav: "★ Unfavorite", swipeTrash: "Remove 🗑", swipeRestore: "↩ Restore",
       removed: (n) => `“${n}” moved to the trash`, restored: (n) => `“${n}” restored`, faved: (n) => `★ “${n}” added to favorites`,
-      undo: "Undo", tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
+      undo: "Undo", tokenPrompt: "This catalogue is private. Enter the admin password, or a read-only share key to just look.", tokenSave: "Open",
       failed: "Couldn't save — check your connection.", menu: "Menu", close: "Close menu", showing: "Showing:",
       folders: "Folders", newFolder: "New folder", newSub: "New folder inside", editFolder: "Edit folder", folderName: "Name",
       folderDesc: "What goes here? (driftnet's AI reads this to sort new links)", folderParent: "Inside", topLevel: "— Top level —",
@@ -316,6 +336,19 @@
         status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries by ${e.summarizer === "off" ? "nobody (off)" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
         savedServer: "Saved — already in effect",
+        access: "Access & connections",
+        password: "Admin password", passwordHelp: "Needed to add links, change settings and let agents write. At least 8 characters, no spaces.",
+        generate: "Generate", show: "Show", hide: "Hide", copy: "Copy", copied: "Copied",
+        strength: { weak: "Weak — easy to guess. Fine on this computer only; don't open a public URL with it.", ok: "OK", strong: "Strong" },
+        passwordWarn: "Anyone with this password can add, move and delete in your catalogue. Don't reuse a password from elsewhere, and don't paste it into public chats.",
+        accessMode: "Who can read", accessChoices: { "": "Anyone who can reach this page", public: "Anyone who can reach this page", private: "Only with the password or the share key" },
+        shareKey: "Read-only share key", shareKeyHelp: "For AIs that can only open links (ChatGPT, Grok, Claude.ai): they can read your catalogue, nothing more. If it leaks, make a new one.",
+        newShareKey: "New key", noShareKey: "No share key yet.",
+        tunnel: "Public URL for cloud AIs", tunnelHelp: "Claude.ai, ChatGPT, Grok and agents on other machines can't reach localhost. This opens a temporary https address through Cloudflare (no account). It changes every time and closes when driftnet stops.",
+        tunnelOn: "Open a public URL", tunnelOff: "Close it", tunnelNeedsPassword: "Save an admin password first.",
+        tunnelInstall: "Needs cloudflared (driftnet never downloads it for you):", tunnelPrivate: "Opening it switches reading to “only with the password or the share key”.",
+        tunnelStarting: "Starting the tunnel… (up to 30 s)", saveFirst: "Save first, then open the public URL.",
+        connect: "🔌 Connect an AI",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["Model provider", "Summaries. None: links are still sorted, only without a summary."],
           DRIFTNET_LLM_MODEL: ["Model", "e.g. claude-haiku-5-5, gpt-5-mini, gemini-3.8-flash, qwen3"],
@@ -354,7 +387,7 @@
       favorite: "加入最愛", unfavorite: "移出最愛", remove: "移到垃圾桶", restore: "還原",
       swipeFav: "☆ 加入最愛", swipeUnfav: "★ 移出最愛", swipeTrash: "移到垃圾桶 🗑", swipeRestore: "↩ 還原",
       removed: (n) => `已將「${n}」移到垃圾桶`, restored: (n) => `已還原「${n}」`, faved: (n) => `★ 已將「${n}」加入最愛`,
-      undo: "復原", tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
+      undo: "復原", tokenPrompt: "這份清單是私人的。請輸入管理密碼；只想瀏覽的話，輸入唯讀分享碼也可以。", tokenSave: "開啟",
       failed: "沒有存成功，請檢查網路。", menu: "選單", close: "關閉選單", showing: "目前顯示：",
       folders: "資料夾", newFolder: "新資料夾", newSub: "在裡面新增資料夾", editFolder: "編輯資料夾", folderName: "名稱",
       folderDesc: "放什麼？（driftnet 的 AI 會照這段說明把新連結分進來）", folderParent: "放在", topLevel: "— 最上層 —",
@@ -377,6 +410,19 @@
         status: (e) => `目前：分類用 ${({ jev: "Jev", llm: "模型", heuristic: "內建規則" })[e.judge] ?? e.judge}，摘要用 ${e.summarizer === "off" ? "（未開啟）" : e.summarizer}`, keep: "已設定，留空就不變", unset: "未設定",
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
         savedServer: "已儲存，馬上生效",
+        access: "存取與連線",
+        password: "管理密碼", passwordHelp: "新增連結、改設定、讓 agent 寫入都需要它。至少 8 個字元，不能有空白。",
+        generate: "產生", show: "顯示", hide: "隱藏", copy: "複製", copied: "已複製",
+        strength: { weak: "弱：很容易被猜到。只在這台電腦用還可以，不要拿它開公開網址。", ok: "普通", strong: "強" },
+        passwordWarn: "知道這組密碼的人，可以新增、移動、刪除你清單裡的東西。不要沿用其他網站的密碼，也不要貼到公開的聊天室。",
+        accessMode: "誰可以讀", accessChoices: { "": "連得到這個網頁的人都可以", public: "連得到這個網頁的人都可以", private: "要有密碼或分享碼才能讀" },
+        shareKey: "唯讀分享碼", shareKeyHelp: "給只會開連結的 AI（ChatGPT、Grok、Claude 網頁版）：只能讀你的清單，不能改。外流的話重產一組就好。",
+        newShareKey: "重新產生", noShareKey: "還沒有分享碼。",
+        tunnel: "給雲端 AI 的公開網址", tunnelHelp: "Claude 網頁版、ChatGPT、Grok 和其他機器上的 agent 連不到 localhost。這會透過 Cloudflare（免帳號）開一個臨時的 https 網址；每次都不一樣，driftnet 關掉就跟著關。",
+        tunnelOn: "開啟公開網址", tunnelOff: "關閉", tunnelNeedsPassword: "要先儲存管理密碼。",
+        tunnelInstall: "需要 cloudflared（driftnet 不會自動幫你下載）：", tunnelPrivate: "開啟後，「誰可以讀」會改成要有密碼或分享碼。",
+        tunnelStarting: "正在開通道…（最多 30 秒）", saveFirst: "先按儲存，再開公開網址。",
+        connect: "🔌 連接 AI",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要。選「不使用」也會分類，只是沒有摘要。"],
           DRIFTNET_LLM_MODEL: ["模型", "例如 claude-haiku-5-5、gpt-5-mini、gemini-3.8-flash、qwen3"],
@@ -511,7 +557,8 @@
       `<button type="button" class="icon" data-new="" title="${esc(T().newFolder)}" aria-label="${esc(T().newFolder)}">＋</button></div>` +
       `<div class="tree" role="list">${folderRows(null, 0)}</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
       Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>` +
-      `<div class="foot"><button type="button" data-settings>${esc(T().settings)}</button>` +
+      `<div class="foot"><button type="button" data-connect>${esc(T().st.connect)}</button>` +
+      `<button type="button" data-settings>${esc(T().settings)}</button>` +
       `<button type="button" data-export="markdown">${esc(T().exportMd)}</button>` +
       `<button type="button" data-export="vault">${esc(T().exportVault)}</button></div>`;
     $("nav").onclick = (e) => {
@@ -527,6 +574,7 @@
       if (b.dataset.edit) return openFolderDialog(b.dataset.edit);
       if (b.dataset.export) return download(b.dataset.export);
       if (b.dataset.settings !== undefined) { if (isDrawer()) setMenu(false); return openSettings(); }
+      if (b.dataset.connect !== undefined) { if (isDrawer()) setMenu(false); return openConnect(); }
       if (b.dataset.new !== undefined) return openFolderDialog(null, b.dataset.new || null);
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
@@ -758,6 +806,7 @@
       const plugins = serverSettings.plugins?.length ? serverSettings.plugins.map((p) => `<div>🧩 ${esc(p)}</div>`).join("")
         : esc(st.pluginsNone(serverSettings.file.replace(/\.env$/, "plugins/")));
       server = `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` +
+        accessPanel(serverSettings, field) +
         group("model") + group("language") + group("rules") +
         `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`;
     }
@@ -769,6 +818,82 @@
     $("settings-dlg").showModal();
   }
   $("st-cancel").onclick = () => $("settings-dlg").close();
+
+  // ── Access panel: password, who can read, share key, public URL ───────────
+  const pwStrength = (pw) => {
+    const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^\w]/].filter((r) => r.test(pw)).length;
+    if ((pw.length >= 16 && kinds >= 2) || (pw.length >= 12 && kinds >= 3)) return "strong";
+    return pw.length >= 10 && kinds >= 2 ? "ok" : "weak";
+  };
+  const randomPassword = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)).replace(/[+/=]/g, "").slice(0, 22); };
+  function accessPanel(v, field) {
+    const st = T().st, a = v.access;
+    const byKey = (k) => v.settings.find((x) => x.key === k);
+    const pw = byKey("DRIFTNET_TOKEN"), mode = byKey("DRIFTNET_ACCESS");
+    const pwInput = `<div class="keyrow"><input id="ac-pw" data-key="DRIFTNET_TOKEN" type="password" autocomplete="new-password"
+        placeholder="${esc(pw.set ? st.keep : st.unset)}" ${pw.locked ? "disabled" : ""}>
+        <button class="btn" type="button" id="ac-show" ${pw.locked ? "disabled" : ""}>${esc(st.show)}</button>
+        <button class="btn" type="button" id="ac-gen" ${pw.locked ? "disabled" : ""}>${esc(st.generate)}</button></div>
+        <div class="meter" id="ac-meter"><i></i></div><small id="ac-strength"></small>`;
+    const modeSel = `<select data-key="DRIFTNET_ACCESS" ${mode.locked ? "disabled" : ""}>${["public", "private"].map((c) =>
+      `<option value="${c}" ${(mode.value || "public") === c ? "selected" : ""}>${esc(st.accessChoices[c])}</option>`).join("")}</select>`;
+    const key = a.readKey
+      ? `<div class="keyrow"><input id="ac-key" readonly value="${esc(a.readKey)}"><button class="btn" type="button" data-copy="#ac-key">${esc(st.copy)}</button>
+         <button class="btn" type="button" id="ac-newkey" ${byKey("DRIFTNET_READ_KEY").locked ? "disabled" : ""}>${esc(st.newShareKey)}</button></div>`
+      : `<div class="keyrow"><small>${esc(st.noShareKey)}</small><span class="spacer"></span><button class="btn" type="button" id="ac-newkey">${esc(st.generate)}</button></div>`;
+    const t = a.tunnel;
+    let tun;
+    if (t.running && t.url) tun = `<div class="keyrow"><input id="ac-url" readonly value="${esc(t.url)}"><button class="btn" type="button" data-copy="#ac-url">${esc(st.copy)}</button>
+        <button class="btn danger" type="button" id="ac-tunnel" data-on="0">${esc(st.tunnelOff)}</button></div>`;
+    else if (!t.available) tun = `<p class="warn">${esc(st.tunnelInstall)}<br><code>brew install cloudflared</code> · <code>winget install Cloudflare.cloudflared</code> ·
+        <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener noreferrer">Linux</a></p>`;
+    else tun = `<button class="btn primary" type="button" id="ac-tunnel" data-on="1" ${a.passwordSet ? "" : "disabled"}>${esc(st.tunnelOn)}</button>
+        <small>${esc(a.passwordSet ? st.tunnelPrivate : st.tunnelNeedsPassword)}</small>`;
+    return `<fieldset class="set-group" id="ac"><legend>${esc(st.access)}</legend>
+      <div class="set-row"><span>${esc(st.password)} <small>DRIFTNET_TOKEN</small></span>${pwInput}
+        <small>${esc(pw.locked ? st.locked : st.passwordHelp)}</small></div>
+      <p class="warn">${esc(st.passwordWarn)}</p>
+      <label class="set-row"><span>${esc(st.accessMode)} <small>DRIFTNET_ACCESS</small></span>${modeSel}</label>
+      <div class="set-row"><span>${esc(st.shareKey)} <small>DRIFTNET_READ_KEY</small></span>${key}<small>${esc(st.shareKeyHelp)}</small></div>
+      <div class="set-row"><span>${esc(st.tunnel)}</span>${tun}<small>${esc(st.tunnelHelp)}</small>${t.error ? `<small class="dlg-error">${esc(t.error)}</small>` : ""}</div>
+    </fieldset>`;
+  }
+  async function adminFetch(path, method, body) {
+    const token = store.get("driftnet-token");
+    const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}) }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    if (!res?.ok) { $("st-error").textContent = data?.error ?? T().failed; return null; }
+    return data;
+  }
+  $("st-body").addEventListener("input", (e) => {
+    if (e.target.id !== "ac-pw") return;
+    const pw = e.target.value, s = pw ? pwStrength(pw) : "";
+    $("ac-meter").dataset.s = s;
+    $("ac-strength").textContent = s ? T().st.strength[s] : "";
+  });
+  $("st-body").addEventListener("click", async (e) => {
+    const st = T().st;
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.copy) {
+      const el = $("st-body").querySelector(b.dataset.copy) ?? $("cx-body").querySelector(b.dataset.copy);
+      await navigator.clipboard?.writeText(el.value ?? el.textContent).catch(() => {});
+      b.textContent = st.copied; setTimeout(() => (b.textContent = st.copy), 1200);
+    } else if (b.id === "ac-show") {
+      const i = $("ac-pw"); i.type = i.type === "password" ? "text" : "password"; b.textContent = i.type === "password" ? st.show : st.hide;
+    } else if (b.id === "ac-gen") {
+      const i = $("ac-pw"); i.value = randomPassword(); i.type = "text"; $("ac-show").textContent = st.hide;
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+    } else if (b.id === "ac-newkey") {
+      if (await adminFetch("/api/read-key", "POST", {})) openSettings();
+    } else if (b.id === "ac-tunnel") {
+      if (b.dataset.on === "1" && $("ac-pw")?.value) { $("st-error").textContent = st.saveFirst; return; }
+      b.disabled = true; b.textContent = b.dataset.on === "1" ? st.tunnelStarting : b.textContent;
+      if (await adminFetch("/api/tunnel", "POST", { on: b.dataset.on === "1" })) openSettings();
+      else b.disabled = false;
+    }
+  });
   $("settings-form").onsubmit = async (e) => {
     e.preventDefault();
     const body = $("st-body");
@@ -789,12 +914,61 @@
         const data = await res?.json().catch(() => ({}));
         if (!res?.ok) { $("st-error").textContent = data?.error ?? T().failed; return; }
         serverSaved = true;
+        // The page keeps working with the password it just set (or forgets a removed one).
+        if ("DRIFTNET_TOKEN" in values) values.DRIFTNET_TOKEN ? store.set("driftnet-token", values.DRIFTNET_TOKEN.trim()) : store.set("driftnet-token", "");
       }
     }
     $("settings-dlg").close();
     toast(serverSaved ? T().st.savedServer : T().saved);
     load();
   };
+
+  // ── Connect an AI: copy-paste cards with the URL and keys filled in ───────
+  async function openConnect() {
+    const t = T(), st = t.st, zh = locale === "zh-TW";
+    const token = store.get("driftnet-token");
+    const res = await fetch("/api/settings", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
+    const a = res?.ok ? (await res.json()).access : null;
+    const base = (a?.publicUrl || location.origin).replace(/\/$/, "");
+    const isLocalUrl = /\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(base);
+    const key = a?.readKey || (zh ? "<唯讀分享碼>" : "<share-key>");
+    const pw = zh ? "<你的管理密碼>" : "<your-admin-password>";
+    const withKey = (u) => (a?.private || a?.readKey ? `${u}?key=${key}` : u);
+    const card = (id, title, desc, code) => `<div class="conn"><h4>${esc(title)}</h4><p>${esc(desc)}</p>
+      <button class="btn copy" type="button" data-copy="#cx-${id}">${esc(st.copy)}</button><pre id="cx-${id}">${esc(code)}</pre></div>`;
+    const cards = [
+      card("cc", "Claude Code", zh ? "這台電腦上：裝插件（含 skill 和本機 MCP）。在別台電腦：連這個網址，可以讀也可以寫。" : "On this computer: the plugin (skill + local MCP). Elsewhere: connect to this URL, read and write.",
+        `/plugin install driftnet --marketplace KevinChu1110/driftnet\n\nclaude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer ${pw}"`),
+      card("claude", zh ? "Claude 網頁版／桌面版（自訂 connector）" : "Claude.ai / Claude Desktop (custom connector)",
+        zh ? "設定 → Connectors → 新增自訂 connector，貼上這個網址。用分享碼連線，只能搜尋和查看，不能改。" : "Settings → Connectors → Add custom connector, paste this URL. The share key makes it read-only: search and look, no changes.",
+        withKey(`${base}/mcp`)),
+      card("gpt", zh ? "ChatGPT 自訂 GPT（Actions）" : "ChatGPT custom GPT (Actions)",
+        zh ? "Actions → 從網址匯入 schema。驗證選 API Key、Bearer，填管理密碼（可寫入）或分享碼（唯讀）。" : "Actions → Import from URL. Authentication: API Key, Bearer — the admin password (read and write) or the share key (read-only).",
+        withKey(`${base}/openapi.json`)),
+      card("chat", zh ? "ChatGPT／Grok／Gemini 對話中直接用" : "ChatGPT / Grok / Gemini, right in a chat",
+        zh ? "只要 AI 會開網址就行，把這段貼進對話。唯讀。" : "Any AI that can open a link: paste this into the chat. Read-only.",
+        zh ? `讀一下 ${withKey(`${base}/llms.txt`)} ，這是我收藏的 AI 工具清單。幫我找適合「（你的需求）」的工具。`
+           : `Read ${withKey(`${base}/llms.txt`)} — it's my catalogue of AI tools. Find me one for: (your task).`),
+      card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。用管理密碼可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. With the admin password they can save, vote and work the queue.",
+        JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2)),
+    ].join("");
+    const warn = isLocalUrl
+      ? `<p class="warn danger">${esc(zh ? "這個網址只有這台電腦連得到。雲端的 AI（Claude 網頁版、ChatGPT、Grok、別台機器上的 agent）請先到 ⚙ 設定 →「存取與連線」開公開網址。"
+          : "This address only works on this computer. For cloud AIs (Claude.ai, ChatGPT, Grok, agents on other machines), open a public URL first: ⚙ Settings → Access & connections.")}</p>` : "";
+    const noKey = a && !a.readKey ? `<p class="warn">${esc(zh ? "還沒有唯讀分享碼：到 ⚙ 設定 →「存取與連線」產生一組。" : "No share key yet: make one in ⚙ Settings → Access & connections.")}</p>` : "";
+    $("cx-title").textContent = st.connect;
+    $("cx-body").innerHTML = warn + noKey + cards;
+    $("cx-close").textContent = t.cancel === "Cancel" ? "Close" : "關閉";
+    $("connect-dlg").showModal();
+  }
+  $("cx-close").onclick = () => $("connect-dlg").close();
+  $("connect-dlg").addEventListener("click", async (e) => {
+    if (e.target === $("connect-dlg")) return $("connect-dlg").close();
+    const b = e.target.closest("button[data-copy]");
+    if (!b) return;
+    await navigator.clipboard?.writeText($("cx-body").querySelector(b.dataset.copy).textContent).catch(() => {});
+    b.textContent = T().st.copied; setTimeout(() => (b.textContent = T().st.copy), 1200);
+  });
 
   // ── Notes ────────────────────────────────────────────────────────────────
   /** Write with the token; on a refusal show `errorEl` or a toast. */

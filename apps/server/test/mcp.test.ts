@@ -55,3 +55,14 @@ test("every tool explains itself: descriptions, a description on every parameter
   assert.equal((await client.callTool({ name: "driftnet_get", arguments: { id: 9999 } })).isError, true);
   await client.close();
 });
+
+test("with only the share key, an agent gets the reading tools", async () => {
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await createMcpServer(dn, "reader", { readOnly: true }).connect(a);
+  const client = new Client({ name: "t", version: "0" });
+  await client.connect(b);
+  const names = (await client.listTools()).tools.map((t) => t.name).sort();
+  assert.deepEqual(names, ["driftnet_folders", "driftnet_get", "driftnet_recent", "driftnet_search"]);
+  for (const t of (await client.listTools()).tools) assert.equal(t.annotations?.readOnlyHint, true);
+  await client.close();
+});
