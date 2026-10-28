@@ -465,6 +465,65 @@ try {
     await evaluate(s, `document.querySelector('[data-map="layout"]').click()`);
     await waitFor(s, `document.querySelectorAll(".mnode.left").length > 0`, "both sides again");
     console.log("✓ mind map: both sides by default, switch to right side and back");
+    // Focus mode: double-click a folder, only its subtree renders, breadcrumb and Esc come back; the URL carries it.
+    {
+      const sub = await evaluate(s, `(() => { const n = [...document.querySelectorAll(".mnode.folder")].find((x) => x.getAttribute("aria-expanded") === "true" || x.classList.contains("l1")); return n.dataset.key.slice(2); })()`);
+      const allNodes = await evaluate(s, `document.querySelectorAll(".mnode").length`);
+      await evaluate(s, `document.querySelector('.mnode[data-key="f:${sub}"]').dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`);
+      await waitFor(s, `!!document.querySelector(".map-crumb") && location.hash === "#focus=" + encodeURIComponent(${JSON.stringify(sub)})`, "focused on a folder");
+      assert.ok(await evaluate(s, `document.querySelectorAll(".mnode").length < ${allNodes}`), "focus renders only the subtree");
+      assert.ok(await evaluate(s, `!document.querySelector('.mnode[data-key="f:${sub}"]')`), "the focused folder is now the root");
+      await evaluate(s, `document.querySelector('.map-crumb [data-map="focus"][data-id=""]').click()`);
+      await waitFor(s, `!document.querySelector(".map-crumb") && document.querySelectorAll(".mnode").length === ${allNodes} && !location.hash.startsWith("#focus=")`, "breadcrumb returns to the full map");
+      await sleep(6500);   // z undoes while a toast is up; let the last one expire so z means "focus"
+      await evaluate(s, `document.querySelector('.mnode[data-key="f:${sub}"]').focus()`);
+      await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "z", text: "z" }, s);
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "z" }, s);
+      await waitFor(s, `!!document.querySelector(".map-crumb")`, "z focuses the folder");
+      await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape" }, s);
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape" }, s);
+      await waitFor(s, `!document.querySelector(".map-crumb")`, "Esc goes up one level");
+      console.log("✓ mind map: focus a folder (dblclick / z), breadcrumb and Esc return");
+    }
+    // Keyboard-only tree walk: roving tabindex, arrows move focus, → opens a folder, ← closes it.
+    {
+      const kd = async (k) => {
+        await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: k, ...(k.length === 1 ? { text: k } : {}) }, s);
+        await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: k }, s);
+        await sleep(120);
+      };
+      const active = () => evaluate(s, `document.activeElement?.dataset?.key ?? null`);
+      assert.equal(await evaluate(s, `document.getElementById("map-canvas").getAttribute("role")`), "tree");
+      assert.equal(await evaluate(s, `document.querySelectorAll('.mnode[tabindex="0"]').length`), 1, "one tab stop");
+      assert.equal(await evaluate(s, `document.querySelector(".mnode").getAttribute("role")`), "treeitem");
+      await evaluate(s, `document.querySelector('.mnode[data-key="root"]').focus()`);
+      await kd("ArrowDown");
+      const first = await active();
+      assert.notEqual(first, "root", "ArrowDown moves to the next node");
+      assert.equal(await evaluate(s, `document.querySelectorAll('.mnode[tabindex="0"]').length`), 1);
+      assert.equal(await evaluate(s, `document.activeElement.getAttribute("tabindex")`), "0");
+      await kd("ArrowUp");
+      assert.equal(await active(), "root");
+      await kd("End");
+      assert.notEqual(await active(), "root");
+      await kd("Home");
+      assert.equal(await active(), "root");
+      // Find a collapsed folder with contents, walk to it, → opens it, → again enters it, ← returns.
+      const closed = await evaluate(s, `(() => { const n = document.querySelector('.mnode.folder[aria-expanded="false"]'); return n && n.dataset.key; })()`);
+      if (closed) {
+        await evaluate(s, `document.querySelector('.mnode[data-key="${closed}"]').focus()`);
+        await kd("ArrowRight");
+        await waitFor(s, `document.activeElement?.dataset?.key === ${JSON.stringify(closed)} && document.activeElement.getAttribute("aria-expanded") === "true"`, "→ expands a folder");
+        await kd("ArrowRight");
+        const child = await active();
+        assert.notEqual(child, closed, "→ on an open folder enters its first child");
+        await kd("ArrowLeft");
+        assert.equal(await active(), closed, "← goes to the parent");
+        await kd("ArrowLeft");
+        await waitFor(s, `document.activeElement?.dataset?.key === ${JSON.stringify(closed)} && document.activeElement.getAttribute("aria-expanded") === "false"`, "← collapses");
+      }
+      console.log("✓ mind map: keyboard tree walk (roving tabindex, arrows, expand/collapse)");
+    }
     await evaluate(s, `document.querySelector('[data-map="fit"]').click()`);
     await sleep(300);
     await shoot(`web-map-${LANG}.png`);

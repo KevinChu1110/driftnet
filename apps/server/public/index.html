@@ -166,6 +166,11 @@
   /* The mind map: folders branch out to the right; drag cards onto folders. */
   .map-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .map-bar .btn { min-height: 40px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; }
+  .map-crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 8px 0 0; font-size: 14px; }
+  .map-crumb button { background: none; border: 0; padding: 6px 4px; min-height: 32px; color: var(--accent, inherit); font: inherit; cursor: pointer; text-decoration: underline; }
+  .map-crumb [aria-current] { font-weight: 600; padding: 6px 4px; }
+  .map-crumb .sep { color: var(--muted); }
+  .mnode:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
   .map-tip { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
   .map-wrap { position: relative; overflow: auto; height: 70vh; min-height: 320px; border: 1px solid var(--line);
               border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); touch-action: pan-x pan-y pinch-zoom; overscroll-behavior: contain;
@@ -491,6 +496,7 @@
     <label><span id="fd-parent-l"></span><select id="fd-parent"></select></label>
     <div class="dlg-actions">
       <button class="btn danger" id="fd-delete" type="button"></button><span class="spacer"></span>
+      <button class="btn" id="fd-focus" type="button" hidden></button>
       <button class="btn" id="fd-cancel" type="button"></button><button class="btn primary" id="fd-save" type="submit"></button>
     </div>
   </form>
@@ -587,6 +593,10 @@
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
+      mapAll: "All", focusCrumb: "Mind map location", focusUp: "Up one level", focusFolder: "Focus on this folder", mapTree: "Mind map",
+      mapHintFocus: "Double-click a folder (or press z on it) to focus on it.",
+      kTreeNav: "Mind map: next / previous node", kTreeOpen: "Open a folder, or step into it", kTreeClose: "Close a folder, or step out to its parent", kTreeEnds: "First / last node", kTreeType: "Type a name", kTreeTypeText: "Jump to the node starting with it",
+      kFocus: "Focus on the folder (mind map)", kFocusUp: "Back up one level (mind map)", keysMap: "Mind map",
       map: "Mind map", mapHint: "Tap a folder to open it, tap a card to preview it. To file a card: drag it onto a folder — on a phone, hold it a moment, let go, then tap the folder. ⋯ renames a folder.",
       a11yFolder: (n, c) => `Folder ${n}, ${c} cards`, a11yCard: (n) => `Card ${n}`,
       expandAll: "Expand all", collapseAll: "Collapse all", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", openCard: "Open card",
@@ -694,6 +704,10 @@
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
+      mapAll: "全部", focusCrumb: "樹狀圖位置", focusUp: "回上一層", focusFolder: "聚焦這個資料夾", mapTree: "樹狀圖",
+      mapHintFocus: "連點兩下資料夾（或在資料夾上按 z）可以只看這個資料夾。",
+      kTreeNav: "樹狀圖：下一個／上一個節點", kTreeOpen: "展開資料夾，或進入第一個子項", kTreeClose: "收合資料夾，或回到上一層", kTreeEnds: "第一個／最後一個節點", kTreeType: "直接輸入名稱", kTreeTypeText: "跳到名稱開頭相符的節點",
+      kFocus: "聚焦這個資料夾（樹狀圖）", kFocusUp: "回上一層（樹狀圖）", keysMap: "樹狀圖",
       map: "樹狀圖", mapHint: "點資料夾展開，點卡片預覽。整理卡片：把它拖到資料夾上；手機上按住卡片一下、放開，再點要放進去的資料夾。按 ⋯ 可以改資料夾名稱。",
       a11yFolder: (n, c) => `資料夾 ${n}，${c} 張卡片`, a11yCard: (n) => `卡片 ${n}`,
       expandAll: "全部展開", collapseAll: "全部收合", zoomIn: "放大", zoomOut: "縮小", fit: "符合畫面", openCard: "開啟卡片",
@@ -1028,12 +1042,16 @@
     del.hidden = !id || id === "other";
     del.textContent = t.del;
     del.classList.remove("armed");
+    const fb = $("fd-focus");
+    fb.hidden = !id || state.view !== "map" || id === mapFocus;
+    fb.textContent = t.focusFolder;
     $("fd-cancel").textContent = t.cancel;
     $("fd-save").textContent = t.save;
     $("fd-error").textContent = "";
     $("folder-dlg").showModal();
     $("fd-name").focus();
   }
+  $("fd-focus").onclick = () => { $("folder-dlg").close(); setMapFocus(editing); };
   $("fd-cancel").onclick = () => $("folder-dlg").close();
   // Delete asks twice inside the dialog (no browser confirm box).
   $("fd-delete").onclick = async () => {
@@ -1506,6 +1524,41 @@
   /** both: branches on both sides of the root (XMind's default); right: all to the right. */
   let mapLayout = store.get("driftnet-map-layout") || "both";
   let mapItems = [];
+  /** The folder the map is focused on (null = the whole map); lives in the URL hash so it survives a reload. */
+  let mapFocus = null;
+  /** Zoom and scroll per focus root, so stepping back up returns to where you were. */
+  const mapViews = new Map();
+  /** Roving tabindex: the one node Tab lands on. */
+  let mapActive = "root";
+  const focusFromHash = () => { const m = /^#focus=(.+)$/.exec(location.hash); try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; } };
+  function syncFocusHash() {
+    const want = state.view === "map" && mapFocus ? `#focus=${encodeURIComponent(mapFocus)}` : "";
+    if (want === location.hash || (!want && !location.hash.startsWith("#focus="))) return;
+    history.replaceState(null, "", location.pathname + location.search + want);
+  }
+  /** Focus the map on a folder (null = back to everything), remembering where each view was. */
+  async function setMapFocus(id) {
+    id = id && folderById(id) ? id : null;
+    if (id === mapFocus) return;
+    const wrap = $("map-wrap"), prev = mapFocus;
+    mapViews.set(prev ?? "", { zoom: mapZoom, left: wrap?.scrollLeft ?? 0, top: wrap?.scrollTop ?? 0 });
+    mapFocus = id;
+    // Stepping up: make sure the folder we came from is visible so focus can return to it.
+    mapActive = "root";
+    if (prev && (id === null || isUnder(prev, id))) {
+      for (let p = folderById(prev)?.parent; p && p !== id; p = folderById(p)?.parent) mapOpen.add(p);
+      saveMapOpen();
+      mapActive = `f:${prev}`;
+    }
+    const saved = mapViews.get(id ?? "");
+    if (saved) mapZoom = saved.zoom;
+    syncFocusHash();
+    await renderMap();
+    if (saved) { const w = $("map-wrap"); w.scrollLeft = saved.left; w.scrollTop = saved.top; }
+    ($("map-canvas")?.querySelector(`.mnode[data-key="${CSS.escape(mapActive)}"]`) ?? $("map-canvas")?.querySelector('.mnode[data-key="root"]'))?.focus({ preventScroll: true });
+  }
+  const isUnder = (id, anc) => { for (let p = folderById(id)?.parent; p; p = folderById(p)?.parent) if (p === anc) return true; return false; };
+  const mapUp = () => setMapFocus(folderById(mapFocus)?.parent ?? null);
   /** Cards shown per folder before the rest fold into a "+N" node. */
   const MAP_CAP = 15;
 
@@ -1517,14 +1570,24 @@
       if (err.unauthorized) return askToken();
       throw err;
     }
+    if (mapFocus && !folderById(mapFocus)) mapFocus = null;
+    syncFocusHash();
+    const crumb = mapFocus ? (() => {
+      const chain = [];
+      for (let p = mapFocus; p; p = folderById(p)?.parent) chain.unshift(p);
+      return `<nav class="map-crumb" aria-label="${esc(t.focusCrumb)}"><button type="button" data-map="focus" data-id="">${esc(t.mapAll)}</button>` +
+        chain.map((id, n) => `<span class="sep" aria-hidden="true">›</span>` + (n === chain.length - 1
+          ? `<span aria-current="location">${esc(catLabel(id))}</span>`
+          : `<button type="button" data-map="focus" data-id="${esc(id)}">${esc(catLabel(id))}</button>`)).join("") + `</nav>`;
+    })() : "";
     const allOpen = mapOpen.size > 0 || !!state.q;
-    const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip">${esc(t.mapHint)} <button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
+    const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip">${esc(t.mapHint)} ${esc(t.mapHintFocus)} <button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
     $("list").innerHTML = `<div class="map-bar">
         <button class="btn" type="button" data-map="${allOpen ? "collapse" : "expand"}">${ic(allOpen ? "collapse" : "expand")} ${esc(allOpen ? t.collapseAll : t.expandAll)}</button>
         <button class="btn" type="button" data-map="new">${ic("plus")} ${esc(t.newFolder)}</button>
         <button class="btn" type="button" data-map="layout" aria-pressed="${mapLayout === "both"}" title="${esc(t.layoutHelp)}">${ic(mapLayout === "both" ? "both" : "map")} ${esc(mapLayout === "both" ? t.layoutBoth : t.layoutRight)}</button>
         ${state.q ? `<span class="hint">${esc(t.mapSearch(state.q))}</span>` : ""}</div>
-      ${tip}
+      ${crumb}${tip}
       <div class="map-shell"><div class="map-wrap" id="map-wrap"><div class="map-canvas" id="map-canvas"></div></div>
         <div class="map-zoom" role="group" aria-label="${esc(t.zoom)}">
           <button type="button" data-map="out" aria-label="${esc(t.zoomOut)}">${ic("minus")}</button>
@@ -1583,38 +1646,55 @@
     for (const i of mapItems) byFolder.set(i.category, [...(byFolder.get(i.category) ?? []), i]);
     const total = (f) => (byFolder.get(f.id)?.length ?? 0) + kids(f.id).reduce((n, c) => n + total(c), 0);
     const hits = (f) => (byFolder.get(f.id) ?? []).some(hit) || kids(f.id).some(hits);
+    /** What hangs under folder f: its sub-folders, then its cards (capped), then a "+N" node. */
+    const content = (f, depth, color, colorOf) => {
+      const cards = byFolder.get(f.id) ?? [];
+      const out = kids(f.id).map((c, n) => build(c, depth, colorOf ? colorOf(n) : color));
+      const shown = q ? [...cards.filter(hit), ...cards.filter((i) => !hit(i))] : cards;
+      out.push(...shown.slice(0, MAP_CAP).map((i) => ({ key: `i:${i.id}`, type: "item", id: i.id, depth, color,
+        label: (i.summary?.name ?? i.title).slice(0, 32), worth: i.worth, hit: hit(i), children: [] })));
+      if (cards.length > MAP_CAP) out.push({ key: `m:${f.id}`, type: "more", id: f.id, depth, color, label: T().more(cards.length - MAP_CAP), children: [] });
+      return out;
+    };
     const build = (f, depth, color) => {
       // While searching, folders holding a match open by themselves (not saved).
       const open = mapOpen.has(f.id) || (q && hits(f));
       const cards = byFolder.get(f.id) ?? [];
       const node = { key: `f:${f.id}`, type: "folder", id: f.id, label: catLabel(f.id), count: total(f), depth, color, open, children: [],
         hasKids: kids(f.id).length > 0 || cards.length > 0, hit: q && f.id && catLabel(f.id).toLowerCase().includes(q) };
-      if (open) {
-        node.children.push(...kids(f.id).map((c) => build(c, depth + 1, color)));
-        const shown = q ? [...cards.filter(hit), ...cards.filter((i) => !hit(i))] : cards;
-        node.children.push(...shown.slice(0, MAP_CAP).map((i) => ({ key: `i:${i.id}`, type: "item", id: i.id, depth: depth + 1, color,
-          label: (i.summary?.name ?? i.title).slice(0, 32), worth: i.worth, hit: hit(i), children: [] })));
-        if (cards.length > MAP_CAP) node.children.push({ key: `m:${f.id}`, type: "more", id: f.id, depth: depth + 1, color, label: T().more(cards.length - MAP_CAP), children: [] });
-      }
+      if (open) node.children = content(f, depth + 1, color);
       return node;
     };
-    const root = { key: "root", type: "root", label: "driftnet", count: mapItems.length, depth: 0, color: "var(--m1)",
-      children: kids(null).map((f, n) => build(f, 1, `var(--m${(n % 8) + 1})`)) };
+    const colorN = (n) => `var(--m${(n % 8) + 1})`;
+    const focusF = mapFocus ? folderById(mapFocus) : null;
+    // Focused: the folder itself is the root, with its own cards beside its sub-folders.
+    const root = focusF
+      ? { key: "root", type: "root", label: catLabel(focusF.id), count: total(focusF), depth: 0, color: "var(--m1)", children: content(focusF, 1, "var(--m1)", colorN) }
+      : { key: "root", type: "root", label: "driftnet", count: mapItems.length, depth: 0, color: "var(--m1)",
+          children: kids(null).map((f, n) => build(f, 1, colorN(n))) };
 
     // Pass 1: create the nodes and measure them.
     const flat = [];
     const walk = (n) => { flat.push(n); n.children.forEach(walk); };
     walk(root);
     canvas.classList.toggle("searching", !!q);
-    canvas.innerHTML = `<svg id="map-svg"></svg>` + flat.map((n) => {
+    canvas.setAttribute("role", "tree");
+    canvas.setAttribute("aria-label", T().mapTree);
+    const nodeKeys = new Set(flat.map((n) => n.key));
+    if (!nodeKeys.has(mapActive)) mapActive = "root";
+    // Sibling position for aria-setsize / aria-posinset (nodes are absolutely positioned, so no group wrappers).
+    flat[0].setsize = 1; flat[0].pos = 1;
+    for (const n of flat) n.children.forEach((c, k) => { c.setsize = n.children.length; c.pos = k + 1; });
+    canvas.innerHTML = `<svg id="map-svg" aria-hidden="true"></svg>` + flat.map((n) => {
       const level = n.type === "folder" ? (n.depth === 1 ? "l1" : "l2") : "";
       const tw = n.type === "folder" && n.hasKids ? `<span class="tw ${n.open ? "open" : ""}">${ic("chev")}</span>` : "";
       const cnt = (n.type === "folder" || n.type === "root") && n.count ? `<span class="cnt">${n.count}</span>` : "";
       const star = n.type === "item" && n.worth === "must-see" ? `<span class="w">${ic("star", "filled")}</span>` : "";
       const more = n.type === "folder" ? `<span class="opt" data-edit="${esc(n.id)}" aria-hidden="true" title="${esc(T().editFolder)}">${ic("dots")}</span>` : "";
       const name = n.type === "folder" ? T().a11yFolder(n.label, n.count) : n.type === "item" ? T().a11yCard(n.label) : n.label;
-      const aria = ` aria-label="${esc(name)}" aria-level="${n.depth + 1}"` + (n.type === "folder" && n.hasKids ? ` aria-expanded="${!!n.open}"` : "");
-      return `<div class="mnode ${n.type} ${level} ${n.type === "folder" && !n.hasKids ? "vacant" : ""} ${n.hit ? "hit" : ""} ${n.type === "item" && selected.has(Number(n.key.slice(2))) ? "sel" : ""}" role="button" tabindex="0"${aria}
+      const aria = ` aria-label="${esc(name)}" aria-level="${n.depth + 1}" aria-setsize="${n.setsize}" aria-posinset="${n.pos}"`
+        + (n.type === "root" ? (n.children.length ? ` aria-expanded="true"` : "") : n.type === "folder" && n.hasKids ? ` aria-expanded="${!!n.open}"` : "");
+      return `<div class="mnode ${n.type} ${level} ${n.type === "folder" && !n.hasKids ? "vacant" : ""} ${n.hit ? "hit" : ""} ${n.type === "item" && selected.has(Number(n.key.slice(2))) ? "sel" : ""}" role="treeitem" tabindex="${n.key === mapActive ? 0 : -1}"${aria}
         data-key="${esc(n.key)}" style="--c:${n.color}">${tw}${star}<span class="t">${esc(n.label)}</span>${cnt}${more}</div>`;
     }).join("");
     const el = new Map([...canvas.querySelectorAll(".mnode")].map((d) => [d.dataset.key, d]));
@@ -1747,12 +1827,13 @@
     else if (a === "in") mapZoomTo(mapZoom + 0.1);
     else if (a === "out") mapZoomTo(mapZoom - 0.1);
     else if (a === "fit") fitMap();
+    else if (a === "focus") setMapFocus(b.dataset.id || null);
   });
   $("list").addEventListener("dblclick", (e) => {
     const node = e.target.closest(".mnode.folder");
     if (!node) return;
     clearTimeout(folderTap);
-    openFolderDialog(node.dataset.key.slice(2));
+    setMapFocus(node.dataset.key.slice(2));
   });
 
   /**
@@ -1839,7 +1920,7 @@
       if (!p.drag && e.shiftKey && role === "admin" && p.key.startsWith("i:")) return toggleSelect(Number(p.key.slice(2)));
       if (!p.drag) return tapNode(p.key, !p.touch);
       if (!target) return;
-      const to = target.dataset.key === "root" ? null : target.dataset.key.slice(2);
+      const to = target.dataset.key === "root" ? mapFocus : target.dataset.key.slice(2);
       // Dragging one of several selected cards takes them all.
       if (p.key.startsWith("i:") && selected.has(Number(p.key.slice(2))) && selected.size > 1) { if (to) await bulkApply("move", [...selected], to); }
       else if (p.key.startsWith("i:")) await mapMoveItem(Number(p.key.slice(2)), to);
@@ -1853,9 +1934,56 @@
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapNode(node.dataset.key); }
       else if ((e.key === "F2" || e.key === "e") && node.dataset.key.startsWith("f:") && role === "admin") { e.preventDefault(); openFolderDialog(node.dataset.key.slice(2)); }
       else if (e.key === "m" && node.dataset.key.startsWith("i:") && role === "admin") { e.preventDefault(); openMovePicker(Number(node.dataset.key.slice(2))); }
+      else if (e.key === "z" && node.dataset.key.startsWith("f:") && !lastUndo) { e.preventDefault(); setMapFocus(node.dataset.key.slice(2)); }
+      else treeKey(e, node);
     });
   })();
   let folderTap = null;
+  /** WAI-ARIA tree keys on the map: arrows, Home/End, type-ahead. Nodes are in tree (document) order. */
+  let typed = "", typedAt = 0;
+  function treeKey(e, node) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const nodes = [...$("map-canvas").querySelectorAll(".mnode")], at = nodes.indexOf(node);
+    const go = (el) => { if (!el) return; el.focus({ preventScroll: true }); el.scrollIntoView({ block: "nearest", inline: "nearest" }); };
+    const level = (n) => Number(n.getAttribute("aria-level"));
+    const key = node.dataset.key, k = e.key;
+    const folderId = key.startsWith("f:") ? key.slice(2) : null;
+    const expanded = node.getAttribute("aria-expanded");
+    if (k === "ArrowDown") go(nodes[Math.min(nodes.length - 1, at + 1)]);
+    else if (k === "ArrowUp") go(nodes[Math.max(0, at - 1)]);
+    else if (k === "Home") go(nodes[0]);
+    else if (k === "End") go(nodes[nodes.length - 1]);
+    else if (k === "ArrowRight") {
+      if (expanded === "false" && folderId) toggleFolder(folderId);
+      else if (expanded === "true" && nodes[at + 1] && level(nodes[at + 1]) === level(node) + 1) go(nodes[at + 1]);
+    } else if (k === "ArrowLeft") {
+      if (expanded === "true" && folderId && mapOpen.has(folderId)) toggleFolder(folderId);
+      else { let p = at - 1; while (p >= 0 && level(nodes[p]) >= level(node)) p--; if (p >= 0) go(nodes[p]); }
+    } else if (k.length === 1 && k !== " " || (k === " " && typed)) {
+      const now = Date.now();
+      const fresh = now - typedAt > 700;
+      // Letters that already do something here (and the global shortcuts) can't start a search.
+      const acts = (fresh || !typed) && (/[0-9/?#gGzZ]/.test(k) || ((k === "e" || k === "E") && folderId && role === "admin") || ((k === "m" || k === "M") && key.startsWith("i:") && role === "admin"));
+      if (acts) return;
+      typed = (fresh ? "" : typed) + k.toLowerCase(); typedAt = now;
+      const label = (n) => (n.querySelector(".t")?.textContent ?? "").toLowerCase();
+      const order = [...nodes.slice(at + (typed.length > 1 ? 0 : 1)), ...nodes.slice(0, at + (typed.length > 1 ? 0 : 1))];
+      const hit = order.find((n) => label(n).startsWith(typed));
+      e.stopPropagation();   // not the global shortcuts (f, n, x, j, k …)
+      e.preventDefault();
+      go(hit);
+      return;
+    } else return;
+    e.preventDefault();
+  }
+  // Roving tabindex: whichever node has focus is the one Tab lands on next time.
+  $("list").addEventListener("focusin", (e) => {
+    const node = e.target.closest?.(".mnode");
+    if (!node || node.dataset.key === mapActive) return;
+    $("map-canvas").querySelector(`.mnode[tabindex="0"]`)?.setAttribute("tabindex", "-1");
+    node.setAttribute("tabindex", "0");
+    mapActive = node.dataset.key;
+  });
   /**
    * Picking up (touch): hold a card or folder, let go, then tap the folder it goes into.
    * Nothing competes with scrolling, and no precise finger drag is needed.
@@ -1894,12 +2022,12 @@
       if (key.startsWith("f:") || (key === "root" && what.startsWith("f:"))) {
         const ids = what.startsWith("i:") && selected.size > 1 ? [...selected] : null;
         dropPicked();
-        const to = key === "root" ? null : key.slice(2);
+        const to = key === "root" ? mapFocus : key.slice(2);
         if (ids) return to ? bulkApply("move", ids, to) : undefined;
         return what.startsWith("i:") ? mapMoveItem(Number(what.slice(2)), to) : mapMoveFolder(what.slice(2), to);
       }
     }
-    // A mouse double-click edits the folder, so a single click waits a moment to be sure.
+    // A mouse double-click focuses the folder, so a single click waits a moment to be sure.
     if (key.startsWith("f:") && viaMouse) { clearTimeout(folderTap); folderTap = setTimeout(() => toggleFolder(key.slice(2)), 230); return; }
     if (key.startsWith("f:")) toggleFolder(key.slice(2));
     else if (key.startsWith("i:")) openPeek(Number(key.slice(2)));
@@ -2257,6 +2385,7 @@
     if (state.view !== "map" && picked) dropPicked();
     if (state.view === "notes") return renderNotes();
     if (state.view === "map") return renderMap();
+    syncFocusHash();
     const p = new URLSearchParams({ limit: "300" });
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
     if (state.view !== "all") p.set("view", state.view);
@@ -2493,6 +2622,12 @@
   });
   // A "found in" link to a card outside the current filter: show everything, then jump.
   addEventListener("hashchange", () => {
+    if (location.hash.startsWith("#focus=")) {
+      const id = focusFromHash();
+      if (state.view !== "map") { mapFocus = id; Object.assign(state, { view: "map", category: "" }); load(); }
+      else setMapFocus(id);
+      return;
+    }
     if (/^#item-\d+$/.test(location.hash) && !document.getElementById(location.hash.slice(1))) {
       Object.assign(state, { view: "all", category: "", kind: "", q: "" });
       $("q").value = "";
@@ -2607,7 +2742,9 @@
       `<h4>${esc(t.keysMove)}</h4>` + row(["j", "k"], t.kNext) + row(["f"], t.kFav) + row(["m"], t.kMove) + row(["n"], t.kNote) + row(["#"], t.kTrash) +
       `<h4>${esc(t.keysSelect)}</h4>` + row(["x"], t.kSelect) + row(["Shift", "click"], t.kRange) + row([t.kHold], t.kLong) + row(["Esc"], t.kClear) +
       `<h4>${esc(t.keysQuick)}</h4>` + (quick.length ? quick.map((id, i) => row([String(i + 1)], t.kQuickN(catLabel(id)))).join("") : `<dd style="grid-column:1/-1">${esc(t.kQuickNone)}</dd>`) +
-      `<h4>${esc(t.keysGo)}</h4>` + row(["/"], t.kSearch) + row(["g", "m"], t.kMap) + row(["g", "a"], t.kAll) + row(["z"], t.kUndo) + row(["?"], t.kHelp);
+      `<h4>${esc(t.keysGo)}</h4>` + row(["/"], t.kSearch) + row(["g", "m"], t.kMap) + row(["g", "a"], t.kAll) + row(["z"], t.kUndo) + row(["?"], t.kHelp) +
+      `<h4>${esc(t.keysMap)}</h4>` + row(["↓", "↑"], t.kTreeNav) + row(["→"], t.kTreeOpen) + row(["←"], t.kTreeClose) + row(["Home", "End"], t.kTreeEnds) +
+      row([t.kTreeType], t.kTreeTypeText) + row(["z"], t.kFocus) + row(["Esc", "Backspace"], t.kFocusUp);
     $("keys-dlg").showModal();
   }
   $("ky-close").onclick = () => $("keys-dlg").close();
@@ -2645,6 +2782,7 @@
     const k = e.key, prev = lastKey;
     lastKey = k;
     if (k === "Escape" && selected.size) { clearSelection(); return; }
+    if ((k === "Escape" || k === "Backspace") && state.view === "map" && mapFocus && !picked && !document.body.classList.contains("menu-open")) { e.preventDefault(); mapUp(); return; }
     if (k === "/") { e.preventDefault(); $("q").focus(); return; }
     if ((k === "z" || k === "u") && lastUndo) { e.preventDefault(); $("toast-undo").click(); return; }
     if (k === "?") { openKeys(); return; }
@@ -2678,6 +2816,7 @@
     load();
   };
   let timer;
+  if (location.hash.startsWith("#focus=")) { mapFocus = focusFromHash(); state.view = "map"; }
   $("q").oninput = (e) => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 200); };
   load();
 </script>
