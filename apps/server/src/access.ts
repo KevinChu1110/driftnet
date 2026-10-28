@@ -35,16 +35,24 @@ function same(given: string | null | undefined, want: string | undefined): boole
 const bearer = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim() || null;
 const queryKey = (req: IncomingMessage) => new URL(req.url ?? "/", "http://x").searchParams.get("key");
 
+type Agent = { id: string; name: string; scope: "read" | "write" };
+/** One lookup per request, including "none": a request asks who it is three or four times. */
+const agents = new WeakMap<IncomingMessage, Agent | null>();
+
 /**
  * The agent token in the Authorization header, if it is active. Only a header,
  * never a URL. The lookup is by sha256 of the given value, a fixed-length digest
- * of a random token, so there is nothing to time. Marks the token as used.
+ * of a random token, so there is nothing to time. Marks the token as used, once
+ * per request: the answer is remembered for the rest of it.
  */
-export function agentOf(req: IncomingMessage, store: Store | undefined): { id: string; name: string; scope: "read" | "write" } | null {
+export function agentOf(req: IncomingMessage, store: Store | undefined): Agent | null {
+  const cached = agents.get(req);
+  if (cached !== undefined) return cached;
   const given = bearer(req);
   if (!store || !given) return null;
   const found = store.findAgentToken(hashToken(given));
   if (found) store.touchAgentToken(found.id);
+  agents.set(req, found);
   return found;
 }
 
