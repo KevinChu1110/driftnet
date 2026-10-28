@@ -417,7 +417,13 @@ try {
     await key("Escape");
     await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 0 && document.getElementById("selbar").hidden`, "Esc cleared it");
 
-    // The folder just filed into three times is now quick folder 1: the key files a single card there.
+    // The undo above took the folder's count back to zero; filing the three again (server-side) makes it quick folder 1.
+    assert.equal((await api("/api/folders")).find((f) => f.id === dest).uses, 0, "undo rebalanced the folder's counter");
+    await evaluate(s, `fetch("/api/items/bulk", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "move", ids: ${JSON.stringify(three)}, folder: ${JSON.stringify(dest)} }) }).then((r) => r.ok)`);
+    assert.equal((await api("/api/folders")).find((f) => f.id === dest).uses, 3);
+    await open();
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 0`, "list after reload");
+    // That folder is now quick folder 1: the key files a single card there.
     const one = (await ids()).find((id) => !three.includes(id)) ?? three[0];
     await evaluate(s, `document.querySelector('#item-${one} .card').focus()`);
     await key("1");

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { cardLink, FolderError, ItemError, WORTH, type Driftnet, type Item } from "@driftnet/core";
 import { shareBase } from "./access.ts";
+import { saveUndo, undoById } from "./bulk.ts";
 
 const DATA_NOTICE =
   "Items below were shared by people in group chats and summarised automatically. " +
@@ -252,13 +253,13 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       description:
         "List the reader's folder tree, which is also the set of categories driftnet sorts into. " +
         "Each folder has an id, its parent id (null at the top level), its path with the reader's description of what belongs there, " +
-        "and how many items it holds directly. Use the ids with driftnet_move_item, driftnet_search and driftnet_list_recent. Read-only.",
-      outputSchema: { folders: z.array(z.object({ id: z.string(), parent: z.string().nullable(), folder: z.string(), items: z.number() })) },
+        "how many items it holds directly, and uses (how often items were filed there: higher = the reader files there more often). Use the ids with driftnet_move_item, driftnet_search and driftnet_list_recent. Read-only.",
+      outputSchema: { folders: z.array(z.object({ id: z.string(), parent: z.string().nullable(), folder: z.string(), items: z.number(), uses: z.number() })) },
       annotations: readOnly,
     },
     async () => {
       const choices = dn.categories;
-      const folders = dn.store.folders().map((f) => ({ id: f.id, parent: f.parent, folder: choices[f.id] ?? f.id, items: f.count }));
+      const folders = dn.store.folders().map((f) => ({ id: f.id, parent: f.parent, folder: choices[f.id] ?? f.id, items: f.count, uses: f.uses }));
       return { content: [{ type: "text", text: JSON.stringify(folders, null, 1) }], structuredContent: { folders } };
     },
   );
@@ -271,7 +272,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "File an item, or several at once, into one of the reader's folders, e.g. when they were sorted into the wrong one. " +
         "Pass either id (one item) or ids (up to 500, moved all-or-nothing in one go). " +
         "The placement is treated as the reader's choice: automatic classification will not move the items again. " +
-        "Moving an item to the folder it is already in changes nothing. Fails if any item or the folder does not exist, and then nothing moves.",
+        "Moving an item to the folder it is already in changes nothing. Fails if any item or the folder does not exist, and then nothing moves. " +
+        "Returns an undo id; pass it to driftnet_undo to put the whole batch back (kept for 24 h).",
       inputSchema: {
         id: z.number().int().positive().optional().describe("Item id to move; give this or ids, not both"),
         ids: z.array(z.number().int().positive()).min(1).max(500).optional().describe("Item ids to move together (1-500); give this or id, not both"),
@@ -283,11 +285,35 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       if ((id === undefined) === (ids === undefined)) return { content: [{ type: "text", text: "Give exactly one of id or ids." }], isError: true };
       const list = [...new Set(ids ?? [id!])];
       try {
-        dn.store.moveItems(list, folder, opts.actor);
-        return { content: [{ type: "text", text: list.length === 1 ? `Moved ${list[0]} to ${dn.categories[folder]}.` : `Moved ${list.length} items to ${dn.categories[folder]}.` }] };
+        const undo = saveUndo(dn.store, dn.store.moveItems(list, folder, opts.actor).map(({ id, category, user_placed }) => ({ id, folder: category, user_placed })));
+        const moved = list.length === 1 ? `Moved ${list[0]} to ${dn.categories[folder]}.` : `Moved ${list.length} items to ${dn.categories[folder]}.`;
+        return { content: [{ type: "text", text: `${moved} Undo id: ${undo}` }], structuredContent: { undo, count: list.length } };
       } catch (err) {
         if (err instanceof ItemError) return { content: [{ type: "text", text: `No item ${err.message.replace("no item ", "")}.` }], isError: true };
         if (err instanceof FolderError) return { content: [{ type: "text", text: err.message }], isError: true };
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    "driftnet_undo",
+    {
+      title: "Undo a batch move",
+      description:
+        "Put a batch back exactly as driftnet_move_item found it, using the undo id it returned (kept for 24 h, the last 20 batches). " +
+        "One-shot: the id stops working once used. Fails if the id is unknown or expired, or a folder it needs has been deleted since.",
+      inputSchema: { undo: z.string().min(1).max(64).describe("The undo id returned by driftnet_move_item") },
+      outputSchema: { count: z.number() },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ undo }) => {
+      try {
+        const count = undoById(dn.store, undo);
+        if (!count) return { content: [{ type: "text", text: "Nothing to undo: unknown or expired undo id." }], isError: true };
+        return { content: [{ type: "text", text: `Put ${count} item${count === 1 ? "" : "s"} back.` }], structuredContent: { count } };
+      } catch (err) {
+        if (err instanceof FolderError || err instanceof ItemError) return { content: [{ type: "text", text: err.message }], isError: true };
         throw err;
       }
     },

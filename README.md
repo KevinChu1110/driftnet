@@ -261,6 +261,7 @@ Give each agent its own key instead of the admin password: **Settings → Access
 | `driftnet_lease_pending` / `driftnet_enrich` | Work the queue, below |
 | `driftnet_get_item` | One card in full: summary, use cases, your note, what people said in chat, tools found inside |
 | `driftnet_list_folders` / `driftnet_move_item` | Read your folder tree, file items into it |
+| `driftnet_undo` | Put a batch move back, using the undo id `driftnet_move_item` returned |
 | `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | Add, rename or re-describe, and delete folders (contents move up; the one tool marked destructive) |
 | `driftnet_trash_item` / `driftnet_restore_item` / `driftnet_favorite_item` / `driftnet_set_note` | Tidy cards: trash (always restorable), star, write the note |
 

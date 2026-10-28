@@ -234,6 +234,7 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 | `driftnet_lease_pending`／`driftnet_enrich` | 整理佇列，見下方 |
 | `driftnet_get_item` | 查看一張卡片的全部內容：摘要、用途、你的筆記、聊天室裡大家說的話、從裡面找到的工具 |
 | `driftnet_list_folders`／`driftnet_move_item` | 讀你的資料夾樹、把卡片放進去 |
+| `driftnet_undo` | 用 `driftnet_move_item` 回傳的復原代碼，把整批移動放回去 |
 | `driftnet_create_folder`／`driftnet_update_folder`／`driftnet_delete_folder` | 新增、改名或改說明、刪除資料夾（內容會移到上一層；唯一標為「破壞性」的工具） |
 | `driftnet_trash_item`／`driftnet_restore_item`／`driftnet_favorite_item`／`driftnet_set_note` | 整理卡片：丟垃圾桶（隨時可還原）、加最愛、寫筆記 |
 

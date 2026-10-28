@@ -38,6 +38,15 @@ test("agents can read the folder tree, add a folder and file an item into it", a
   const many = await client.callTool({ name: "driftnet_move_item", arguments: { ids: [item.id, second.id], folder: "other" } });
   assert.match(text(many), /Moved 2 items/);
   assert.equal(dn.store.get(second.id)!.category, "other");
+  // The batch can be reverted with the id it returned, once.
+  const undo = (many.structuredContent as { undo: string }).undo;
+  assert.match(text(many), new RegExp(undo));
+  assert.equal((await client.callTool({ name: "driftnet_undo", arguments: { undo } })).isError, undefined);
+  assert.deepEqual([dn.store.get(item.id)!.category, dn.store.get(second.id)!.category], ["games", "other"]);
+  assert.equal((await client.callTool({ name: "driftnet_undo", arguments: { undo } })).isError, true);
+  await client.callTool({ name: "driftnet_move_item", arguments: { ids: [item.id, second.id], folder: "other" } });
+  const listed = JSON.parse(text(await client.callTool({ name: "driftnet_list_folders", arguments: {} })));
+  assert.equal(listed.find((f: { id: string }) => f.id === "other").uses, 2);
   assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { ids: [item.id, 999], folder: "games" } })).isError, true);
   assert.equal(dn.store.get(item.id)!.category, "other", "a bad id moves nothing");
   assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { folder: "games" } })).isError, true);
@@ -48,7 +57,7 @@ test("agents can read the folder tree, add a folder and file an item into it", a
 test("every tool explains itself: descriptions, a description on every parameter, annotations", async () => {
   const client = await connect();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 16);
+  assert.equal(tools.length, 17);
   for (const t of tools) {
     assert.ok((t.description ?? "").length > 150, `${t.name}: description too thin`);
     assert.ok(t.annotations && t.annotations.readOnlyHint !== undefined && t.annotations.destructiveHint !== undefined, `${t.name}: annotations`);
