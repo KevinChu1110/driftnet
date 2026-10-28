@@ -8,6 +8,8 @@
 [English](README.md) · **繁體中文**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
+[![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
 ![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
 ![Runs locally](https://img.shields.io/badge/runs-locally-0f9f8f.svg)
 ![Any model](https://img.shields.io/badge/model-any%20%C2%B7%20or%20none-2459e0.svg)
@@ -64,6 +66,15 @@ pnpm install
 pnpm start                                                 # http://localhost:8787
 pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
 ```
+
+或用 Docker（只要裝 Docker）：
+
+```bash
+docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
+docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 driftnet start
+```
+
+不加 `start` 時，容器就是 stdio 的 MCP 伺服器（`docker run -i --rm -v driftnet:/data driftnet`）。
 
 需要 Node.js 22.13 以上。不管從哪裡啟動，設定都在 `~/.driftnet/.env`，清單在 `~/.driftnet/driftnet.db`
 （用 `DRIFTNET_HOME` 可以一起搬走）。試試看：

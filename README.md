@@ -8,6 +8,8 @@
 **English** · [繁體中文](README.zh-TW.md)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
+[![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
 ![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
 ![Runs locally](https://img.shields.io/badge/runs-locally-0f9f8f.svg)
 ![Any model](https://img.shields.io/badge/model-any%20%C2%B7%20or%20none-2459e0.svg)
@@ -71,6 +73,15 @@ pnpm install
 pnpm start                                                 # http://localhost:8787
 pnpm service:install                                       # optional: start at login (macOS / Linux)
 ```
+
+Or in Docker (nothing to install but Docker):
+
+```bash
+docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
+docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 driftnet start
+```
+
+Without `start`, the container is the MCP server over stdio (`docker run -i --rm -v driftnet:/data driftnet`).
 
 Needs Node.js 22.13+. Settings live in `~/.driftnet/.env` and the catalogue in
 `~/.driftnet/driftnet.db`, wherever you start it from (`DRIFTNET_HOME` moves both). Try it:
