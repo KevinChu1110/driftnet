@@ -194,7 +194,7 @@
   .mnode.folder.l1 .cnt { background: rgba(255,255,255,.25); color: #fff; }
   .mnode.folder.l1 .tw, .mnode.folder.l1 .opt { color: #fff; }
   .mnode.folder.l2 { font-weight: 600; background: color-mix(in srgb, var(--c) 14%, var(--panel)); }
-  .mnode.folder.vacant { opacity: .6; border: 2px dashed var(--c); background: var(--panel); color: var(--text); }
+  .mnode.folder.vacant { opacity: .75; border: 2px dashed var(--c); background: var(--panel); color: var(--text); }
   .mnode.folder.vacant .opt { color: var(--muted); }
   .mnode.item { height: 30px; font-size: 13px; padding: 0 4px; border: 0; border-bottom: 2px solid var(--c); border-radius: 0; background: none; box-shadow: none; }
   .mnode.item:hover { background: color-mix(in srgb, var(--c) 10%, transparent); border-radius: 6px 6px 0 0; }
@@ -220,6 +220,13 @@
   @keyframes bump { 30% { transform: scale(1.14); box-shadow: 0 0 0 6px color-mix(in srgb, var(--c) 35%, transparent); } }
   .map-wrap.panning { cursor: grabbing; }
   body.map-view { overflow: hidden; }
+  /* On the map, messages sit at the top so they never cover the zoom buttons. */
+  body.map-view .toast { bottom: auto; top: calc(env(safe-area-inset-top) + 76px); transform: translate(-50%, calc(-100% - 120px)); }
+  body.map-view .toast.show { transform: translate(-50%, 0); }
+  body.map-view .pickbar { bottom: auto; top: calc(env(safe-area-inset-top) + 72px); }
+  .pickbar button { white-space: nowrap; }
+  .mnode .opt { position: relative; }
+  .mnode .opt::before { content: ""; position: absolute; inset: -9px; }
   body.map-view main { padding-bottom: 0; }
   .map-wrap { user-select: none; -webkit-user-select: none; }
   .mghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -130%) rotate(-2deg); opacity: .95; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
@@ -292,8 +299,9 @@
   /* A card sits on top of two action strips that show while it is dragged. */
   .swipe { position: relative; border-radius: 12px; overflow: hidden; scroll-margin-top: 90px; transition: height .25s ease, margin .25s ease, opacity .25s ease; }
   .swipe.gone { opacity: 0; }
-  .swipe.flash .card { animation: flash 1.6s ease; }
-  @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: var(--shadow); } }
+  /* Inside the card (the swipe wrapper clips anything outside it). */
+  .swipe.flash .card { animation: flash 2s ease; }
+  @keyframes flash { 0%, 55% { outline: 3px solid var(--accent); outline-offset: -3px; background: var(--accent-soft); } 100% { outline-color: transparent; } }
   .act { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 22px; font-weight: 600; font-size: 14px; }
   .act.right { justify-content: flex-start; background: var(--star-soft); color: var(--star); }
   .act.left { justify-content: flex-end; background: var(--danger-soft); color: var(--danger); }
@@ -352,9 +360,12 @@
   /* Dark mode: light branch fills need dark text on the map. */
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mnode.folder.l1, :root:not([data-theme="light"]) .mnode.folder.l1 .tw,
                                         :root:not([data-theme="light"]) .mnode.folder.l1 .opt { color: #121211; }
-                                        :root:not([data-theme="light"]) .mnode.folder.l1 .cnt { background: rgba(0,0,0,.18); color: #121211; } }
+                                        :root:not([data-theme="light"]) .mnode.folder.l1 .cnt { background: rgba(0,0,0,.18); color: #121211; }
+                                        :root:not([data-theme="light"]) .mnode.folder.l1.vacant, :root:not([data-theme="light"]) .mnode.folder.l1.vacant .tw,
+                                        :root:not([data-theme="light"]) .mnode.folder.l1.vacant .opt { color: var(--text); } }
   :root[data-theme="dark"] .mnode.folder.l1, :root[data-theme="dark"] .mnode.folder.l1 .tw, :root[data-theme="dark"] .mnode.folder.l1 .opt { color: #121211; }
   :root[data-theme="dark"] .mnode.folder.l1 .cnt { background: rgba(0,0,0,.18); color: #121211; }
+  :root[data-theme="dark"] .mnode.folder.l1.vacant, :root[data-theme="dark"] .mnode.folder.l1.vacant .tw, :root[data-theme="dark"] .mnode.folder.l1.vacant .opt { color: var(--text); }
 
   @media (max-width: 720px) {
     header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); gap: 8px 10px; }
@@ -531,7 +542,7 @@
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
-      map: "Mind map", mapHint: "Tap a folder to open it, tap a card to preview it. To file a card, drag it onto a folder (on a phone: hold it a moment first). ⋯ or a double-click renames a folder.",
+      map: "Mind map", mapHint: "Tap a folder to open it, tap a card to preview it. To file a card: drag it onto a folder — on a phone, hold it a moment, let go, then tap the folder. ⋯ renames a folder.",
       a11yFolder: (n, c) => `Folder ${n}, ${c} cards`, a11yCard: (n) => `Card ${n}`,
       expandAll: "Expand all", collapseAll: "Collapse all", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", openCard: "Open card",
       gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", showInList: "Show in the list", close: "Close",
@@ -551,7 +562,7 @@
         theme: "Theme", themes: { auto: "Follow the system", light: "Light", dark: "Dark" },
         model: "Model & classifier", language: "Language & chat replies", rules: "Your rules",
         plugins: "Plugins", pluginsNone: (dir) => `No plugins. Put .js files in ${dir} — see examples/plugins in the repo.`,
-        status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries by ${e.summarizer === "off" ? "nobody (off)" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
+        status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries: ${e.summarizer === "off" ? "off" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
         savedServer: "Saved — already in effect", chat: "Chat replies", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
@@ -570,7 +581,7 @@
         tunnelStarting: "Starting the tunnel… (up to 30 s)", saveFirst: "Save first, then open the public URL.",
         connect: "Connect an AI",
         login: "Enter admin password", logout: "Log out on this device", loginTitle: "Unlock editing", loginOk: "Unlock", unlocked: "Unlocked — you can edit now", unlockShort: "Unlock",
-        loginWrong: "That's not the admin password.", viewOnly: "View only · Unlock",
+        loginWrong: "That password didn't work — try again.", viewOnly: "View only · Unlock",
         loginHelp: "Type this driftnet's password — usually from whoever set it up. Without it you can still look at everything.",
         loginAdvanced: "Forgot it (you set it up)? Open driftnet on the computer it runs on — Settings there sets a new one. On a server: From your computer run  ssh -L PORT:127.0.0.1:PORT <server>  and open http://localhost:PORT.",
         keyWrong: "That's neither the admin password nor a share key.",
@@ -585,7 +596,7 @@
           GITHUB_TOKEN: ["GitHub token", "Optional: GitHub lookups go from 60 to 5000 an hour"],
           DRIFTNET_LANGUAGE: ["Summary language", "English, Traditional Chinese (Taiwan), Japanese…"],
           DRIFTNET_LOCALE: ["Bot language", ""],
-          DRIFTNET_REPLY: ["Chat replies", ""],
+          DRIFTNET_REPLY: ["How the bot replies", ""],
           DRIFTNET_PUBLIC_URL: ["This page's public URL", "Replies link here, e.g. https://driftnet.example.com"],
           DRIFTNET_SUMMARY_RULES: ["Extra rules for summaries", "e.g. Say whether it's free. Mention if it needs a GPU."],
           DRIFTNET_BLOCK_DOMAINS: ["Never catalogue these domains", "Comma or space separated, e.g. example.com, spam.io"],
@@ -621,7 +632,7 @@
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
-      map: "樹狀圖", mapHint: "點資料夾展開，點卡片預覽。要整理就把卡片拖到資料夾上（手機先按住一下再拖）。按 ⋯ 或連點兩下可以改資料夾名稱。",
+      map: "樹狀圖", mapHint: "點資料夾展開，點卡片預覽。整理卡片：把它拖到資料夾上；手機上按住卡片一下、放開，再點要放進去的資料夾。按 ⋯ 可以改資料夾名稱。",
       a11yFolder: (n, c) => `資料夾 ${n}，${c} 張卡片`, a11yCard: (n) => `卡片 ${n}`,
       expandAll: "全部展開", collapseAll: "全部收合", zoomIn: "放大", zoomOut: "縮小", fit: "符合畫面", openCard: "開啟卡片",
       gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", showInList: "在清單中查看", close: "關閉",
@@ -660,7 +671,7 @@
         tunnelStarting: "正在開通道…（最多 30 秒）", saveFirst: "先按儲存，再開公開網址。",
         connect: "連接 AI",
         login: "輸入管理密碼", logout: "在這台裝置登出", loginTitle: "解鎖編輯", loginOk: "解鎖", unlocked: "已解鎖，現在可以編輯了", unlockShort: "解鎖",
-        loginWrong: "管理密碼不對。", viewOnly: "只能看 · 解鎖編輯",
+        loginWrong: "密碼不對，再試一次。", viewOnly: "只能看 · 解鎖編輯",
         loginHelp: "輸入這個 driftnet 的密碼，通常是架設它的人給你的。沒有密碼也能看所有內容，只是不能修改。",
         loginAdvanced: "密碼是你自己設的但忘了？到跑 driftnet 的那台電腦打開網頁，設定裡可以直接設新的。跑在伺服器上的話：在你的電腦執行  ssh -L PORT:127.0.0.1:PORT <伺服器>  再打開 http://localhost:PORT。",
         keyWrong: "這不是管理密碼，也不是分享碼。",
@@ -675,7 +686,7 @@
           GITHUB_TOKEN: ["GitHub token", "選填：GitHub 查詢上限從每小時 60 次變 5000 次"],
           DRIFTNET_LANGUAGE: ["摘要語言", "English、Traditional Chinese (Taiwan)、Japanese…"],
           DRIFTNET_LOCALE: ["機器人語言", ""],
-          DRIFTNET_REPLY: ["聊天室回覆", ""],
+          DRIFTNET_REPLY: ["機器人怎麼回覆", ""],
           DRIFTNET_PUBLIC_URL: ["這個網頁的公開網址", "回覆裡的連結會指到這裡，例如 https://driftnet.example.com"],
           DRIFTNET_SUMMARY_RULES: ["摘要的額外規則", "例如：說明是否免費。需要 GPU 的話要提到。"],
           DRIFTNET_BLOCK_DOMAINS: ["不要收錄的網域", "用逗號或空白分隔，例如 example.com, spam.io"],
@@ -797,6 +808,7 @@
     // Keyboard and screen-reader focus stay inside the drawer while it is open.
     for (const id of ["list", "crumb"]) $(id).inert = open && isDrawer();
     document.querySelector("header").inert = open && isDrawer();
+    document.querySelector(".skip").inert = open && isDrawer();
     $("menu").setAttribute("aria-expanded", String(open));
     if (!keyboard) return;
     if (open) $("nav").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
@@ -974,7 +986,7 @@
                                       ...(body ? { body: JSON.stringify(body) } : {}) });
       if (res.status === 401) { needAdmin(); return null; }
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { $("fd-error").textContent = data.error ?? T().failed; return null; }
+      if (!res.ok) { $("fd-error").textContent = friendlyError(data.error) ?? T().failed; return null; }
       return data;
     } catch {
       $("fd-error").textContent = T().failed;
@@ -1004,7 +1016,11 @@
   $("mv-cancel").onclick = () => $("move-dlg").close();
   $("mv-filter").addEventListener("input", () => {
     const q = $("mv-filter").value.trim().toLowerCase();
-    for (const b of $("mv-list").querySelectorAll("[data-to]")) b.hidden = !!q && !b.textContent.toLowerCase().includes(q) && !b.dataset.to.includes(q);
+    const rows = [...$("mv-list").querySelectorAll("[data-to]")];
+    // Match what the reader sees; the hidden id (e.g. "coding-agent") only when no visible name matches.
+    const byName = rows.filter((b) => b.textContent.toLowerCase().includes(q));
+    const shown = new Set(q ? (byName.length ? byName : rows.filter((b) => b.dataset.to.includes(q))) : rows);
+    for (const b of rows) b.hidden = !shown.has(b);
   });
   $("mv-filter").addEventListener("keydown", (e) => {
     const visible = [...$("mv-list").querySelectorAll("[data-to]:not([hidden])")];
@@ -1043,7 +1059,10 @@
     const el = document.getElementById(`item-${id}`);
     // Still inside the folder being viewed? Update the badge; otherwise it leaves the list.
     const visible = !state.category || subtreeOf(state.category).has(to);
-    if (el && !visible) dismiss(el);
+    if (el && !visible) {
+      if (el.contains(document.activeElement)) (el.nextElementSibling ?? el.previousElementSibling)?.querySelector?.(".card")?.focus();
+      dismiss(el);
+    }
     else if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); }
     refreshTree();
     // The list and the map hold their own copies of the item: keep both in step.
@@ -1167,8 +1186,9 @@
     $("st-body").dataset.tab = tab;
     $("st-cancel").textContent = t.cancel;
     $("st-save").textContent = st.save;
-    settingsOpener = document.activeElement;
+    settingsOpener = isDrawer() ? $("menu") : document.activeElement;
     $("settings-dlg").showModal();
+    $("st-body").querySelector('[data-tab-btn][aria-selected="true"]')?.focus();
   }
   let settingsOpener = null;
   $("settings-dlg").addEventListener("close", () => { if (settingsOpener?.isConnected) settingsOpener.focus(); });
@@ -1224,11 +1244,11 @@
     else tun = `<button class="btn primary" type="button" id="ac-tunnel" data-on="1" ${a.passwordSet ? "" : "disabled"}>${esc(st.tunnelOn)}</button>
         <small>${esc(a.passwordSet ? st.tunnelPrivate : st.tunnelNeedsPassword)}</small>`;
     return `<fieldset class="set-group" id="ac"><legend>${esc(st.access)}</legend>
-      <div class="set-row"><span>${esc(st.password)} <small>DRIFTNET_TOKEN</small></span>${pwInput}
+      <div class="set-row"><span title="DRIFTNET_TOKEN">${esc(st.password)}</span>${pwInput}
         <small>${esc(pw.locked ? st.locked : st.passwordHelp)}</small></div>
       <p class="warn">${esc(st.passwordWarn)}</p>
-      <label class="set-row"><span>${esc(st.accessMode)} <small>DRIFTNET_ACCESS</small></span>${modeSel}</label>
-      <div class="set-row"><span>${esc(st.shareKey)} <small>DRIFTNET_READ_KEY</small></span>${key}<small>${esc(st.shareKeyHelp)}</small></div>
+      <label class="set-row"><span title="DRIFTNET_ACCESS">${esc(st.accessMode)}</span>${modeSel}</label>
+      <div class="set-row"><span title="DRIFTNET_READ_KEY">${esc(st.shareKey)}</span>${key}<small>${esc(st.shareKeyHelp)}</small></div>
       <div class="set-row"><span>${esc(st.tunnel)}</span>${tun}<small>${esc(st.tunnelHelp)}</small>${t.error ? `<small class="dlg-error">${esc(t.error)}</small>` : ""}</div>
     </fieldset>`;
   }
@@ -1322,6 +1342,7 @@
       [/set an admin password first|Save first/, () => zh ? "要先設定並儲存管理密碼。" : "Set and save an admin password first."],
       [/cloudflared is not installed/, () => zh ? "這台電腦還沒安裝 cloudflared。" : "cloudflared isn't installed on this computer."],
       [/set by the environment/, () => zh ? "這個設定由執行環境決定（例如 systemd），要在那裡改。" : "This one is set by the environment driftnet runs in; change it there."],
+      [/already a folder called “(.+)” here/, (m) => zh ? `這裡已經有一個叫「${m[1]}」的資料夾了。` : `There's already a folder called “${m[1]}” here.`],
       [/too many wrong passwords/, () => zh ? "密碼錯太多次，請 15 分鐘後再試。" : "Too many wrong passwords — try again in 15 minutes."],
     ];
     for (const [re, f] of rules) { const m = re.exec(msg); if (m) return f(m); }
@@ -1344,7 +1365,7 @@
       if (err.unauthorized) return askToken();
       throw err;
     }
-    const allOpen = mapOpen.size > 0;
+    const allOpen = mapOpen.size > 0 || !!state.q;
     const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip">${esc(t.mapHint)} <button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
     $("list").innerHTML = `<div class="map-bar">
         <button class="btn" type="button" data-map="${allOpen ? "collapse" : "expand"}">${ic(allOpen ? "collapse" : "expand")} ${esc(allOpen ? t.collapseAll : t.expandAll)}</button>
@@ -1358,8 +1379,24 @@
           <button type="button" data-map="in" aria-label="${esc(t.zoomIn)}">${ic("plus")}</button></div></div>`;
     drawMap();
     sizeMap();
-    // On a phone the whole tree rarely fits: start fitted to the width (still readable), root in view.
+    // On a phone the whole tree rarely fits: start fitted to the width (still readable).
     if (isDrawer() && !store.get("driftnet-map-zoom")) fitWidth();
+    centreOnRoot();
+  }
+  /** The toolbar's Expand all / Collapse all follows what is open. */
+  function syncMapToggle() {
+    const b = $("list").querySelector('[data-map="expand"], [data-map="collapse"]');
+    if (!b) return;
+    const open = mapOpen.size > 0, t = T();
+    b.dataset.map = open ? "collapse" : "expand";
+    b.innerHTML = `${ic(open ? "collapse" : "expand")} ${esc(open ? t.collapseAll : t.expandAll)}`;
+  }
+  /** Every time the map opens, start from the root, not wherever the scroll happened to be. */
+  function centreOnRoot() {
+    const wrap = $("map-wrap"), root = $("map-canvas")?.querySelector('.mnode[data-key="root"]');
+    if (!wrap || !root) return;
+    wrap.scrollTop = root.offsetTop * mapZoom - wrap.clientHeight / 2;
+    wrap.scrollLeft = 0;
   }
   function fitWidth() {
     const wrap = $("map-wrap"), c = $("map-canvas");
@@ -1370,7 +1407,11 @@
   }
   function fitMap() {
     const wrap = $("map-wrap"), c = $("map-canvas");
-    if (wrap && c) mapZoomTo(Math.min(1.3, (wrap.clientWidth - 8) / c.offsetWidth, (wrap.clientHeight - 8) / c.offsetHeight));
+    if (!wrap || !c) return;
+    // Fit, but never so small the text can't be read (phones stop at 0.6, desktops at 0.45); then start at the root.
+    const floor = isDrawer() ? 0.6 : 0.45;
+    mapZoomTo(Math.max(floor, Math.min(1.3, (wrap.clientWidth - 8) / c.offsetWidth, (wrap.clientHeight - 8) / c.offsetHeight)));
+    centreOnRoot();
   }
   /** The map fills the rest of the screen, so the page and the map don't scroll inside each other. */
   function sizeMap() {
@@ -1470,6 +1511,7 @@
     // The scroll area follows the zoomed size.
     canvas.style.marginRight = `${width * mapZoom - width}px`;
     canvas.style.marginBottom = `${height * mapZoom - height}px`;
+    restoreFocus();
     const first = canvas.querySelector(".mnode.hit");
     const wrap = $("map-wrap");
     // Scroll only the map, never the page (the toolbar must stay reachable).
@@ -1492,7 +1534,7 @@
   };
   const toggleFolder = (id) => {
     const refocus = document.activeElement?.dataset?.key === `f:${id}`;
-    mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); saveMapOpen(); drawMap();
+    mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); saveMapOpen(); drawMap(); syncMapToggle();
     if (refocus) $("map-canvas").querySelector(`.mnode[data-key="f:${CSS.escape(id)}"]`)?.focus();
   };
   /** The "+N" node: everything in that folder, as cards. */
@@ -1853,6 +1895,7 @@
     item.note = saved.note;
     const el = document.getElementById(`item-${noting}`);
     if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${noting}`)); }
+    setTimeout(restoreFocus, 0);
     toast(T().saved);
   };
 
@@ -1992,6 +2035,7 @@
     $("add-form")?.addEventListener("submit", addLink);
     $("list").querySelector("[data-connect-empty]")?.addEventListener("click", () => openConnect());
     for (const el of $("list").querySelectorAll(".swipe")) attachSwipe(el);
+    restoreFocus();
     // Only #item-<n> is ours; anything else in the hash must not break the page.
     if (/^#item-\d+$/.test(location.hash)) {
       const target = document.getElementById(location.hash.slice(1));
@@ -2193,6 +2237,23 @@
 
   // ── Toast with undo ──────────────────────────────────────────────────────
   let toastTimer;
+  /**
+   * Keyboard focus survives re-renders: remember the card or map node last focused, and put focus back
+   * when a re-render or a closing dialog would otherwise drop it on <body>.
+   */
+  let focusKey = null, focusAt = 0;
+  document.addEventListener("focusin", (e) => {
+    const card = e.target.closest?.(".swipe"), node = e.target.closest?.(".mnode");
+    if (card) { focusKey = `#${card.id} .card`; focusAt = Date.now(); }
+    else if (node) { focusKey = `.mnode[data-key="${CSS.escape(node.dataset.key)}"]`; focusAt = Date.now(); }
+  });
+  function restoreFocus() {
+    if (!focusKey || Date.now() - focusAt > 60_000 || document.querySelector("dialog[open]")) return;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const el = document.querySelector(focusKey);
+    if (el) el.focus({ preventScroll: true });
+  }
+  for (const d of document.querySelectorAll("dialog")) d.addEventListener("close", () => setTimeout(restoreFocus, 0));
   /** The newest undoable action, so z (or ⌘/Ctrl+Z) can undo it from the keyboard. */
   let lastUndo = null;
   function toast(text, undo) {
@@ -2205,14 +2266,16 @@
     $("toast").classList.add("show");
     toastMs = Math.min(9000, 4500 + text.length * 45);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => $("toast").classList.remove("show"), toastMs);
+    toastTimer = setTimeout(hideToast, toastMs);
   }
+  // Once the toast is gone, z no longer undoes something you can't see any more.
+  function hideToast() { $("toast").classList.remove("show"); lastUndo = null; }
   let toastMs = 5000;
   // Reading or reaching for Undo keeps the toast up.
   for (const ev of ["pointerenter", "focusin"]) $("toast").addEventListener(ev, () => clearTimeout(toastTimer));
   for (const ev of ["pointerleave", "focusout"]) $("toast").addEventListener(ev, () => {
     clearTimeout(toastTimer);
-    if ($("toast").classList.contains("show")) toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2500);
+    if ($("toast").classList.contains("show")) toastTimer = setTimeout(hideToast, 2500);
   });
 
   // ── Keyboard: j/k to step through cards, then act on the focused one ─────

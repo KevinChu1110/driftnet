@@ -113,7 +113,7 @@ where to read it on the web page. Want the summary in the chat instead, or no re
 
 ### The web page
 
-<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the ☰ drawer with your folder tree, the Move to… picker, and a card being swiped left to the trash" width="100%"></p>
+<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the ☰ drawer with your folder tree, filing a card on the mind map (hold it, then tap a folder), and a card being swiped left to the trash" width="100%"></p>
 
 Every link lands on a page you can search, filter by folder and kind, and open from a phone. On a
 phone the sidebar folds into a ☰ drawer, and a line under the search box says what you're looking at.

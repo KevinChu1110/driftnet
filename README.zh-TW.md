@@ -105,7 +105,7 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ### 網頁
 
-<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：☰ 側邊欄裡的資料夾樹、「移動到…」選單、一張卡片往左滑向垃圾桶" width="100%"></p>
+<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：☰ 選單裡的資料夾樹、在樹狀圖上整理卡片（按住後點資料夾）、一張卡片往左滑向垃圾桶" width="100%"></p>
 
 每個連結都會整理到一個網頁上，可以搜尋、依資料夾和類型篩選，手機也能開。在手機上，側邊欄會收進左上角的 ☰，
 搜尋框下方有一行字告訴你現在看的是哪個資料夾。

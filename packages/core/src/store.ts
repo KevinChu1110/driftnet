@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Item, Judgement, Kind, ShareContext, Summary, Worth } from "./types.ts";
+import { categoryLabel, LOCALES } from "./i18n.ts";
 
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
@@ -238,7 +239,9 @@ export class Store {
     const parent = input.parent || null;
     if (parent && !this.folderExists(parent)) throw new FolderError(`no folder ${parent}`);
     // Two folders with the same name side by side can't be told apart (in the tree, or by the classifier).
-    if (this.folders().some((f) => (f.parent ?? null) === parent && (f.name ?? f.id).toLowerCase() === name.toLowerCase())) {
+    // A built-in folder goes by its label in every language ("Other", "其他"), not just its id.
+    const names = (f: Folder) => (f.name ? [f.name] : [f.id, ...LOCALES.map((l) => categoryLabel(f.id, l))]).map((x) => x.toLowerCase());
+    if (this.folders().some((f) => (f.parent ?? null) === parent && names(f).includes(name.toLowerCase()))) {
       throw new FolderError(`there is already a folder called “${name}” here`);
     }
     const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
