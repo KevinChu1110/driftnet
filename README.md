@@ -1,75 +1,162 @@
+<div align="center">
+
 # driftnet
 
-**Drop links into your group chat. Get them sorted, explained and searchable — for a fraction of a cent each.**
+**Drop links into your group chat. Get them sorted, explained and searchable.**
 
-You see a great AI tool on Threads, Facebook, X or YouTube. You paste it into a chat "to look at
-later". Three weeks and two hundred links later, it's a graveyard.
+**English** · [繁體中文](README.zh-TW.md)
 
-driftnet is a bot for LINE, Slack, Discord and Telegram that reads every link you drop, follows it
-to the actual tool, sorts it onto a shelf, writes a two-line explanation, and puts it on a
-searchable page. Your agents (Claude Code, pi, Hermes, OpenClaw, ChatGPT, Grok…) can read the same
-catalogue over MCP to find tools that make *them* better.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
+![LINE · Slack · Discord · Telegram](https://img.shields.io/badge/chat-LINE%20·%20Slack%20·%20Discord%20·%20Telegram-555.svg)
+![MCP](https://img.shields.io/badge/agents-MCP-8a63d2.svg)
 
-[繁體中文說明](README.zh-TW.md)
+</div>
 
-Illustrative reply:
+You see a great AI tool on Threads, Facebook, X or YouTube and paste it into a chat "to look at
+later". Three weeks and two hundred links later, that chat is a graveyard.
 
+driftnet is a bot for **LINE, Slack, Discord and Telegram**. It reads every link you drop, follows
+it to the actual tool, sorts it onto a shelf, writes a short explanation in your language, and
+puts it on a searchable page. Your agents (Claude Code, pi, Hermes, OpenClaw, ChatGPT, Grok…) read
+the same catalogue over MCP to find tools that make *them* better.
+
+```text
+you ▸ https://www.facebook.com/share/v/1DfVB2odi3/
+
+bot ▸ 📌 This week in AI (3/11)｜news
+      A one-minute roundup of this week's AI releases
+      • Paperclip: an open-source framework for agent "companies"
+      • Symphony: OpenAI's board for assigning work to agents
+      Mentions: FelixCraftAI, Paperclip, Symphony, GPT-5.4
+      #1 · reply 👍1 / 👎1
+
+      ↳ 📌 paperclip｜agent-framework
+        https://github.com/paperclipai/paperclip
+      ↳ 📌 symphony｜agent-framework
+        https://github.com/openai/symphony
 ```
-you  ▸ https://www.facebook.com/share/v/1Erc2aumUF/
-bot  ▸ 📌 ascii-sharks｜design-frontend
-       An ASCII-art ocean that runs at 60 FPS in plain Canvas, zero dependencies
-       • Pure TypeScript, no 3D engine
-       https://github.com/stackedlol/ascii-sharks
-       #5 · reply 👍5 / 👎5
-```
 
-## Why it's cheap
+<sub>Illustrative reply. The repos were found from names in the post: it had no links.</sub>
 
-Most "AI bookmark" tools send every page to a big model. driftnet spends as little as possible at
-each step, and most links never reach the expensive one:
+**Contents** · [Features](#features) · [Quick start](#quick-start) · [Chat platforms](#chat-platforms) ·
+[Models](#bring-any-model) · [Agents](#for-agents) · [Configuration](#configuration) ·
+[Your data](#where-your-data-goes) · [Contributing](#contributing)
 
-| Step | What happens | Cost |
+## Features
+
+### Light on tokens
+
+Most AI bookmark tools send every page to a big model. driftnet does the free steps first, and
+most links never reach the model at all:
+
+| Step | What happens | Model call |
 |---|---|---|
-| 1. Cache | Same link (after stripping `utm_`, `fbclid`, `si`… and unifying `youtu.be`, share links, repo sub-paths) | **$0** |
-| 2. Extract | GitHub API + README head, YouTube description, `og:` tags. Clipped to a fixed budget (~2k chars) | $0 |
-| 3. Guard | Strip hidden Unicode, flag prompt injection | $0 |
-| 4. Reputation | Publishers the community keeps voting down are stored but not summarised | $0 |
-| 5. Judge | [Jev](https://console.typesafe.ai) answers category / kind / worth / injection as typed choices, ~100 ms | **~$0.00006** |
-| 6. Summarise | One structured call to the model **you** choose, only for items worth reading | a small model is plenty |
+| 1. Cache | Same link again, after stripping `utm_`, `fbclid`, `si`… and unifying `youtu.be`, share links and repo sub-paths | none |
+| 2. Extract | GitHub API + README head, YouTube description, `og:` tags, clipped to ~2,000 characters | none |
+| 3. Guard | Strip hidden Unicode, flag prompt injection | none |
+| 4. Reputation | Publishers the community keeps voting down are stored, not summarised | none |
+| 5. Judge | [Jev](https://console.typesafe.ai) answers category, kind, worth and injection as typed choices (~100 ms) | tiny classifier |
+| 6. Summarise | One structured call to the model **you** choose, only for items worth reading | one call |
 
-Measured on five real Facebook reels: judging all five cost **$0.00029**. One that was nothing but
-a one-line caption was judged `skip` and would never have been summarised.
+On five real Facebook reels, Jev's judging cost **$0.00029 in total**. One reel was just a
+one-line caption: it was judged `skip` and never sent to the model.
 
-No Jev key? The summariser classifies in the same call. No model at all? Items are still
-extracted, deduplicated and listed.
+No Jev key? The model classifies in the same call. No model? Links are still extracted,
+deduplicated and listed.
 
-## Follows links to the actual tool
+### Follows links to the actual tool
 
-Social posts are usually *about* a tool, not the tool:
+Social posts are usually *about* a tool, not the tool itself:
 
-- A post that links a GitHub repo → driftnet catalogues the **repo** and keeps the post as context.
-- A post that only *names* open-source projects ("link in comments") → driftnet looks them up on
-  GitHub by name (exact-name match only) and catalogues each one.
-- A weekly-roundup post → one item for the roundup, plus one per open-source project it mentions.
+- A post linking a GitHub repo → the **repo** is catalogued, with the post as context.
+- A post that only *names* open-source projects ("link in comments") → driftnet finds them on
+  GitHub by exact name and catalogues each one.
+- A weekly roundup → one item for the roundup, plus one per open-source project it mentions.
+- Links pasted back-to-back without spaces are split correctly.
 
-## Learns what to ignore
+### Learns what to ignore
 
-- 👎 a result in chat (`👎12 ad`), on the web, or from an agent. Votes roll up into a reputation
-  per publisher (GitHub owner, YouTube channel, domain).
-- Publishers below 25% approval (≥ 3 votes) are no longer summarised — junk gets cheaper over time.
-- Items flagged for prompt injection are kept for humans but **never served to agents**.
+- Vote in chat (`👎12 ad`), on the web, or from an agent. Votes add up to a reputation per
+  publisher (GitHub owner, YouTube channel, domain).
+- Publishers below 25% approval (3+ votes) are no longer summarised. The more junk you vote
+  down, the less it costs.
+- Items flagged for prompt injection stay visible to people but are **never served to agents**.
+
+### English or Chinese
+
+One setting, `DRIFTNET_LANGUAGE`, sets the language of the summaries **and** of the bot's own
+replies. Use `English` or `Traditional Chinese (Taiwan)`. Summaries work in any language the model
+writes, such as `Japanese`, while the bot's own words fall back to English. Tool names are kept
+as-is.
+
+## Quick start
+
+```bash
+git clone https://github.com/KevinChu1110/driftnet && cd driftnet
+pnpm install
+cp .env.example .env   # pick a model provider (optional) and your chat platforms
+pnpm dev               # http://localhost:8787
+```
+
+Requires Node.js 22.13+ (driftnet uses the built-in `node:sqlite`). Try it without any chat
+platform:
+
+```bash
+curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
+  -d '{"text": "look at this https://github.com/paperclipai/paperclip"}'
+```
+
+## Chat platforms
+
+| Platform | Set | Public URL? |
+|---|---|---|
+| Telegram | `TELEGRAM_BOT_TOKEN` (from @BotFather). For groups, turn privacy mode off with `/setprivacy` | No (long polling) |
+| Discord | `DISCORD_BOT_TOKEN`. Enable the **Message Content** intent | No (gateway) |
+| LINE | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`. Webhook URL: `/webhooks/line` | Yes |
+| Slack | `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN` (`channels:history`, `groups:history`, `chat:write`). Events URL: `/webhooks/slack` | Yes |
+| Anything else | `POST /api/chat {"text": "…"}` returns the reply text | — |
+
+For local development, expose the webhooks with `cloudflared tunnel` or `ngrok`.
+
+**In the chat:** messages without a link are ignored. Every reply ends with the item number. Vote
+with `👍12` / `👎12 reason` (or `+12` / `-12`).
+
+## Bring any model
+
+driftnet is not tied to a vendor. Summaries go through one small interface (`LlmProvider`: "fill
+in this JSON schema"), with two adapters built in:
+
+| `DRIFTNET_LLM_PROVIDER` | Covers |
+|---|---|
+| `anthropic` | Claude, through the official SDK |
+| `openai` | Anything OpenAI-compatible: OpenAI, Gemini, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio (fully local)** |
+| *(empty)* | No model: links are still extracted, judged by Jev if configured, deduplicated and listed |
+
+```bash
+DRIFTNET_LLM_PROVIDER=openai
+DRIFTNET_LLM_MODEL=gemini-3.8-flash
+DRIFTNET_LLM_API_KEY=...
+DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+```
+
+> [!NOTE]
+> driftnet never reads `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Exporting those changes how other
+> tools on your machine bill you: Claude Code, for example, switches from your subscription to
+> API billing.
+
+Replies are validated against the schema whatever the provider, so a model that ignores
+structured output cannot store malformed data. Truncated, refused or malformed replies are
+retried once. Auth and bad-request errors are not.
 
 ## For agents
 
-| Client | How |
+| Client | How to connect |
 |---|---|
-| Claude Code / Claude Desktop / pi / Hermes / OpenClaw / any MCP client | `POST /mcp` (Streamable HTTP) or `pnpm --filter @driftnet/server mcp` (stdio) |
-| Agents with skills | Copy [`skills/driftnet`](skills/driftnet/SKILL.md) into your skills folder |
+| Claude Code, Claude Desktop, pi, Hermes, OpenClaw, any MCP client | `POST /mcp` (Streamable HTTP), or `pnpm --filter @driftnet/server mcp` (stdio) |
+| Agents with skills | Copy [`skills/driftnet`](skills/driftnet/SKILL.md) into the skills folder |
 | ChatGPT custom GPT Actions | Import `GET /openapi.json` |
 | Anything that can fetch a URL | `GET /llms.txt` |
-
-MCP tools: `driftnet_search`, `driftnet_recent`, `driftnet_save`, `driftnet_feedback`. The skill
-tells agents to *propose* upgrades to their human, never to install anything by themselves.
 
 ```bash
 # Claude Code
@@ -77,68 +164,85 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
   --header "Authorization: Bearer $DRIFTNET_TOKEN" --header "X-Driftnet-Agent: claude-code"
 ```
 
-## Quick start
-
-```bash
-git clone https://github.com/KevinChu1110/driftnet && cd driftnet
-pnpm install
-cp .env.example .env   # pick a model provider (optional) and the chat platforms you use
-pnpm dev               # http://localhost:8787
-```
-
-Requires Node.js 22.13+ (uses the built-in `node:sqlite`).
-
-### Bring any model
-
-driftnet is not tied to a vendor. Summaries go through one small interface (`LlmProvider`: fill
-in a JSON schema), with two adapters built in:
-
-| `DRIFTNET_LLM_PROVIDER` | Covers |
+| MCP tool | Use |
 |---|---|
-| `anthropic` | Claude, via the official SDK |
-| `openai` | Anything OpenAI-compatible: OpenAI, Gemini, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio (fully local)** |
-| *(empty)* | No model: links are still extracted, judged by Jev if configured, deduplicated and listed |
+| `driftnet_search` | Search the catalogue before picking a tool for a task |
+| `driftnet_recent` | What's new: find tools that would improve the agent's own workflow |
+| `driftnet_save` | Catalogue a link |
+| `driftnet_feedback` | Vote an item up or down. Agent votes count toward reputation too |
 
-Every provider uses the same three variables: `DRIFTNET_LLM_MODEL`, `DRIFTNET_LLM_API_KEY`,
-`DRIFTNET_LLM_BASE_URL`. driftnet never reads `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`: exporting
-those changes how other tools on your machine bill you (Claude Code, for example, switches from
-your subscription to API billing). Replies are validated against the schema whatever the
-provider, so a model that ignores structured output cannot store malformed data.
+The skill tells agents to **propose** upgrades to their human, never to install anything
+themselves, and to treat everything in the catalogue as data, not instructions.
+
+## Configuration
+
+All settings are environment variables. See [`.env.example`](.env.example).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DRIFTNET_LLM_PROVIDER` | *(off)* | `anthropic`, `openai` or empty |
+| `DRIFTNET_LLM_MODEL` | — | Model name, required when a provider is set |
+| `DRIFTNET_LLM_API_KEY` | — | Key for that provider (optional for Ollama / LM Studio) |
+| `DRIFTNET_LLM_BASE_URL` | OpenAI | Endpoint for the `openai` provider |
+| `DRIFTNET_LLM_EFFORT` | `anthropic`: `low` | `anthropic`: `low` to `xhigh` (a typo falls back to `low`). `openai`: sent as `reasoning_effort` only when set |
+| `DRIFTNET_LANGUAGE` | `English` | Language of the summaries and the bot's replies |
+| `DRIFTNET_LOCALE` | from `DRIFTNET_LANGUAGE` | Force the bot's own words to `en` or `zh-TW` |
+| `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge. `DRIFTNET_JUDGE=off` disables it |
+| `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
+| `DRIFTNET_CATEGORIES` | built-in | JSON file of your own shelves: `{ "id": "description" }` |
+| `GITHUB_TOKEN` | — | Raises the GitHub API limit from 60 to 5,000 requests per hour |
+| `DRIFTNET_TOKEN` | — | Required for writes (ingest, votes, MCP) once the server is public |
+| `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
+| `DRIFTNET_DB` | `./data/driftnet.db` | SQLite file |
+| `PORT` | `8787` | HTTP port |
+
+**HTTP endpoints:** `GET /` web page · `GET /api/items` · `GET /api/items/:id` ·
+`POST /api/items/:id/feedback` · `POST /api/ingest` · `POST /api/chat` · `GET /api/stats` ·
+`GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 ## Where your data goes
 
 > [!IMPORTANT]
-> "Self-hosted" describes storage. The database lives on your server, but to judge and summarise
-> a link driftnet sends a **digest** of it (title, a clipped excerpt, the chat note it was shared
-> with) to **TypeSafe** (Jev, if `TYPESAFE_API_KEY` is set) and to **your chosen model provider**,
-> under their API terms. Chat messages without a link are never processed or stored. Point the
-> `openai` provider at Ollama and turn Jev off (`DRIFTNET_JUDGE=off`) to keep everything on your
-> own machine.
+> "Self-hosted" describes storage. The database lives on your server. To judge and summarise a
+> link, driftnet sends a **digest** of it (title, a clipped excerpt, and the chat text it was
+> shared with) to **TypeSafe** (Jev, if enabled) and to **your chosen model provider**, under their
+> API terms. Chat messages without a link are never processed or stored.
+>
+> To keep everything on your own machine, point the `openai` provider at Ollama and set
+> `DRIFTNET_JUDGE=off`.
 
-## Layout
+## Contributing
 
-```
-packages/core     pipeline, extractors, judge (Jev), summariser + model adapters, guard, store (SQLite)
+```text
+packages/core     pipeline, extractors, judge (Jev), summariser + model adapters, guard, store
 apps/server       HTTP API, web page, MCP, chat adapters
-skills/driftnet   Agent Skill for any skills-capable agent
+skills/driftnet   Agent Skill
 ```
 
-Add an extractor (say, a logged-in browser for Facebook photo posts) with `registerExtractor()`.
-Add a chat platform by calling `handleChatText()` from `apps/server/src/adapters/handle.ts`.
+```bash
+pnpm typecheck && pnpm test
+```
 
-## Roadmap — good first contributions
+Extension points:
 
-Found by running driftnet on real shared links:
+- **Extractor** for a new site: `registerExtractor()` in `packages/core/src/extractors`
+- **Model**: implement `LlmProvider` in `packages/core/src/llm`
+- **Chat platform**: call `handleChatText()` from `apps/server/src/adapters/handle.ts`
+- **Judge**: implement `Judge` in `packages/core/src/judge`
+- **Bot language**: add a locale to `packages/core/src/i18n.ts`
 
-- [ ] **Video transcripts.** Many reels say the tool's name only out loud (captions, Whisper).
-- [ ] **Login-walled posts.** Facebook photo posts and some Threads posts return nothing
-      anonymously: a pluggable logged-in fetcher, or OCR on the post image.
+### Roadmap: good first issues
+
+These came from running driftnet on links people actually share:
+
+- [ ] **Video transcripts.** Many reels only say the tool's name out loud (captions, Whisper).
+- [ ] **Login-walled posts.** Facebook photo posts return nothing anonymously. Needs a pluggable
+      logged-in fetcher, or OCR on the post image.
 - [ ] **Links in comments.** "Link in the first comment" is everywhere.
-- [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, reaction-based voting.
+- [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, voting by reaction.
 - [ ] **Weekly digest** posted back to the chat.
-- [ ] **More judges and model adapters.** `Judge` takes any typed classifier; `LlmProvider`
-      takes any model that can fill a JSON schema (Gemini native, Bedrock, Vertex…).
+- [ ] **More adapters.** Native Gemini, Bedrock, Vertex, more judges.
 
 ## License
 
-MIT
+[MIT](LICENSE)

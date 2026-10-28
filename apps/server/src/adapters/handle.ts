@@ -1,4 +1,4 @@
-import { extractUrls, renderText, type Driftnet, type ShareContext } from "@driftnet/core";
+import { extractUrls, messages, renderText, type Driftnet, type ShareContext } from "@driftnet/core";
 
 /** "👍 12", "+12", "👎12 太舊了", "-12 spam" */
 const VOTE_RE = /^\s*(👍|👎|\+|-)\s*#?(\d+)\s*(.*)$/su;
@@ -12,19 +12,20 @@ export async function handleChatText(
   text: string,
   ctx: Omit<ShareContext, "note">,
 ): Promise<string | null> {
+  const t = messages();
   const vote = VOTE_RE.exec(text);
   if (vote) {
     const id = Number(vote[2]);
-    if (!dn.store.get(id)) return `No item #${id}.`;
+    if (!dn.store.get(id)) return t.noItem(id);
     const up = vote[1] === "👍" || vote[1] === "+";
     dn.store.vote(id, up ? 1 : -1, `${ctx.platform}:${ctx.userId ?? ctx.chatId}`, vote[3]?.trim() || undefined);
-    return up ? `👍 #${id}` : `👎 #${id} — noted, similar items will cost less next time`;
+    return up ? t.votedUp(id) : t.votedDown(id);
   }
 
   if (extractUrls(text).length === 0) return null;
   const results = await dn.pipeline.ingestMessage(text, ctx);
   const base = process.env.DRIFTNET_PUBLIC_URL;
   return results
-    .map((r) => `${renderText(r, base)}\n#${r.item.id} · reply 👍${r.item.id} / 👎${r.item.id}`)
+    .map((r) => `${renderText(r, base, t)}\n${t.footer(r.item.id)}`)
     .join("\n\n");
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canonicalize, extractUrls, guard, Store } from "../src/index.ts";
+import { canonicalize, extractUrls, guard, messages, renderText, resolveLocale, Store } from "../src/index.ts";
 import { cleanReadme } from "../src/extractors/github.ts";
 
 test("canonicalize strips tracking and unifies hosts", () => {
@@ -45,4 +45,19 @@ test("store: reputation learns from votes", () => {
   assert.equal(rep.down, 3);
   assert.ok(rep.score < 0.25);
   assert.equal(store.reputation("unknown").score, 0.5);
+});
+
+test("bot strings follow DRIFTNET_LANGUAGE unless DRIFTNET_LOCALE is set", () => {
+  assert.equal(resolveLocale({}), "en");
+  assert.equal(resolveLocale({ DRIFTNET_LANGUAGE: "Traditional Chinese (Taiwan)" }), "zh-TW");
+  assert.equal(resolveLocale({ DRIFTNET_LANGUAGE: "Traditional Chinese (Taiwan)", DRIFTNET_LOCALE: "en" }), "en");
+  const item = {
+    id: 3, url: "https://github.com/a/b", title: "b", kind: "repo" as const, category: "news", worth: "normal" as const,
+    isAiTool: 1, judgeEngine: "jev" as const, flags: [], source: "github:a", shareCount: 2, createdAt: "", updatedAt: "",
+    summary: { name: "b", oneLiner: "x", highlights: [], useCases: [], tags: [], mentions: [{ name: "P", openSource: true }, { name: "Q", openSource: false }] },
+  };
+  const zh = renderText({ item, cached: true }, undefined, messages("zh-TW"));
+  assert.match(zh, /提到：P、Q/);
+  assert.match(zh, /已收錄過 · 分享 2 次/);
+  assert.match(renderText({ item, cached: true }, undefined, messages("en")), /Mentions: P, Q/);
 });
