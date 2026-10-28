@@ -2,13 +2,13 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import type { Item, Judgement, Kind, ShareContext, Summary, Worth } from "./types.ts";
+import type { Item, Judgement, Kind, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
   is_ai_tool: number; summary: string | null; judge_engine: string; enriched_by: string | null;
-  trashed_at: string | null; favorite: number; note: string | null;
+  trashed_at: string | null; favorite: number; note: string | null; user_placed: number; suggestions: string | null;
   flags: string; source: string; share_count: number; created_at: string; updated_at: string;
 }
 
@@ -29,9 +29,13 @@ export interface Folder {
   position: number;
   /** Items directly in this folder (not counting sub-folders), trash excluded. */
   count: number;
+  /** Came with driftnet; false for folders the reader (or an accepted AI plan) made. */
+  builtin: boolean;
   /** How often items were filed here by hand or by an agent (moves minus undone moves): higher = filed into more often. */
   uses: number;
 }
+
+export interface FolderRow { id: string; parent: string | null; name: string | null; description: string; position: number; builtin: number }
 
 export class FolderError extends Error {}
 /** A bulk action named an item that doesn't exist; nothing was changed. */
@@ -60,8 +64,8 @@ export interface Note {
 }
 
 export interface ListQuery {
-  /** all (default, trash excluded), favorites, or trash. */
-  view?: "all" | "favorites" | "trash";
+  /** all (default, trash excluded), favorites, trash, or inbox (not filed by hand yet, newest first). */
+  view?: "all" | "favorites" | "trash" | "inbox";
   q?: string;
   category?: string;
   kind?: Kind;
@@ -190,8 +194,17 @@ export class Store {
       ["note", "TEXT"],
       // Who acted, when known: "admin" or "agent:<token id>".
       ["claimed_actor", "TEXT"], ["moved_by", "TEXT"],
+      // The classifier's top folders as JSON [{folder, score}]: what the Inbox offers as one-tap chips.
+      ["suggestions", "TEXT"],
     ] as const) {
       if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
+    }
+    // Which folders came from the seed (the reader didn't make them): an AI plan may rename or merge only those.
+    const folderCols = new Set((this.db.prepare("PRAGMA table_info(folders)").all() as { name: string }[]).map((c) => c.name));
+    if (!folderCols.has("builtin")) {
+      this.db.exec("ALTER TABLE folders ADD COLUMN builtin INTEGER NOT NULL DEFAULT 0");
+      // Folders made before the marker existed: a never-renamed shelf is certainly a built-in one.
+      this.db.exec("UPDATE folders SET builtin = 1 WHERE name IS NULL");
     }
   }
 
@@ -210,23 +223,24 @@ export class Store {
 
   upsert(input: {
     url: string; aliases: string[]; title: string; judgement: Judgement; summary: Summary | null;
-    flags: string[]; source: string;
+    flags: string[]; source: string; suggestions?: Suggestion[];
   }): Item {
     const { judgement: j } = input;
     const row = this.db
       .prepare(
-        `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source, suggestions)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(url) DO UPDATE SET
            title = excluded.title, kind = excluded.kind, category = excluded.category, worth = excluded.worth,
            is_ai_tool = excluded.is_ai_tool, summary = excluded.summary, judge_engine = excluded.judge_engine,
-           flags = excluded.flags, source = excluded.source,
+           flags = excluded.flags, source = excluded.source, suggestions = COALESCE(excluded.suggestions, suggestions),
            updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
          RETURNING *`,
       )
       .get(
         input.url, input.title, j.kind, j.category, j.worth, j.isAiTool,
         input.summary ? JSON.stringify(input.summary) : null, j.engine, input.flags.join(","), input.source,
+        input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
       ) as unknown as ItemRow;
     const alias = this.db.prepare("INSERT OR IGNORE INTO aliases (url, item_id) VALUES (?, ?)");
     for (const a of input.aliases) if (a !== input.url) alias.run(a, row.id);
@@ -247,7 +261,7 @@ export class Store {
   seedFolders(seed: Record<string, string>): void {
     const has = this.db.prepare("SELECT COUNT(*) AS n FROM folders").get() as { n: number };
     if (has.n > 0) return;
-    const insert = this.db.prepare("INSERT INTO folders (id, description, position) VALUES (?, ?, ?)");
+    const insert = this.db.prepare("INSERT INTO folders (id, description, position, builtin) VALUES (?, ?, ?, 1)");
     Object.entries(seed).forEach(([id, description], i) => insert.run(id, description, i));
     if (!("other" in seed)) insert.run("other", "Anything that fits none of the above", Object.keys(seed).length);
   }
@@ -255,13 +269,13 @@ export class Store {
   folders(): Folder[] {
     const rows = this.db
       .prepare(
-        `SELECT f.id, f.parent_id AS parent, f.name, f.description, f.position,
+        `SELECT f.id, f.parent_id AS parent, f.name, f.description, f.position, f.builtin,
                 (SELECT COUNT(*) FROM items i WHERE i.category = f.id AND i.trashed_at IS NULL) AS count
          FROM folders f ORDER BY f.position, f.id`,
       )
       .all() as unknown as Folder[];
     const uses = this.folderUses();
-    return rows.map((r) => ({ id: r.id, parent: r.parent ?? null, name: r.name ?? null, description: r.description, position: r.position, count: r.count, uses: uses[r.id] ?? 0 }));
+    return rows.map((r) => ({ id: r.id, parent: r.parent ?? null, name: r.name ?? null, description: r.description, position: r.position, builtin: Number(r.builtin) === 1, count: r.count, uses: uses[r.id] ?? 0 }));
   }
 
   /** The move counter per folder: one JSON object in the state table. */
@@ -392,22 +406,110 @@ export class Store {
     for (const [folder, n] of undone) this.bumpFolderUse(folder, -n);
   }
 
+  private txDepth = 0;
+
+  /** Run `fn` all or nothing; calls inside it (moveItems, …) join the same transaction through savepoints. */
+  transaction<T>(fn: () => T): T {
+    const name = `sp${this.txDepth}`;
+    this.db.exec(this.txDepth === 0 ? "BEGIN" : `SAVEPOINT ${name}`);
+    this.txDepth++;
+    try {
+      const out = fn();
+      this.txDepth--;
+      this.db.exec(this.txDepth === 0 ? "COMMIT" : `RELEASE ${name}`);
+      return out;
+    } catch (err) {
+      this.txDepth--;
+      this.db.exec(this.txDepth === 0 ? "ROLLBACK" : `ROLLBACK TO ${name}; RELEASE ${name}`);
+      throw err;
+    }
+  }
+
   /** Run `fn` for every id in one transaction; an unknown id rolls the whole batch back. `cols` are read first and passed in. */
   private inTransaction<T>(ids: number[], cols: string, fn: (id: number, before: Record<string, unknown>) => T): T[] {
     const read = this.db.prepare(`SELECT ${cols} FROM items WHERE id = ?`);
-    this.db.exec("BEGIN");
-    try {
-      const out = ids.map((id) => {
-        const before = read.get(id) as Record<string, unknown> | undefined;
-        if (!before) throw new ItemError(`no item ${id}`);
-        return fn(id, before);
-      });
-      this.db.exec("COMMIT");
-      return out;
-    } catch (err) {
-      this.db.exec("ROLLBACK");
-      throw err;
-    }
+    return this.transaction(() => ids.map((id) => {
+      const before = read.get(id) as Record<string, unknown> | undefined;
+      if (!before) throw new ItemError(`no item ${id}`);
+      return fn(id, before);
+    }));
+  }
+
+  /** The whole folder table as stored, for an undo snapshot. */
+  snapshotFolders(): FolderRow[] {
+    return this.db.prepare("SELECT id, parent_id AS parent, name, description, position, builtin FROM folders ORDER BY position, id").all() as unknown as FolderRow[];
+  }
+
+  /** Put the folder table back exactly as a snapshot found it. Cards left in a folder that no longer exists go to "other". */
+  restoreFolders(rows: FolderRow[]): void {
+    this.transaction(() => {
+      this.db.exec("PRAGMA defer_foreign_keys = ON");
+      this.db.exec("DELETE FROM folders");
+      const ins = this.db.prepare("INSERT INTO folders (id, parent_id, name, description, position, builtin) VALUES (?, ?, ?, ?, ?, ?)");
+      // Parents first, so a foreign key never points at a row that isn't there yet.
+      const done = new Set<string>();
+      const pending = [...rows];
+      while (pending.length) {
+        const before = pending.length;
+        for (let i = pending.length - 1; i >= 0; i--) {
+          const r = pending[i]!;
+          if (r.parent && !done.has(r.parent)) continue;
+          ins.run(r.id, r.parent, r.name, r.description, r.position, r.builtin);
+          done.add(r.id);
+          pending.splice(i, 1);
+        }
+        if (pending.length === before) throw new FolderError("folder snapshot has a loop");
+      }
+      if (!done.has("other")) this.db.prepare("INSERT INTO folders (id, description, position, builtin) VALUES ('other', 'Anything that fits none of the above', 9999, 1)").run();
+      this.db.prepare("UPDATE items SET category = 'other' WHERE category NOT IN (SELECT id FROM folders)").run();
+    });
+  }
+
+  /** Cards of `ids` that are still waiting for the reader: not filed by hand, not trashed. */
+  movableCards(ids: number[]): { id: number; folder: string }[] {
+    const read = this.db.prepare("SELECT id, category FROM items WHERE id = ? AND user_placed = 0 AND trashed_at IS NULL");
+    return ids.flatMap((id) => {
+      const r = read.get(id) as { id: number; category: string } | undefined;
+      return r ? [{ id: r.id, folder: r.category }] : [];
+    });
+  }
+
+  /** Folder and placement of each existing item, for an undo snapshot. */
+  itemPlacement(ids: number[]): { id: number; folder: string; user_placed: number }[] {
+    const read = this.db.prepare("SELECT id, category, user_placed FROM items WHERE id = ?");
+    return ids.flatMap((id) => {
+      const r = read.get(id) as { id: number; category: string; user_placed: number } | undefined;
+      return r ? [{ id: r.id, folder: r.category, user_placed: r.user_placed }] : [];
+    });
+  }
+
+  /** Every item (trash included) sitting directly in a folder. */
+  categoryItemIds(folder: string): number[] {
+    return (this.db.prepare("SELECT id FROM items WHERE category = ?").all(folder) as { id: number }[]).map((r) => r.id);
+  }
+
+  /** Folders that hold at least one card the reader filed by hand. */
+  placedFolders(): Set<string> {
+    return new Set((this.db.prepare("SELECT DISTINCT category FROM items WHERE user_placed = 1").all() as { category: string }[]).map((r) => r.category));
+  }
+
+  /** Fold `from` into `into`: its cards and sub-folders go there, the folder goes away, its move count carries over. */
+  mergeFolders(from: string, into: string): void {
+    if (from === "other") throw new FolderError("“other” can't be merged away");
+    if (!this.folderExists(from) || !this.folderExists(into)) throw new FolderError(`no folder ${from} / ${into}`);
+    if (from === into || this.descendants(from).includes(into)) throw new FolderError("a folder can't be merged into itself");
+    this.transaction(() => {
+      this.db.prepare("UPDATE items SET category = ? WHERE category = ?").run(into, from);
+      this.db.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ?").run(into, from);
+      this.db.prepare("DELETE FROM folders WHERE id = ?").run(from);
+    });
+    const n = this.folderUses()[from] ?? 0;
+    if (n) { this.bumpFolderUse(from, -Infinity); this.bumpFolderUse(into, n); }
+  }
+
+  /** Is this a shelf that came with driftnet (not one the reader or an AI plan made)? */
+  isBuiltinFolder(id: string): boolean {
+    return (this.db.prepare("SELECT builtin FROM folders WHERE id = ?").get(id) as { builtin: number } | undefined)?.builtin === 1;
   }
 
   /**
@@ -686,6 +788,7 @@ export class Store {
     const where: string[] = [query.view === "trash" ? "trashed_at IS NOT NULL" : "trashed_at IS NULL"];
     const args: (string | number)[] = [];
     if (query.view === "favorites") where.push("favorite = 1");
+    if (query.view === "inbox") where.push("user_placed = 0");
     if (query.category) {
       // A folder shows everything below it too.
       const ids = this.descendants(query.category);
@@ -709,12 +812,18 @@ export class Store {
     }
     // The trash lists what was removed last first; elsewhere the best comes first.
     const order = query.view === "trash" ? "trashed_at DESC"
+      : query.view === "inbox" ? "created_at DESC, id DESC"
       : query.sort === "newest" ? "created_at DESC, id DESC"
       : query.sort === "shared" ? `share_count DESC, ${WORTH_ORDER} DESC, updated_at DESC`
       : `${WORTH_ORDER} DESC, updated_at DESC`;
     const sql = `SELECT * FROM items WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`;
     args.push(clampInt(query.limit, 1, 500, 50));
     return (this.db.prepare(sql).all(...args) as unknown as ItemRow[]).map(toItem);
+  }
+
+  /** Cards waiting in the Inbox: not filed by hand, not trashed. */
+  inboxCount(): number {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM items WHERE user_placed = 0 AND trashed_at IS NULL AND flags NOT LIKE '%injection%' AND ${Store.NET_VOTES} > -2`).get() as { n: number }).n;
   }
 
   stats(): { items: number; shares: number; favorites: number; trash: number; byCategory: Record<string, number> } {
@@ -768,9 +877,19 @@ function toItem(r: ItemRow): Item {
     ...(r.trashed_at ? { trashedAt: r.trashed_at } : {}),
     ...(r.enriched_by ? { enrichedBy: r.enriched_by } : {}),
     ...(r.note ? { note: r.note } : {}),
+    suggestions: parseSuggestions(r.suggestions),
+    placed: r.user_placed === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+function parseSuggestions(raw: string | null): Suggestion[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw) as Suggestion[];
+    return Array.isArray(v) ? v.filter((s) => s && typeof s.folder === "string").slice(0, 3) : [];
+  } catch { return []; }
 }
 
 interface NoteRow { id: number; title: string; body: string; created_at: string; updated_at: string }

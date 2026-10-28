@@ -6,6 +6,7 @@ import { JevJudge } from "./judge/jev.ts";
 import { Pipeline, type Engines } from "./pipeline.ts";
 import { Store } from "./store.ts";
 import { createProvider } from "./llm/index.ts";
+import type { LlmProvider } from "./llm/types.ts";
 import { Summarizer } from "./summarize.ts";
 import { categoryLabel, resolveLocale, type Locale } from "./i18n.ts";
 import { defaultDbPath } from "./home.ts";
@@ -18,9 +19,11 @@ export { Pipeline } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, loadCategories } from "./categories.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";
-export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type Note, type ListQuery, type Reputation } from "./store.ts";
+export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
 export { Summarizer } from "./summarize.ts";
+export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
+export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
 export { renderLink, renderText } from "./render.ts";
 export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
@@ -34,6 +37,8 @@ export interface Driftnet {
   /** A folder's display name: the reader's name, or the built-in label in `locale`. */
   folderLabel(id: string, locale?: Locale): string;
   readonly engines: { judge: string; summarizer: string };
+  /** The configured model, or undefined when none is (AI features then say so). */
+  readonly llm: LlmProvider | undefined;
   /** Rebuild the judge, model and rules from (new) settings without restarting. */
   reconfigure(env?: NodeJS.ProcessEnv): { judge: string; summarizer: string };
   /** Configuration problems worth printing at startup. */
@@ -67,6 +72,9 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
     get engines() {
       return built.labels;
     },
+    get llm() {
+      return built.llm;
+    },
     reconfigure(next = env) {
       built = buildEngines(next);
       pipeline.configure(built.engines);
@@ -82,7 +90,7 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
 }
 
 /** Judge, model and rules from settings; rebuilt when the settings page saves. */
-function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { judge: string; summarizer: string } } {
+function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { judge: string; summarizer: string }; llm: LlmProvider | undefined } {
   const jevKey = env.TYPESAFE_API_KEY || readKeyFile(join(homedir(), ".typesafe", "api_key"));
   const judge = jevKey && env.DRIFTNET_JUDGE !== "off" ? new JevJudge(jevKey) : undefined;
   const llm = createProvider(env);
@@ -90,6 +98,7 @@ function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { jud
   const blockedDomains = (env.DRIFTNET_BLOCK_DOMAINS ?? "").split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^\*?\./, "")).filter(Boolean);
   const minConfidence = env.DRIFTNET_MIN_CONFIDENCE ? Number(env.DRIFTNET_MIN_CONFIDENCE) : undefined;
   return {
+    llm,
     engines: {
       ...(judge ? { judge } : {}),
       ...(summarizer ? { summarizer } : {}),

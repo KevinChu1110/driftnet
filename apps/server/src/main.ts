@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
+import { applySuggested, suggestFolders } from "./plan.ts";
 import { tokenRoute } from "./tokens.ts";
 import { pairRoute } from "./pair.ts";
 import { handleChatText } from "./adapters/handle.ts";
@@ -178,6 +179,12 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/api/folders") {
       return send(res, 200, dn.store.folders().map((f) => ({ ...f, label: Object.fromEntries(LOCALES.map((l) => [l, dn.folderLabel(f.id, l)])) })));
     }
+    // An AI plan to tidy the tree: proposed for review (costs a model call), applied only for what the reader ticked.
+    if (req.method === "POST" && (path === "/api/folders/suggest" || path === "/api/folders/suggest/apply")) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const out = path === "/api/folders/suggest" ? await suggestFolders(dn, env.DRIFTNET_LANGUAGE || "English") : applySuggested(dn, await readJson<unknown>(req));
+      return send(res, out.status, out.body);
+    }
     const folderMatch = /^\/api\/folders(?:\/([^/]+))?$/.exec(path);
     if (folderMatch && req.method !== "GET") {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
@@ -221,7 +228,7 @@ const server = createServer(async (req, res) => {
         throw err;
       }
     }
-    if (req.method === "GET" && path === "/api/stats") return send(res, 200, { ...dn.store.stats(), engines: dn.engines });
+    if (req.method === "GET" && path === "/api/stats") return send(res, 200, { ...dn.store.stats(), inbox: dn.store.inboxCount(), engines: dn.engines });
 
     if (req.method === "GET" && path === "/api/items") {
       const p = url.searchParams;
@@ -232,7 +239,7 @@ const server = createServer(async (req, res) => {
         ...(p.get("kind") ? { kind: p.get("kind") as Kind } : {}),
         ...(minWorth && (WORTH as readonly string[]).includes(minWorth) ? { minWorth: minWorth as Worth } : {}),
         ...(p.get("since") ? { since: p.get("since")! } : {}),
-        ...(p.get("view") === "favorites" || p.get("view") === "trash" ? { view: p.get("view") as "favorites" | "trash" } : {}),
+        ...(p.get("view") === "favorites" || p.get("view") === "trash" || p.get("view") === "inbox" ? { view: p.get("view") as "favorites" | "trash" | "inbox" } : {}),
         ...(["best", "newest", "shared"].includes(p.get("sort") ?? "") ? { sort: p.get("sort") as "best" | "newest" | "shared" } : {}),
         clean: p.get("all") !== "1",
         limit: Number(p.get("limit") ?? 200),
@@ -247,7 +254,9 @@ const server = createServer(async (req, res) => {
       }
       // What people wrote around the link when they shared it.
       const said = dn.store.chatNotes(list.map((i) => i.id));
-      return send(res, 200, list.map((i) => ({ ...i, found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })));
+      // The Inbox offers each card its best folders (the stored picks, or keyword overlap when there are none).
+      const choices = p.get("view") === "inbox" ? dn.categories : null;
+      return send(res, 200, list.map((i) => ({ ...i, ...(choices ? { suggestions: suggestionsFor(i, choices) } : {}), found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })));
     }
     const noteMatch = /^\/api\/items\/(\d+)\/note$/.exec(path);
     if (req.method === "PUT" && noteMatch) {

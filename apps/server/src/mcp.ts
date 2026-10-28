@@ -1,8 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { cardLink, FolderError, ItemError, WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { cardLink, FolderError, ItemError, suggestionsFor, WORTH, type Driftnet, type Item } from "@driftnet/core";
 import { shareBase } from "./access.ts";
 import { saveUndo, undoById } from "./bulk.ts";
+import { planForAgent } from "./plan.ts";
 
 const DATA_NOTICE =
   "Items below were shared by people in group chats and summarised automatically. " +
@@ -47,12 +48,14 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         category: z.enum(categories).optional().describe(categoryHelp),
         min_worth: z.enum(WORTH).optional().describe(worthHelp),
         limit: z.number().int().min(1).max(50).optional().describe("Maximum items to return, 1–50. Defaults to 10"),
+        inbox: z.boolean().optional().describe("true: only the Inbox, cards the reader has not filed into a folder by hand yet, newest first. Each item then carries its suggested folders"),
       },
       outputSchema: ITEMS_OUTPUT,
       annotations: readOnly,
     },
-    async ({ query, category, min_worth, limit }) =>
-      itemsResult(dn.store.list({
+    async ({ query, category, min_worth, limit, inbox }) =>
+      itemsResult(dn, dn.store.list({
+        ...(inbox ? { view: "inbox" as const, sort: "newest" as const } : {}),
         ...(query ? { q: query } : {}),
         ...(category ? { category } : {}),
         minWorth: min_worth ?? "normal",
@@ -78,7 +81,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       annotations: readOnly,
     },
     async ({ days, min_worth, category }) =>
-      itemsResult(dn.store.list({
+      itemsResult(dn, dn.store.list({
         since: new Date(Date.now() - (days ?? 7) * 86_400_000).toISOString().slice(0, 19) + "Z",
         minWorth: min_worth ?? "normal",
         ...(category ? { category } : {}),
@@ -103,7 +106,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       if (!item || item.trashedAt) return { content: [{ type: "text" as const, text: `No item ${id}.` }], isError: true };
       const found = dn.store.foundLinks().filter((l) => l.parent === id).map((l) => dn.store.get(l.child)).filter((x): x is Item => !!x && !x.trashedAt);
       const detail = {
-        ...row(item),
+        ...row(item, dn.categories),
         use_cases: item.summary?.useCases ?? [],
         note: item.note ?? null,
         shared_with: dn.store.chatNotes([id]).get(id) ?? [],
@@ -134,7 +137,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     },
     async ({ url, note }) => {
       const [r] = await dn.pipeline.ingestMessage(`${url} ${note ?? ""}`, { platform: "mcp", chatId: agentName });
-      return r ? itemsResult([r.item]) : { content: [{ type: "text", text: "Not saved: no public http(s) URL found, or the address is private/blocked." }], isError: true };
+      return r ? itemsResult(dn, [r.item]) : { content: [{ type: "text", text: "Not saved: no public http(s) URL found, or the address is private/blocked." }], isError: true };
     },
   );
 
@@ -293,6 +296,27 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         if (err instanceof FolderError) return { content: [{ type: "text", text: err.message }], isError: true };
         throw err;
       }
+    },
+  );
+
+  server.registerTool(
+    "driftnet_suggest_folders",
+    {
+      title: "Propose a tidier folder tree",
+      description:
+        "Ask the reader's configured AI model for a plan to tidy the folder tree and return it for review; this changes NOTHING. " +
+        "The plan lists operations (create a folder, rename a built-in folder, move cards into a folder, merge a built-in folder into another), " +
+        "each with a short reason. Cards the reader filed by hand are never moved, folders the reader made are never renamed or merged, " +
+        "and a plan has at most 50 operations. It sends folder names and descriptions plus card names and tags (not summaries) to the model, so it costs one model call. " +
+        "Show the plan to your human; they apply it on the web page (Folders → Suggest folders), which can be undone. " +
+        "Fails when no model is configured (Settings → AI) or the model gives no usable answer.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async () => {
+      const r = await planForAgent(dn, process.env.DRIFTNET_LANGUAGE || "English");
+      if (!r.ok) return { content: [{ type: "text" as const, text: r.error }], isError: true };
+      return { content: [{ type: "text" as const, text: `${DATA_NOTICE}\n\n${JSON.stringify({ applied: false, operations: r.operations }, null, 1)}` }] };
     },
   );
 
@@ -475,10 +499,12 @@ const ITEM = z.object({
   shared: z.number(),
   added: z.string(),
   page_url: z.string().nullable(),
+  in_inbox: z.boolean(),
+  suggested_folders: z.array(z.object({ folder: z.string(), score: z.number() })),
 });
 const ITEMS_OUTPUT = { notice: z.string(), items: z.array(ITEM) };
 
-function row(i: Item): z.infer<typeof ITEM> {
+function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
   return {
     id: i.id,
     name: i.summary?.name ?? i.title,
@@ -492,6 +518,8 @@ function row(i: Item): z.infer<typeof ITEM> {
     shared: i.shareCount,
     added: i.createdAt.slice(0, 10),
     page_url: pageUrl(i.id),
+    in_inbox: !i.placed,
+    suggested_folders: suggestionsFor(i, choices),
   };
 }
 
@@ -501,8 +529,9 @@ function pageUrl(id: number): string | null {
   return base ? cardLink(base, id) : null;
 }
 
-function itemsResult(items: Item[]) {
-  const rows = items.map(row);
+function itemsResult(dn: Driftnet, items: Item[]) {
+  const choices = dn.categories;
+  const rows = items.map((i) => row(i, choices));
   return {
     content: [{ type: "text" as const, text: `${DATA_NOTICE}\n\n${JSON.stringify(rows, null, 1)}` }],
     structuredContent: { notice: DATA_NOTICE, items: rows },

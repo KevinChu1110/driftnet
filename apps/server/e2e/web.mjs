@@ -772,6 +772,58 @@ try {
     console.log("✓ 🔑 entry: a wrong password is refused, the right one unlocks editing");
   }
 
+  // Inbox: unfiled cards with one-tap folder chips; 1–3 pick a chip, s skips; a plan button that needs a model.
+  {
+    await viewport(1280, 820, false);
+    await open();
+    const key = async (k) => {
+      await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: k, text: k }, s);
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: k }, s);
+      await sleep(150);
+    };
+    // The password may be set by now (and the catalogue private): read through the page's own token.
+    const tok = await evaluate(s, `localStorage.getItem("driftnet-token") || localStorage.getItem("driftnet-key") || ""`);
+    const get = (path) => fetch(`http://127.0.0.1:${port}${path}`, { headers: tok ? { authorization: `Bearer ${tok}` } : {} }).then((r) => r.json());
+    const inboxBefore = (await get("/api/items?view=inbox&limit=500")).length;
+    assert.ok(inboxBefore > 3, "the seeded cards are all in the Inbox");
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="inbox"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe .chips").length > 2`, "inbox cards with chips");
+    assert.equal(await evaluate(s, `document.querySelector('[data-field="view"][data-value="inbox"] .count').textContent`), String(inboxBefore), "the sidebar shows the Inbox count");
+    // 1 files the focused card into its first suggestion; the next card takes focus.
+    const first = await evaluate(s, `(() => { const sw = document.querySelector(".swipe"); sw.querySelector(".card").focus(); return JSON.stringify({ id: Number(sw.dataset.id), folder: sw.querySelector("[data-chip]")?.dataset.chip ?? null }); })()`).then(JSON.parse);
+    if (first.folder) {
+      await key("1");
+      await waitFor(s, `!document.getElementById("item-${first.id}")`, "the filed card leaves the Inbox");
+      assert.equal((await get(`/api/items/${first.id}`)).category, first.folder);
+      assert.equal((await get("/api/items?view=inbox&limit=500")).length, inboxBefore - 1);
+      assert.equal(await evaluate(s, `document.activeElement.closest(".swipe") !== null`), true, "focus moves to the next card");
+      // Undo puts it back in the Inbox.
+      await evaluate(s, `document.getElementById("toast-undo").click()`);
+      await waitFor(s, `!!document.getElementById("item-${first.id}")`, "undo returns the card to the Inbox");
+    }
+    // s skips: focus moves on and nothing is filed.
+    const skipped = await evaluate(s, `(() => { const c = [...document.querySelectorAll(".swipe .card")]; c[0].focus(); return c[0].closest(".swipe").dataset.id; })()`);
+    await key("s");
+    assert.notEqual(await evaluate(s, `document.activeElement.closest(".swipe").dataset.id`), skipped);
+    assert.equal((await get(`/api/items/${skipped}`)).placed, false);
+    // Chips are tappable too; "m" opens the full picker.
+    await evaluate(s, `document.querySelector(".swipe .card").focus()`);
+    await key("m");
+    await waitFor(s, `document.getElementById("move-dlg").open`, "full picker from the Inbox");
+    await evaluate(s, `document.getElementById("mv-cancel").click()`);
+    // The ? dialog explains that 1–3 mean chips here.
+    await key("?");
+    await waitFor(s, `document.getElementById("ky-body").innerText.includes("1") && document.querySelectorAll("#ky-body h4").length >= 5`, "shortcuts dialog lists the Inbox keys");
+    await evaluate(s, `document.getElementById("ky-close").click()`);
+    // No model in this setup: the suggest button says so instead of failing.
+    await evaluate(s, `document.querySelector("[data-suggest]").click()`);
+    await waitFor(s, `document.getElementById("toast").classList.contains("show") && document.getElementById("toast-text").textContent.length > 0 && !document.getElementById("plan-dlg").open`, "suggest folders needs a model");
+    const r = await fetch(`http://127.0.0.1:${port}/api/folders/suggest`, { method: "POST", headers: tok ? { authorization: `Bearer ${tok}` } : {} });
+    assert.equal(r.status, 409, "the endpoint refuses without a model");
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
+    console.log("✓ inbox: chips file a card with 1–3, s skips, m opens the picker, undo returns it; suggest folders needs a model");
+  }
+
   console.log("\nall web checks passed");
 } catch (err) {
   failed = true;
