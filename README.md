@@ -131,6 +131,8 @@ in this JSON schema"), with two adapters built in:
 |---|---|
 | `anthropic` | Claude, through the official SDK |
 | `openai` | Anything OpenAI-compatible: OpenAI, Gemini, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio (fully local)** |
+| `claude-cli` | **Your Claude subscription**, through a logged-in Claude Code on the same machine. No API key |
+| `gemini-cli` | **Your Google account**, through a logged-in Gemini CLI on the same machine. No API key |
 | *(empty)* | No model: links are still extracted, judged by Jev if configured, deduplicated and listed |
 
 ```bash
@@ -147,7 +149,38 @@ DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 
 Replies are validated against the schema whatever the provider, so a model that ignores
 structured output cannot store malformed data. Truncated, refused or malformed replies are
-retried once. Auth and bad-request errors are not.
+retried once. Auth and bad-request errors are not. A link the model gives for a tool is kept only
+if it appears in the fetched content; otherwise driftnet asks GitHub for an exact-name match,
+because models readily invent plausible-looking repo URLs.
+
+### No API key? Use the CLI you're already logged in to
+
+```bash
+DRIFTNET_LLM_PROVIDER=claude-cli      # model defaults to haiku
+# or
+DRIFTNET_LLM_PROVIDER=gemini-cli
+DRIFTNET_LLM_MODEL=gemini-3.5-flash-lite
+```
+
+driftnet runs the CLI in the background, one call at a time, and locks it down because shared
+links are untrusted input:
+
+| | Claude Code | Gemini CLI |
+|---|---|---|
+| Tools | all off (`--tools ""`) | all excluded through a system-level settings file |
+| Your settings, hooks, MCP servers, `CLAUDE.md` / `GEMINI.md` | not loaded | not loaded (own system prompt, no extensions) |
+| Working directory | an empty private temp folder | an empty private temp folder |
+| Environment | driftnet's secrets and `ANTHROPIC_API_KEY` removed, so the CLI uses your login | driftnet's secrets and `GEMINI_API_KEY` removed |
+| Measured | ~4 s per item | ~3.5 s per item |
+
+Limits: the CLI has to be installed and logged in on the machine running driftnet, and calls
+count toward your plan's usage limits.
+
+> [!WARNING]
+> Using a consumer subscription from a program is governed by each vendor's terms. Anthropic does
+> not permit third-party products to offer claude.ai login. `claude-cli` runs **your own** Claude
+> Code, with **your own** login, on **your own** machine, and is off by default. Check the current
+> terms before relying on it, and don't use it to serve other people.
 
 ## For agents
 
@@ -180,11 +213,13 @@ All settings are environment variables. See [`.env.example`](.env.example).
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DRIFTNET_LLM_PROVIDER` | *(off)* | `anthropic`, `openai` or empty |
-| `DRIFTNET_LLM_MODEL` | — | Model name, required when a provider is set |
+| `DRIFTNET_LLM_PROVIDER` | *(off)* | `anthropic`, `openai`, `claude-cli`, `gemini-cli` or empty |
+| `DRIFTNET_LLM_MODEL` | — | Model name. Required for `anthropic` and `openai`; `claude-cli` defaults to `haiku` |
 | `DRIFTNET_LLM_API_KEY` | — | Key for that provider (optional for Ollama / LM Studio) |
 | `DRIFTNET_LLM_BASE_URL` | OpenAI | Endpoint for the `openai` provider |
-| `DRIFTNET_LLM_EFFORT` | `anthropic`: `low` | `anthropic`: `low` to `xhigh` (a typo falls back to `low`). `openai`: sent as `reasoning_effort` only when set |
+| `DRIFTNET_LLM_EFFORT` | `anthropic`: `low` | `anthropic`: `low` to `xhigh` (a typo falls back to `low`). `openai`: sent as `reasoning_effort`. `claude-cli`: `--effort`. Only sent when set, except for `anthropic` |
+| `DRIFTNET_CLI_PATH` | `claude` / `gemini` | Path to the CLI binary for `claude-cli` / `gemini-cli` |
+| `DRIFTNET_CLI_CONCURRENCY` | `1` | How many CLI processes may run at once |
 | `DRIFTNET_LANGUAGE` | `English` | Language of the summaries and the bot's replies |
 | `DRIFTNET_LOCALE` | from `DRIFTNET_LANGUAGE` | Force the bot's own words to `en` or `zh-TW` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge. `DRIFTNET_JUDGE=off` disables it |

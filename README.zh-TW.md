@@ -120,6 +120,8 @@ driftnet 不綁任何一家。摘要只透過一個很小的介面（`LlmProvide
 |---|---|
 | `anthropic` | Claude（官方 SDK） |
 | `openai` | 所有相容 OpenAI 格式的服務：OpenAI、Gemini、Grok、DeepSeek、OpenRouter、LiteLLM、**Ollama／LM Studio（完全本機）** |
+| `claude-cli` | **你的 Claude 訂閱**，透過同一台機器上已登入的 Claude Code，不需要 API key |
+| `gemini-cli` | **你的 Google 帳號**，透過同一台機器上已登入的 Gemini CLI，不需要 API key |
 | *（不填）* | 不用模型：照樣擷取、用 Jev 判斷（有設的話）、去重、列出 |
 
 ```bash
@@ -134,7 +136,34 @@ DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 > 例如 Claude Code 會從訂閱額度改走 API 計費。
 
 不論哪家模型，回覆都會照 schema 驗證，不守格式的模型也存不進壞資料。回覆被截斷、拒答或格式錯誤時重試一次；
-金鑰錯誤或請求有誤則不重試。
+金鑰錯誤或請求有誤則不重試。模型給的工具連結，只有真的出現在抓到的內容裡才會保留；否則改用名稱到 GitHub
+做完全比對，因為模型很容易編出看起來很像真的 repo 網址。
+
+### 沒有 API key？用你已經登入的 CLI
+
+```bash
+DRIFTNET_LLM_PROVIDER=claude-cli      # 模型預設 haiku
+# 或
+DRIFTNET_LLM_PROVIDER=gemini-cli
+DRIFTNET_LLM_MODEL=gemini-3.5-flash-lite
+```
+
+driftnet 會在背景一次一個地呼叫 CLI。分享進來的連結是不可信的內容，所以 CLI 會被鎖住：
+
+| | Claude Code | Gemini CLI |
+|---|---|---|
+| 工具 | 全部關閉（`--tools ""`） | 用系統層級設定檔全部排除 |
+| 你的設定、hooks、MCP、`CLAUDE.md`／`GEMINI.md` | 不載入 | 不載入（用自己的系統提示、不載入擴充） |
+| 工作資料夾 | 空的私人暫存資料夾 | 空的私人暫存資料夾 |
+| 環境變數 | 拿掉 driftnet 的機密和 `ANTHROPIC_API_KEY`，確保走你的登入 | 拿掉 driftnet 的機密和 `GEMINI_API_KEY` |
+| 實測 | 每則約 4 秒 | 每則約 3.5 秒 |
+
+限制：跑 driftnet 的那台機器要裝好 CLI 並登入；每次呼叫都會計入你方案的用量上限。
+
+> [!WARNING]
+> 用程式呼叫個人訂閱，受各家條款規範。Anthropic 不允許第三方產品提供 claude.ai 登入。`claude-cli` 是在
+> **你自己的**機器上、用**你自己的**登入、跑**你自己的** Claude Code，預設關閉。使用前請先確認最新條款，
+> 也不要拿來替別人提供服務。
 
 ## 給 agent 用
 
@@ -166,11 +195,13 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 
 | 變數 | 預設 | 用途 |
 |---|---|---|
-| `DRIFTNET_LLM_PROVIDER` | *（關閉）* | `anthropic`、`openai` 或留空 |
-| `DRIFTNET_LLM_MODEL` | — | 模型名稱，設了供應商就必填 |
+| `DRIFTNET_LLM_PROVIDER` | *（關閉）* | `anthropic`、`openai`、`claude-cli`、`gemini-cli` 或留空 |
+| `DRIFTNET_LLM_MODEL` | — | 模型名稱。`anthropic`、`openai` 必填；`claude-cli` 預設 `haiku` |
 | `DRIFTNET_LLM_API_KEY` | — | 該供應商的金鑰（Ollama／LM Studio 可不填） |
 | `DRIFTNET_LLM_BASE_URL` | OpenAI | `openai` 供應商的端點 |
-| `DRIFTNET_LLM_EFFORT` | `anthropic`：`low` | `anthropic`：`low`～`xhigh`，打錯字會退回 `low`；`openai`：有設才當作 `reasoning_effort` 送出 |
+| `DRIFTNET_LLM_EFFORT` | `anthropic`：`low` | `anthropic`：`low`～`xhigh`，打錯字會退回 `low`；`openai`：當作 `reasoning_effort`；`claude-cli`：`--effort`。除了 `anthropic`，都是有設才送 |
+| `DRIFTNET_CLI_PATH` | `claude`／`gemini` | `claude-cli`／`gemini-cli` 使用的執行檔路徑 |
+| `DRIFTNET_CLI_CONCURRENCY` | `1` | 同時最多跑幾個 CLI |
 | `DRIFTNET_LANGUAGE` | `English` | 摘要和 bot 回覆的語言 |
 | `DRIFTNET_LOCALE` | 跟 `DRIFTNET_LANGUAGE` | 強制 bot 自己的用語用 `en` 或 `zh-TW` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | 啟用 Jev 判斷；`DRIFTNET_JUDGE=off` 可關閉 |

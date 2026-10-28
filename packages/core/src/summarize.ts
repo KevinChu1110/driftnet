@@ -12,7 +12,10 @@ const SummarySchema = z.object({
   primary_url: z.string().describe("Best link to the tool itself (repo or official site) if it appears in the input, else empty"),
   mentions: z
     .array(z.object({ name: z.string(), open_source: z.boolean() }))
-    .describe("Other named tools, models or projects the content introduces (max 6), excluding the main one; empty if none"),
+    .describe(
+      "Other named tools, models or projects the content introduces or recommends (max 6), excluding the main one. " +
+        "Leave out anything named only for comparison, as background, as a dependency, or to criticise it. Empty if none",
+    ),
 });
 
 /** Used when there is no judge: one call answers the judge questions and writes the summary. */
@@ -77,7 +80,8 @@ export class Summarizer {
     return [
       "You catalogue AI tools that people share in group chats.",
       "Read the link digest and describe the tool itself, not the post that mentions it.",
-      "If the content is a roundup of several tools, describe the roundup and list every tool in mentions.",
+      "If the content is a roundup of several tools, describe the roundup and list every tool it introduces in mentions.",
+      "mentions is for tools a reader should look at next, never for tools the content argues against or only compares with.",
       `Write name as-is; write one_liner, highlights and use_cases in ${this.language}.`,
       "Be concrete and terse. Never invent features that are not in the input.",
       "Reply with JSON only.",

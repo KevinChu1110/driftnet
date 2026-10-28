@@ -65,7 +65,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
  * zod's JSON Schema already lists all non-optional keys as required; close the
  * objects and drop keywords strict mode rejects.
  */
-function strictJsonSchema(schema: z.ZodType): Record<string, unknown> {
+export function strictJsonSchema(schema: z.ZodType): Record<string, unknown> {
   const walk = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(walk);
     if (!node || typeof node !== "object") return node;

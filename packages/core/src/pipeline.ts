@@ -4,8 +4,8 @@ import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
 import type { Summarizer } from "./summarize.ts";
-import type { Digest, IngestResult, Judgement, ShareContext } from "./types.ts";
-import { extractUrls, hostOf } from "./url.ts";
+import type { Digest, IngestResult, Judgement, ShareContext, Summary } from "./types.ts";
+import { canonicalize, extractUrls, hostOf } from "./url.ts";
 
 export interface PipelineOptions {
   store: Store;
@@ -83,12 +83,14 @@ export class Pipeline {
     }
 
     let summary = null;
-    const worthReading = judgement ? judgement.worth !== "skip" && judgement.isAiTool >= 0.3 : true;
+    // Only "worth" gates the model. Not-quite-AI tools (a web library, a design
+    // trick) are what people share too, so isAiTool is informational.
+    const worthReading = judgement ? judgement.worth !== "skip" : true;
     if (this.opts.summarizer && worthReading && !distrusted && !flags.includes("injection")) {
       const r = await this.opts.summarizer.summarize(
         digest, cleanedNote.text, judgement ? undefined : this.opts.categories,
       );
-      summary = r.summary;
+      summary = r.summary ? await this.verifyPrimaryUrl(r.summary, digest) : null;
       judgement ??= r.judgement ?? null;
     }
 
@@ -101,6 +103,25 @@ export class Pipeline {
     store.recordShare(item.id, ctx);
     const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
     return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
+  }
+
+  /**
+   * Models invent plausible links ("github.com/<some-org>/<tool>") when a post
+   * names a tool without linking it. Keep the model's link only if it appears in
+   * what we actually fetched; otherwise ask GitHub for an exact-name match.
+   */
+  private async verifyPrimaryUrl(summary: Summary, digest: Digest): Promise<Summary> {
+    const seen = new Set(
+      [digest.url, ...digest.outlinks, ...extractUrls(digest.text)].map((u) => canonicalize(u)).filter(Boolean),
+    );
+    const claimed = summary.primaryUrl ? canonicalize(summary.primaryUrl) : null;
+    const { primaryUrl: _dropped, ...rest } = summary;
+    if (claimed && seen.has(claimed)) return { ...rest, primaryUrl: claimed };
+    if (digest.kind === "post" || digest.kind === "video") {
+      const repo = await findGithubRepo(summary.name).catch(() => null);
+      if (repo) return { ...rest, primaryUrl: repo };
+    }
+    return rest;
   }
 
   /** Named open-source projects without a link → look them up on GitHub and catalogue them too. */
