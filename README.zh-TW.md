@@ -214,6 +214,9 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
   --header "Authorization: Bearer $DRIFTNET_TOKEN" --header "X-Driftnet-Agent: claude-code"
 ```
 
+每個 agent 各用自己的金鑰，不要拿管理密碼出去：**設定 → 存取 → Agent 專用金鑰**（或「連接 AI」卡片上的
+「幫這個 agent 建一把專用金鑰」）。把金鑰放在 `$DRIFTNET_TOKEN` 的位置即可。
+
 | MCP 工具 | 用途 |
 |---|---|
 | `driftnet_search` | 挑工具前先搜尋清單 |
@@ -304,9 +307,9 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 擷取器外掛（`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
-| `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
+| `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、管理 agent 金鑰、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
 | `DRIFTNET_READ_KEY` | — | 唯讀分享碼（放 header 或 `?key=`）：只能讀，MCP 也只有讀取類工具 |
-| `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取要密碼或分享碼 |
+| `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取要密碼、分享碼或 agent 金鑰 |
 | `DRIFTNET_CLOUDFLARED` | `cloudflared` | `cloudflared` 的路徑，給網頁上的「公開網址」按鈕用 |
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
 | `DRIFTNET_HOME` | `~/.driftnet` | 放 `.env`、資料庫和服務日誌的資料夾 |
@@ -324,7 +327,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）·
-`GET|PUT /api/settings`（限本機，或帶 token）· `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id`（限管理密碼）· `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -338,12 +341,17 @@ ChatGPT、Grok、架在伺服器上的 Hermes 或 OpenClaw）。伺服器只聽 
 2. **誰可以讀。**選「要有密碼或分享碼才能讀」，沒有就什麼都看不到。
 3. **唯讀分享碼。**給只會開連結的 AI：`…/llms.txt?key=…` 只能讀清單。外流就按「重新產生」。管理密碼永遠不能放在網址裡。
    聊天機器人和 agent 給你的卡片連結會帶著它，手機點開不用輸入密碼；網頁會記住分享碼，並把它從網址列拿掉。
-4. **公開網址。**按一下就透過 Cloudflare 開一個臨時的 `https://….trycloudflare.com`（免帳號；
+4. **Agent 專用金鑰。**每個 agent（Hermes、Claude Code、OpenClaw……）一把，不必用管理密碼：「可讀寫」能收錄、
+   搬移、整理，「唯讀」只能看。金鑰建立時只顯示一次，系統只存它的雜湊值。按「撤銷」立刻斷掉那一個 agent；
+   換管理密碼不會影響它們。金鑰只能放在 Bearer header，不能放網址，也不能改設定或再建金鑰。
+   佇列領取和卡片搬移都會記下是哪一把金鑰做的。
+5. **公開網址。**按一下就透過 Cloudflare 開一個臨時的 `https://….trycloudflare.com`（免帳號；
    [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
    要自己裝，driftnet 不會幫你下載）。必須先設密碼，開啟後讀取會改成私人，driftnet 關掉就跟著關。
 
 接著側邊欄的 **🔌 連接 AI** 會列出 Claude Code、Claude 網頁版／桌面版（自訂 connector，唯讀）、ChatGPT 自訂 GPT、
-任何會開連結的聊天 AI，以及 Hermes／OpenClaw／pi 的設定，網址和分享碼都已經填好，複製貼上就能用。
+任何會開連結的聊天 AI，以及 Hermes／OpenClaw／pi 的設定，網址和分享碼都已經填好，複製貼上就能用。agent 的卡片還能直接幫它建一把金鑰並填進設定，
+管理密碼不必離開網頁。
 
 <p align="center"><img src="assets/access-connect-zh-TW.jpg" alt="設定裡的「存取與連線」，和「連接 AI」的卡片" width="100%"></p>
 

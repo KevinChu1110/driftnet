@@ -479,7 +479,32 @@ try {
     await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
     await shoot(`web-connect-${LANG}.png`);
     console.log("✓ connect cards: public URL and share key filled in, password left out");
+
+    // A card makes a token for its agent and shows the snippet with it, not the password.
+    await evaluate(s, `document.querySelector('[data-mint="cc"]').click()`);
+    await waitFor(s, `document.getElementById("cx-cc").textContent.includes("dn_")`, "token on the Claude Code card");
+    const cardToken = (await evaluate(s, `document.getElementById("cx-cc").textContent`)).match(/dn_[\w-]+/)[0];
+    assert.ok(!(await evaluate(s, `document.getElementById("cx-body").innerText`)).includes(pw), "still no password on the cards");
+    const asAgent = (t, path, init = {}) => fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers: { ...remote, authorization: `Bearer ${t}`, "content-type": "application/json" } });
+    assert.equal((await asAgent(cardToken, "/api/ingest", { method: "POST", body: "{}" })).status, 200, "a write token writes");
     await evaluate(s, `document.getElementById("cx-close").click()`);
+
+    // Settings → Access lists it; make a read token, see it once, revoke it.
+    await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
+    await waitFor(s, `document.getElementById("settings-dlg").open && !!document.querySelector("#agent-tokens .tok")`, "agent tokens listed");
+    assert.ok((await evaluate(s, `document.getElementById("agent-tokens").innerText`)).includes("Claude Code"));
+    await evaluate(s, `(() => { document.getElementById("at-name").value = "Dashboard"; document.getElementById("at-scope").value = "read"; document.getElementById("at-create").click(); return 1; })()`);
+    await waitFor(s, `!!document.getElementById("ac-newtok")?.value`, "new token shown once");
+    const readToken = await evaluate(s, `document.getElementById("ac-newtok").value`);
+    assert.equal((await asAgent(readToken, "/api/items")).status, 200, "a read token reads");
+    assert.equal((await asAgent(readToken, "/api/ingest", { method: "POST", body: "{}" })).status, 401, "a read token can't write");
+    assert.equal((await asAgent(cardToken, "/api/agent-tokens")).status, 403, "a token can't manage tokens");
+    await evaluate(s, `document.querySelector('[data-revoke]:not([disabled])') && [...document.querySelectorAll("#agent-tokens .tok")].find((r) => r.innerText.includes("Dashboard")).querySelector("[data-revoke]").click()`);
+    await waitFor(s, `[...document.querySelectorAll("#agent-tokens .tok.revoked")].some((r) => r.innerText.includes("Dashboard"))`, "token revoked in the list");
+    assert.equal((await asAgent(readToken, "/api/items")).status, 401, "a revoked token stops at once");
+    assert.equal(await evaluate(s, `!!document.getElementById("ac-newtok")`), false, "the token is not shown a second time");
+    await evaluate(s, `document.getElementById("st-cancel").click()`);
+    console.log("✓ agent tokens: made from a card and from Settings, scoped, shown once, revoked at once");
 
     // A phone that got a link from a bot: no password stored, only ?key= in the link.
     await evaluate(s, `(() => { localStorage.removeItem("driftnet-token"); localStorage.removeItem("driftnet-key"); return 1; })()`);

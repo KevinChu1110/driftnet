@@ -13,7 +13,7 @@ const DATA_NOTICE =
  * "what's new" to find upgrades for itself, save links, and vote — votes from
  * agents feed the same reputation that keeps junk out.
  */
-export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readOnly?: boolean } = {}): McpServer {
+export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readOnly?: boolean; actor?: string } = {}): McpServer {
   const mcp = new McpServer({ name: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev" });
   // With only the read-only share key, an agent gets the reading tools and nothing that changes the catalogue.
   const READ_TOOLS = new Set(["driftnet_search", "driftnet_list_recent", "driftnet_get_item", "driftnet_list_folders"]);
@@ -153,7 +153,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     async ({ limit }) => {
       const language = process.env.DRIFTNET_LANGUAGE || "English";
       const rules = process.env.DRIFTNET_SUMMARY_RULES?.trim();
-      const items = dn.store.claimPending(`agent:${agentName}`, limit ?? 5);
+      const items = dn.store.claimPending(`agent:${agentName}`, limit ?? 5, 30, opts.actor);
       const rows = items.map((i) => ({
         id: i.id,
         url: i.url,
@@ -279,7 +279,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     },
     async ({ id, folder }) => {
       try {
-        return dn.store.moveItem(id, folder)
+        return dn.store.moveItem(id, folder, opts.actor)
           ? { content: [{ type: "text", text: `Moved ${id} to ${dn.categories[folder]}.` }] }
           : { content: [{ type: "text", text: `No item ${id}.` }], isError: true };
       } catch (err) {

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Item, Judgement, Kind, ShareContext, Summary, Worth } from "./types.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 
@@ -31,6 +32,19 @@ export interface Folder {
 }
 
 export class FolderError extends Error {}
+
+/** A named key for one agent. Only its sha256 is stored; the token itself is shown once, at creation. */
+export interface AgentToken {
+  id: string;
+  name: string;
+  /** read: the reading tools and routes. write: everything the admin password may do except settings. */
+  scope: "read" | "write";
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 /** A free-standing note: Markdown, may point at items as #12. */
 export interface Note {
@@ -133,6 +147,16 @@ export class Store {
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
         updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
       );
+      -- One key per agent, so a leaked config is one revoke away and the admin password stays private.
+      CREATE TABLE IF NOT EXISTS agent_tokens (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        scope TEXT NOT NULL CHECK (scope IN ('read', 'write')),
+        hash TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+        last_used_at TEXT,
+        revoked_at TEXT
+      );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
@@ -152,6 +176,8 @@ export class Store {
       ["user_placed", "INTEGER NOT NULL DEFAULT 0"],
       // The reader's own words about the item.
       ["note", "TEXT"],
+      // Who acted, when known: "admin" or "agent:<token id>".
+      ["claimed_actor", "TEXT"], ["moved_by", "TEXT"],
     ] as const) {
       if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
     }
@@ -292,9 +318,9 @@ export class Store {
   }
 
   /** The reader put this item here; classification won't touch it again. */
-  moveItem(itemId: number, folderId: string): boolean {
+  moveItem(itemId: number, folderId: string, actor?: string): boolean {
     if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
-    return this.db.prepare("UPDATE items SET category = ?, user_placed = 1 WHERE id = ?").run(folderId, itemId).changes > 0;
+    return this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, itemId).changes > 0;
   }
 
   /**
@@ -421,6 +447,42 @@ export class Store {
   }
 
   /** Small key/value memory for adapters, e.g. the last message seen per channel. */
+  /** Mint a token. The only time the plain value exists: keep it out of logs. */
+  createAgentToken(input: { name: string; scope: "read" | "write" }): { id: string; name: string; scope: "read" | "write"; token: string } {
+    const name = input.name.trim().slice(0, 60);
+    if (!name) throw new Error("name is required");
+    if (input.scope !== "read" && input.scope !== "write") throw new Error("scope must be read or write");
+    const id = randomUUID().slice(0, 8);
+    const token = `dn_${randomBytes(24).toString("base64url")}`;
+    this.db.prepare("INSERT INTO agent_tokens (id, name, scope, hash) VALUES (?, ?, ?, ?)").run(id, name, input.scope, hashToken(token));
+    return { id, name, scope: input.scope, token };
+  }
+
+  /** Every token, revoked ones included (they show greyed out); never the hash. */
+  listAgentTokens(): AgentToken[] {
+    const rows = this.db.prepare("SELECT id, name, scope, created_at, last_used_at, revoked_at FROM agent_tokens ORDER BY created_at DESC, rowid DESC").all() as {
+      id: string; name: string; scope: "read" | "write"; created_at: string; last_used_at: string | null; revoked_at: string | null;
+    }[];
+    return rows.map((r) => ({ id: r.id, name: r.name, scope: r.scope, createdAt: r.created_at, lastUsedAt: r.last_used_at, revokedAt: r.revoked_at }));
+  }
+
+  revokeAgentToken(id: string): boolean {
+    return this.db.prepare("UPDATE agent_tokens SET revoked_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND revoked_at IS NULL").run(id).changes > 0;
+  }
+
+  /** The active token with this sha256, if any. */
+  findAgentToken(hash: string): { id: string; name: string; scope: "read" | "write" } | null {
+    const r = this.db.prepare("SELECT id, name, scope FROM agent_tokens WHERE hash = ? AND revoked_at IS NULL").get(hash) as { id: string; name: string; scope: "read" | "write" } | undefined;
+    return r ? { id: r.id, name: r.name, scope: r.scope } : null;
+  }
+
+  /** Remember when a token was last used, at most once a minute: a write per request would be wasteful. */
+  touchAgentToken(id: string): void {
+    this.db
+      .prepare("UPDATE agent_tokens SET last_used_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? AND (last_used_at IS NULL OR last_used_at <= strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 minute'))")
+      .run(id);
+  }
+
   getState(key: string): string | undefined {
     return (this.db.prepare("SELECT value FROM state WHERE key = ?").get(key) as { value: string } | undefined)?.value;
   }
@@ -440,10 +502,10 @@ export class Store {
    * `leaseMinutes`, so two agents working the queue don't do the same item.
    * Most-shared first, then oldest.
    */
-  claimPending(agent: string, limit: number, leaseMinutes = 30): Item[] {
+  claimPending(agent: string, limit: number, leaseMinutes = 30, actor?: string): Item[] {
     const rows = this.db
       .prepare(
-        `UPDATE items SET claimed_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), claimed_by = ?
+        `UPDATE items SET claimed_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), claimed_by = ?, claimed_actor = ?
          WHERE id IN (
            SELECT id FROM items
            WHERE ${PENDING_SQL}
@@ -451,7 +513,7 @@ export class Store {
            ORDER BY share_count DESC, created_at ASC LIMIT ?)
          RETURNING *`,
       )
-      .all(agent, `-${clampInt(leaseMinutes, 0, 1440, 30)} minutes`, clampInt(limit, 1, 20, 5)) as unknown as ItemRow[];
+      .all(agent, actor ?? null, `-${clampInt(leaseMinutes, 0, 1440, 30)} minutes`, clampInt(limit, 1, 20, 5)) as unknown as ItemRow[];
     return rows.map(toItem).sort((a, b) => b.shareCount - a.shareCount || a.createdAt.localeCompare(b.createdAt));
   }
 
