@@ -174,7 +174,10 @@
   .map-canvas > svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
   .map-canvas > svg path { fill: none; stroke-linecap: round; opacity: .8; }
   .map-canvas.searching > svg path:not(.hit) { opacity: .25; }
-  .map-zoom { position: sticky; float: right; bottom: 12px; right: 12px; margin: -60px 12px 12px 0; display: flex; background: var(--panel);
+  /* The zoom pill sits on the frame's corner, not on the (scrolling) map. */
+  .map-shell { position: relative; min-width: 0; width: 100%; }   /* never wider than the page, however wide the map */
+  main { min-width: 0; }
+  .map-zoom { position: absolute; bottom: 12px; right: 12px; display: flex; background: var(--panel);
               border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; z-index: 2; }
   .map-zoom button { width: 44px; height: 44px; border: 0; background: none; color: var(--text); cursor: pointer; display: grid; place-items: center; }
   .map-zoom button + button { border-left: 1px solid var(--line); }
@@ -203,6 +206,7 @@
   .mnode .cnt { font-size: 12px; color: var(--c); font-weight: 600; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border-radius: 99px; padding: 0 7px; }
   .mnode .tw { display: inline-flex; color: var(--c); transition: transform .15s ease; }
   .mnode .tw.open { transform: rotate(90deg); }
+  .mnode.left .tw:not(.open) { transform: rotate(180deg); }
   .mnode .opt { display: inline-flex; color: var(--muted); margin-right: -8px; padding: 6px; border-radius: 50%; }
   .mnode .opt:hover { background: rgba(0,0,0,.1); }
   .map-canvas.searching .mnode:not(.hit):not(.root):not(.l1) { opacity: .35; }
@@ -420,6 +424,7 @@
     <symbol id="i-expand" viewBox="0 0 24 24"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></symbol>
     <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M7 20l5-5 5 5M7 4l5 5 5-5"/></symbol>
     <symbol id="i-dots" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></g></symbol>
+    <symbol id="i-both" viewBox="0 0 24 24"><rect x="9" y="9.5" width="6" height="5" rx="1.5"/><circle cx="3.5" cy="5.5" r="1.8"/><circle cx="3.5" cy="18.5" r="1.8"/><circle cx="20.5" cy="5.5" r="1.8"/><circle cx="20.5" cy="18.5" r="1.8"/><path d="M9 11.5C7 11.5 6.5 6 5.3 5.6M9 12.5C7 12.5 6.5 18 5.3 18.4M15 11.5c2 0 2.5-5.5 3.7-5.9M15 12.5c2 0 2.5 5.5 3.7 5.9"/></symbol>
     <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
@@ -545,7 +550,8 @@
       map: "Mind map", mapHint: "Tap a folder to open it, tap a card to preview it. To file a card: drag it onto a folder — on a phone, hold it a moment, let go, then tap the folder. ⋯ renames a folder.",
       a11yFolder: (n, c) => `Folder ${n}, ${c} cards`, a11yCard: (n) => `Card ${n}`,
       expandAll: "Expand all", collapseAll: "Collapse all", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", openCard: "Open card",
-      gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", showInList: "Show in the list", close: "Close",
+      layoutBoth: "Both sides", layoutRight: "Right side", layoutHelp: "Switch between branches on both sides (XMind) and all to the right",
+      zoom: "Zoom", gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", showInList: "Show in the list", close: "Close",
       needPassword: "Changing things needs the admin password.",
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
@@ -635,7 +641,8 @@
       map: "樹狀圖", mapHint: "點資料夾展開，點卡片預覽。整理卡片：把它拖到資料夾上；手機上按住卡片一下、放開，再點要放進去的資料夾。按 ⋯ 可以改資料夾名稱。",
       a11yFolder: (n, c) => `資料夾 ${n}，${c} 張卡片`, a11yCard: (n) => `卡片 ${n}`,
       expandAll: "全部展開", collapseAll: "全部收合", zoomIn: "放大", zoomOut: "縮小", fit: "符合畫面", openCard: "開啟卡片",
-      gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", showInList: "在清單中查看", close: "關閉",
+      layoutBoth: "兩側展開", layoutRight: "往右展開", layoutHelp: "切換：分支分佈在兩側（XMind 預設）或全部往右",
+      zoom: "縮放", gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", showInList: "在清單中查看", close: "關閉",
       needPassword: "要修改需要管理密碼。",
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
@@ -1353,6 +1360,8 @@
   const mapOpen = new Set((() => { try { return JSON.parse(store.get("driftnet-map-open") ?? "[]"); } catch { return []; } })());
   const saveMapOpen = () => store.set("driftnet-map-open", JSON.stringify([...mapOpen]));
   let mapZoom = Number(store.get("driftnet-map-zoom")) || 1;
+  /** both: branches on both sides of the root (XMind's default); right: all to the right. */
+  let mapLayout = store.get("driftnet-map-layout") || "both";
   let mapItems = [];
   /** Cards shown per folder before the rest fold into a "+N" node. */
   const MAP_CAP = 15;
@@ -1370,10 +1379,11 @@
     $("list").innerHTML = `<div class="map-bar">
         <button class="btn" type="button" data-map="${allOpen ? "collapse" : "expand"}">${ic(allOpen ? "collapse" : "expand")} ${esc(allOpen ? t.collapseAll : t.expandAll)}</button>
         <button class="btn" type="button" data-map="new">${ic("plus")} ${esc(t.newFolder)}</button>
+        <button class="btn" type="button" data-map="layout" aria-pressed="${mapLayout === "both"}" title="${esc(t.layoutHelp)}">${ic(mapLayout === "both" ? "both" : "map")} ${esc(mapLayout === "both" ? t.layoutBoth : t.layoutRight)}</button>
         ${state.q ? `<span class="hint">${esc(t.mapSearch(state.q))}</span>` : ""}</div>
       ${tip}
-      <div class="map-wrap" id="map-wrap"><div class="map-canvas" id="map-canvas"></div>
-        <div class="map-zoom" role="group" aria-label="Zoom">
+      <div class="map-shell"><div class="map-wrap" id="map-wrap"><div class="map-canvas" id="map-canvas"></div></div>
+        <div class="map-zoom" role="group" aria-label="${esc(t.zoom)}">
           <button type="button" data-map="out" aria-label="${esc(t.zoomOut)}">${ic("minus")}</button>
           <button type="button" data-map="fit" aria-label="${esc(t.fit)}">${ic("fit")}</button>
           <button type="button" data-map="in" aria-label="${esc(t.zoomIn)}">${ic("plus")}</button></div></div>`;
@@ -1396,7 +1406,7 @@
     const wrap = $("map-wrap"), root = $("map-canvas")?.querySelector('.mnode[data-key="root"]');
     if (!wrap || !root) return;
     wrap.scrollTop = root.offsetTop * mapZoom - wrap.clientHeight / 2;
-    wrap.scrollLeft = 0;
+    wrap.scrollLeft = (root.offsetLeft + root.offsetWidth / 2) * mapZoom - wrap.clientWidth / 2;
   }
   function fitWidth() {
     const wrap = $("map-wrap"), c = $("map-canvas");
@@ -1465,39 +1475,79 @@
         data-key="${esc(n.key)}" style="--c:${n.color}">${tw}${star}<span class="t">${esc(n.label)}</span>${cnt}${more}</div>`;
     }).join("");
     const el = new Map([...canvas.querySelectorAll(".mnode")].map((d) => [d.dataset.key, d]));
-    const colW = [];
-    for (const n of flat) { n.w = el.get(n.key).offsetWidth; n.h = el.get(n.key).offsetHeight; colW[n.depth] = Math.max(colW[n.depth] ?? 0, n.w); }
-    const colX = [32];
-    for (let d = 1; d < colW.length; d++) colX[d] = colX[d - 1] + colW[d - 1] + (d === 1 ? 84 : 60);
+    for (const n of flat) { n.w = el.get(n.key).offsetWidth; n.h = el.get(n.key).offsetHeight; }
 
-    // Pass 2: leaves take a row each; a parent sits in the middle of its children; branches get air between them.
-    let row = 0;
-    const ROW = 42;
-    const place = (n) => {
-      if (!n.children.length) { n.cy = 32 + row++ * ROW + ROW / 2; return; }
-      n.children.forEach((c, k) => { if (n.type === "root" && k > 0) row += 0.4; place(c); });
-      n.cy = (n.children[0].cy + n.children[n.children.length - 1].cy) / 2;
+    // Which side each top-level branch grows to. "both" (XMind's default): the first half by height goes right,
+    // top to bottom; the rest goes left with the last branch at the top. "right": everything to the right.
+    const leaves = (n) => (n.children.length ? n.children.reduce((a, c) => a + leaves(c), 0) : 1);
+    let right = root.children, left = [];
+    if (mapLayout === "both" && root.children.length > 1) {
+      const total = leaves(root);
+      right = []; let acc = 0;
+      for (const c of root.children) { if (!right.length || acc + leaves(c) / 2 <= total / 2) { right.push(c); acc += leaves(c); } else left.push(c); }
+      if (!left.length) left.push(right.pop());
+      left.reverse();
+    }
+    const mark = (n, side) => { n.side = side; n.children.forEach((c) => mark(c, side)); };
+    right.forEach((c) => mark(c, 1));
+    left.forEach((c) => mark(c, -1));
+    root.side = 0;
+
+    // Columns per side: the widest node at each depth, plus a gap (wider next to the root).
+    const GAP = (d) => (d === 1 ? 84 : 60);
+    const colW = { 1: [], "-1": [] };
+    for (const n of flat) if (n.side) colW[n.side][n.depth] = Math.max(colW[n.side][n.depth] ?? 0, n.w);
+    const span = (side) => colW[side].reduce((a, w, d) => a + (w ?? 0) + GAP(d), 0);
+    const rootX = 32 + span(-1);
+    root.x = rootX;
+    const edge = (side, d) => {   // right side: a column's left edge; left side: its right edge
+      let off = GAP(1);
+      for (let k = 1; k < d; k++) off += (colW[side][k] ?? 0) + GAP(k + 1);
+      return side === 1 ? rootX + root.w + off : rootX - off;
     };
-    place(root);
+
+    // Rows: leaves take a row each, a parent sits in the middle of its children, branches get air between them.
+    const ROW = 42;
+    const rowsOf = (list) => {
+      let row = 0;
+      const place = (n) => {
+        if (!n.children.length) { n.row = row++; return; }
+        n.children.forEach(place);
+        n.row = (n.children[0].row + n.children[n.children.length - 1].row) / 2;
+      };
+      list.forEach((c, k) => { if (k > 0) row += 0.4; place(c); });
+      return row;
+    };
+    const rowsR = rowsOf(right), rowsL = rowsOf(left), rows = Math.max(rowsR, rowsL, 1);
+    root.cy = 32 + (rows * ROW) / 2;
+    // Each side is centred on the root.
+    const top = { 1: root.cy - (rowsR * ROW) / 2, "-1": root.cy - (rowsL * ROW) / 2 };
     for (const n of flat) {
-      n.x = colX[n.depth];
+      if (n.side) {
+        n.cy = top[n.side] + n.row * ROW + ROW / 2;
+        n.x = n.side === 1 ? edge(1, n.depth) : edge(-1, n.depth) - n.w;
+      }
       const d = el.get(n.key);
       d.style.left = `${n.x}px`;
       d.style.top = `${n.cy - n.h / 2}px`;
+      d.classList.toggle("left", n.side === -1);
     }
     const width = Math.max(...flat.map((n) => n.x + n.w)) + 48;
-    const height = 32 + row * ROW + 32;
+    const height = 32 + rows * ROW + 32;
     const paths = [];
-    // Each parent gets a short trunk, then curves fan out from its end.
+    // A short trunk out of the parent (on the side its children grow), then curves fan out from its end.
     const link = (p) => {
-      if (!p.children.length) return;
-      const x0 = p.x + p.w, trunk = x0 + (p.type === "root" ? 22 : 12);
-      paths.push(`<path d="M${x0} ${p.cy} H${trunk}" style="stroke:${p.type === "root" ? "var(--muted)" : p.color}" stroke-width="${p.type === "root" ? 2.6 : 2}"/>`);
-      for (const c of p.children) {
-        const x2 = c.x, k = Math.min(48, (x2 - trunk) / 2);
-        const sw = c.depth === 1 ? 3 : c.type === "folder" ? 2.2 : 1.6;
-        paths.push(`<path d="M${trunk} ${p.cy} C${trunk + k} ${p.cy}, ${x2 - k} ${c.cy}, ${x2} ${c.cy}" style="stroke:${c.color}" stroke-width="${sw}" class="${c.hit ? "hit" : ""}"/>`);
-        link(c);
+      for (const side of [1, -1]) {
+        const kids = p.children.filter((c) => c.side === side);
+        if (!kids.length) continue;
+        const x0 = side === 1 ? p.x + p.w : p.x, trunk = x0 + side * (p.type === "root" ? 22 : 12);
+        paths.push(`<path d="M${x0} ${p.cy} H${trunk}" style="stroke:${p.type === "root" ? "var(--muted)" : p.color}" stroke-width="${p.type === "root" ? 2.6 : 2}"/>`);
+        for (const c of kids) {
+          const x2 = side === 1 ? c.x : c.x + c.w, k = Math.min(48, Math.abs(x2 - trunk) / 2) * side;
+          const sw = c.depth === 1 ? 3 : c.type === "folder" ? 2.2 : 1.6;
+          paths.push(`<path d="M${trunk} ${p.cy} C${trunk + k} ${p.cy}, ${x2 - k} ${c.cy}, ${x2} ${c.cy}" style="stroke:${c.color}" stroke-width="${sw}" class="${c.hit ? "hit" : ""}"/>`);
+          link(c);
+        }
       }
     };
     link(root);
@@ -1549,6 +1599,7 @@
     if (a === "expand") { folders.forEach((f) => mapOpen.add(f.id)); saveMapOpen(); renderMap().then(() => { if (isDrawer()) fitMap(); }); }
     else if (a === "collapse") { mapOpen.clear(); saveMapOpen(); renderMap(); }
     else if (a === "new") openFolderDialog(null, null);
+    else if (a === "layout") { mapLayout = mapLayout === "both" ? "right" : "both"; store.set("driftnet-map-layout", mapLayout); renderMap(); }
     else if (a === "tip") { store.set("driftnet-map-tip", "1"); b.closest(".map-tip").remove(); sizeMap(); }
     else if (a === "in") mapZoomTo(mapZoom + 0.1);
     else if (a === "out") mapZoomTo(mapZoom - 0.1);

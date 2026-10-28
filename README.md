@@ -122,7 +122,8 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   the AI files new links by each folder's path and description, so “Games › MapleStory — Artale
   helpers” gets the MapleStory tools. Move a card with 📁 **Move to…**, or drag it by ⠿ onto a folder
   on a computer; a card you placed stays put. Deleting a folder moves its links up one level.
-- **Mind map.** Folders branch out from the root like XMind, a colour per branch. Tap a folder to open
+- **Mind map.** Folders branch out on both sides of the root like XMind, a colour per branch (one tap
+  switches to everything on the right). Tap a folder to open
   it, tap a card to preview it, and drag a card onto a folder to file it (on a phone, hold it a moment
   first, so a quick swipe still pans). Drag a folder onto another to nest it. Search highlights the
   matches; big folders fold into “+N”.

@@ -382,6 +382,13 @@ try {
     await waitFor(s, `document.getElementById("toast").classList.contains("show")`, "moved on the map");
     assert.equal((await api(`/api/items/${pick}`)).category, target, "dragging a card onto a folder files it");
     await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    // Two-sided by default (XMind); one tap switches everything to the right, and back.
+    assert.ok(await evaluate(s, `document.querySelectorAll(".mnode.left").length > 0`), "branches on both sides by default");
+    await evaluate(s, `document.querySelector('[data-map="layout"]').click()`);
+    await waitFor(s, `!!document.querySelector('.mnode[data-key="root"]') && document.querySelectorAll(".mnode.left").length === 0`, "all to the right");
+    await evaluate(s, `document.querySelector('[data-map="layout"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".mnode.left").length > 0`, "both sides again");
+    console.log("✓ mind map: both sides by default, switch to right side and back");
     await evaluate(s, `document.querySelector('[data-map="fit"]').click()`);
     await sleep(300);
     await shoot(`web-map-${LANG}.png`);
