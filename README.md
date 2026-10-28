@@ -160,6 +160,9 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   press (about half a second) starts selecting. A bar at the bottom then offers **Move to…**, ★, **Trash**
   (**Restore** in the trash), **Select all** and **Clear**; `Esc` clears. The whole batch is one change,
   and one **Undo** puts every card back exactly where it was.
+- **Refresh** a card to fetch its page again and redo the summary, e.g. when it was saved behind a login
+  wall or the page has changed. Your note, favorite, share count and a folder you chose stay; if the page
+  now comes back empty, the old summary is kept.
 - **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
   agents and `/llms.txt` too; if someone shares one again, it comes back.
 - **Notes.** 📝 on any card for your own note (tried it? needs a GPU?). What people wrote with the link
@@ -277,7 +280,10 @@ In Claude Code, the plugin brings the skill and a local MCP server in one step:
 Claude Desktop, pi, Hermes, OpenClaw or any MCP client connects to `/mcp` (Streamable HTTP) or runs
 `npx -y driftnet mcp` (stdio; also in the [MCP Registry](https://registry.modelcontextprotocol.io) as
 `io.github.KevinChu1110/driftnet`). ChatGPT custom GPTs import
-`/openapi.json`; anything that can fetch a URL reads `/llms.txt`.
+`/openapi.json`; anything that can fetch a URL reads `/llms.txt`. RSS readers, n8n or Zapier subscribe to
+`/feed.xml` (Atom, newest 50, `?folder=<id>` for one branch); **🔌 Connect an AI** has the link with the
+share key filled in. To push instead, set an outgoing webhook (below): every new or updated card is POSTed
+as JSON, signed with `X-Driftnet-Signature` when a secret is set.
 
 ```bash
 claude mcp add --transport http driftnet http://localhost:8787/mcp \
@@ -297,6 +303,7 @@ Give each agent its own key instead of the admin password: **Settings → Access
 | `driftnet_get_item` | One card in full: summary, use cases, your note, what people said in chat, tools found inside |
 | `driftnet_list_folders` / `driftnet_move_item` | Read your folder tree, file items into it |
 | `driftnet_undo` | Put a batch move back, using the undo id `driftnet_move_item` returned |
+| `driftnet_refresh_item` | Fetch a card's page again and redo its summary (keeps the reader's note, favorite and chosen folder) |
 | `driftnet_suggest_folders` | Ask the model for a tidy-up plan for the folder tree (proposes only; the human applies it on the page) |
 | `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | Add, rename or re-describe, and delete folders (contents move up; the one tool marked destructive) |
 | `driftnet_trash_item` / `driftnet_restore_item` / `driftnet_favorite_item` / `driftnet_set_note` | Tidy cards: trash (always restorable), star, write the note |
@@ -379,6 +386,10 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge; `DRIFTNET_JUDGE=off` disables it |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
+| `DRIFTNET_FOLDERS` | `ai` | Starting folder template on a new database: `ai` (AI & coding), `research` (papers, articles, datasets…) or `everyday` (cooking, travel, money…). An empty catalogue also offers the choice on the page |
+| `DRIFTNET_WEBHOOK_URL` | — | POST each new or updated card here as JSON (`item.added` / `item.updated`), 5 s timeout, one retry |
+| `DRIFTNET_WEBHOOK_SECRET` | — | Signs the body: `X-Driftnet-Signature: sha256=<hmac>` |
+| `DRIFTNET_WEBHOOK_ALLOW_LOCAL` | — | `1` allows a webhook on a private address (n8n on your LAN), for that exact host only |
 | `DRIFTNET_CATEGORIES` | built-in | JSON file of starting folders, `{ "id": "description" }`, used once on a new database; after that, edit folders on the page |
 | `GITHUB_TOKEN` | — | GitHub API limit from 60 to 5,000 requests per hour |
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
@@ -404,7 +415,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
-`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
 

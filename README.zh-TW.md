@@ -138,6 +138,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 - **往右滑**加入最愛，**往左滑**移到垃圾桶；滑太短不會觸發，上下捲動也不會被當成滑動。電腦上可以按 ☆ 和 🗑，或用滑鼠拖曳。
 - **一次選多張。**`x` 選取目前這張，Shift＋點擊選一段範圍，手機上長按（約半秒）就開始選取。下方會出現一條工具列：**移動到…**、★、**垃圾桶**
   （在垃圾桶裡是**還原**）、**全選**、**清除**；按 `Esc` 也能清除。整批算一次變更，按一次**復原**，每張卡片都會回到原本的位置。
+- **重新整理**卡片：重新抓網頁、重寫摘要，適合當初卡在登入牆、或網頁內容已經改了的時候。你的筆記、最愛、分享次數和自己選的資料夾都會保留；
+  如果這次抓回來是空的，會保留原本的摘要。
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
 - **筆記。**每張卡片都能按 📝 寫自己的筆記（試過了嗎？要 GPU 嗎？）。大家丟連結時在聊天室說的話也會顯示在卡片上（💬），
   兩者都搜尋得到。側邊欄的 **📝 筆記** 可以寫不綁卡片的 Markdown 筆記，寫 `#12` 就會連到第 12 張卡片。
@@ -241,7 +243,9 @@ DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 ```
 
 Claude Desktop、pi、Hermes、OpenClaw 或任何 MCP 用戶端連 `/mcp`（Streamable HTTP），或執行 `npx -y driftnet mcp`
-（stdio；也登記在 [MCP Registry](https://registry.modelcontextprotocol.io)，名稱 `io.github.KevinChu1110/driftnet`）。ChatGPT 自訂 GPT 匯入 `/openapi.json`；任何能抓網址的程式讀 `/llms.txt`。
+（stdio；也登記在 [MCP Registry](https://registry.modelcontextprotocol.io)，名稱 `io.github.KevinChu1110/driftnet`）。ChatGPT 自訂 GPT 匯入 `/openapi.json`；任何能抓網址的程式讀 `/llms.txt`。RSS 閱讀器、n8n、Zapier 可以訂閱 `/feed.xml`
+（Atom 格式，最新 50 則，加 `?folder=<id>` 只看某一支）；**🔌 連接 AI** 裡有已經帶好分享碼的連結。想主動推送的話，
+設定下面的對外 Webhook：每張新增或更新的卡片都會以 JSON POST 過去，有設密鑰時會附 `X-Driftnet-Signature` 簽章。
 
 ```bash
 claude mcp add --transport http driftnet http://localhost:8787/mcp \
@@ -261,6 +265,7 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 | `driftnet_get_item` | 查看一張卡片的全部內容：摘要、用途、你的筆記、聊天室裡大家說的話、從裡面找到的工具 |
 | `driftnet_list_folders`／`driftnet_move_item` | 讀你的資料夾樹、把卡片放進去 |
 | `driftnet_undo` | 用 `driftnet_move_item` 回傳的復原代碼，把整批移動放回去 |
+| `driftnet_refresh_item` | 重新抓卡片的網頁、重寫摘要（保留讀者的筆記、最愛和自己選的資料夾） |
 | `driftnet_suggest_folders` | 請模型替資料夾樹提一份整理方案（只提案，要你在網頁上套用） |
 | `driftnet_create_folder`／`driftnet_update_folder`／`driftnet_delete_folder` | 新增、改名或改說明、刪除資料夾（內容會移到上一層；唯一標為「破壞性」的工具） |
 | `driftnet_trash_item`／`driftnet_restore_item`／`driftnet_favorite_item`／`driftnet_set_note` | 整理卡片：丟垃圾桶（隨時可還原）、加最愛、寫筆記 |
@@ -338,6 +343,10 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | 啟用 Jev 判斷；`DRIFTNET_JUDGE=off` 可關閉 |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
+| `DRIFTNET_FOLDERS` | `ai` | 新資料庫的起始資料夾樣板：`ai`（AI 與程式）、`research`（論文、文章、資料集……）或 `everyday`（料理、旅行、理財……）。清單還是空的時候，網頁上也能選 |
+| `DRIFTNET_WEBHOOK_URL` | — | 每張新增或更新的卡片以 JSON POST 到這裡（`item.added`／`item.updated`），逾時 5 秒、重試一次 |
+| `DRIFTNET_WEBHOOK_SECRET` | — | 為內容簽章：`X-Driftnet-Signature: sha256=<hmac>` |
+| `DRIFTNET_WEBHOOK_ALLOW_LOCAL` | — | 設 `1` 允許 Webhook 打到內網位址（例如區網裡的 n8n），只限你填的那台主機 |
 | `DRIFTNET_CATEGORIES` | 內建 | 起始資料夾的 JSON 檔：`{ "id": "說明" }`，只在新資料庫用一次，之後直接在網頁上改 |
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
@@ -363,7 +372,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）·
-`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
 

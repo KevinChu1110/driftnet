@@ -537,7 +537,8 @@ try {
       assert.ok(await evaluate(s, `!document.querySelector('.mnode[data-key="f:${sub}"]')`), "the focused folder is now the root");
       await evaluate(s, `document.querySelector('.map-crumb [data-map="focus"][data-id=""]').click()`);
       await waitFor(s, `!document.querySelector(".map-crumb") && document.querySelectorAll(".mnode").length === ${allNodes} && !location.hash.startsWith("#focus=")`, "breadcrumb returns to the full map");
-      await sleep(6500);   // z undoes while a toast is up; let the last one expire so z means "focus"
+      // z undoes while a toast is up (longer text stays longer); let the last one expire so z means "focus".
+      await waitFor(s, `!document.getElementById("toast").classList.contains("show")`, "the last toast expired", 12000);
       await evaluate(s, `document.querySelector('.mnode[data-key="f:${sub}"]').focus()`);
       await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "z", text: "z" }, s);
       await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "z" }, s);

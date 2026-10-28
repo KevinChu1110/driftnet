@@ -2150,7 +2150,7 @@
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapNode(node.dataset.key); }
       else if ((e.key === "F2" || e.key === "e") && node.dataset.key.startsWith("f:") && role === "admin") { e.preventDefault(); openFolderDialog(node.dataset.key.slice(2)); }
       else if (e.key === "m" && node.dataset.key.startsWith("i:") && role === "admin") { e.preventDefault(); openMovePicker(Number(node.dataset.key.slice(2))); }
-      else if (e.key === "z" && node.dataset.key.startsWith("f:") && !lastUndo) { e.preventDefault(); setMapFocus(node.dataset.key.slice(2)); }
+      else if (e.key === "z" && node.dataset.key.startsWith("f:") && !canUndo()) { e.preventDefault(); setMapFocus(node.dataset.key.slice(2)); }
       else treeKey(e, node);
     });
   })();
@@ -3326,6 +3326,8 @@
   }
   // Once the toast is gone, z no longer undoes something you can't see any more.
   function hideToast() { $("toast").classList.remove("show"); lastUndo = null; }
+  /** z undoes only what the toast still shows. */
+  const canUndo = () => !!lastUndo && $("toast").classList.contains("show");
   let toastMs = 5000;
   // Reading or reaching for Undo keeps the toast up.
   for (const ev of ["pointerenter", "focusin"]) $("toast").addEventListener(ev, () => clearTimeout(toastTimer));
@@ -3337,7 +3339,7 @@
   // ── Keyboard: j/k to step through cards, then act on the focused one ─────
   let lastKey = "";
   addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "z" && lastUndo && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? "")) { e.preventDefault(); $("toast-undo").click(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === "z" && canUndo() && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName ?? "")) { e.preventDefault(); $("toast-undo").click(); return; }
     if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "")) return;
     const k = e.key, prev = lastKey;
@@ -3345,7 +3347,7 @@
     if (k === "Escape" && selected.size) { clearSelection(); return; }
     if ((k === "Escape" || k === "Backspace") && mapShown() && mapFocus && !picked && !document.body.classList.contains("menu-open")) { e.preventDefault(); mapUp(); return; }
     if (k === "/") { e.preventDefault(); $("q").focus(); return; }
-    if ((k === "z" || k === "u") && lastUndo) { e.preventDefault(); $("toast-undo").click(); return; }
+    if ((k === "z" || k === "u") && canUndo()) { e.preventDefault(); $("toast-undo").click(); return; }
     if (k === "?") { openKeys(); return; }
     // Inbox: 1–3 pick the focused card's suggestion chips (before the global "file into top-9 folders").
     if (state.view === "inbox" && /^[1-3]$/.test(k) && role === "admin" && focusedId() && !selected.size) {
