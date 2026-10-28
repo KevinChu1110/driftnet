@@ -82,8 +82,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 **在聊天室裡**，沒有連結的訊息一律忽略。每個連結只回一行：它是什麼，以及在網頁上的哪裡看。想在聊天室直接看摘要，
 或完全不回？設 `DRIFTNET_REPLY=full` 或 `off`。用 `👍12` 或 `👎12 原因` 投票。
 
-<p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 在 Discord 頻道回覆一個 GitHub 連結和一則 FB reel，並從 reel 追到 Paperclip repo" width="70%"></p>
-<sub>Discord 實測畫面。reel 沒有附連結，driftnet 用名稱找到 Paperclip；因為這個 repo 剛好也被貼了，所以顯示「已收錄過 · 分享 2 次」。伺服器網址已替換。</sub>
+<p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
+<sub>Discord 實測畫面：一則訊息兩個連結，各回一行。使用者名稱和伺服器網址已隱藏。</sub>
 
 ### Chrome 擴充
 

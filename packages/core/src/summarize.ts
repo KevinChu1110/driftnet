@@ -4,7 +4,9 @@ import { judgeState, WORTH_CRITERIA } from "./judge/index.ts";
 import { IncompleteOutput, type LlmProvider } from "./llm/types.ts";
 
 const SummarySchema = z.object({
-  name: z.string().describe("The tool or project name, not the post title"),
+  name: z
+    .string()
+    .describe("The tool's own name exactly as its authors write it (e.g. ascii-sharks), never translated; not the post title"),
   one_liner: z.string().describe("What it is, in one sentence of at most 40 characters for CJK or 20 words otherwise"),
   highlights: z.array(z.string()).describe("Up to 3 concrete things it does"),
   use_cases: z.array(z.string()).describe("Up to 2 situations where someone would reach for it"),
@@ -106,7 +108,8 @@ export class Summarizer {
       "Read the link digest and describe the tool itself, not the post that mentions it.",
       "If the content is a roundup of several tools, describe the roundup and list every tool it introduces in mentions.",
       "mentions is for tools a reader should look at next, never for tools the content argues against or only compares with.",
-      `Write name as-is; write one_liner, highlights and use_cases in ${this.language}.`,
+      `Write one_liner, highlights and use_cases in ${this.language}.`,
+      "Never translate name: it is how people search for the tool (e.g. on GitHub). Keep the original spelling, usually English.",
       "Be concrete and terse. Never invent features that are not in the input.",
       "Reply with JSON only.",
       categories &&

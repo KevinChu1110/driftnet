@@ -90,8 +90,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 where to read it on the web page. Want the summary in the chat instead, or no reply at all? Set
 `DRIFTNET_REPLY=full` or `off`. Vote with `👍12` or `👎12 reason`.
 
-<p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet replying in a Discord channel to a GitHub link and to a Facebook reel, which it traced to the Paperclip repo" width="70%"></p>
-<sub>A real run in Discord, with <code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>. The reel had no link; driftnet found Paperclip by name, and since the repo had just been shared too, it shows "already saved · shared 2×". Server address replaced.</sub>
+<p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet answering a Discord message with two links: one line per link, each pointing to its page" width="80%"></p>
+<sub>A real run in Discord (<code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>): two links in one message, one line back for each. Name and server address hidden.</sub>
 
 ### Chrome extension
 
