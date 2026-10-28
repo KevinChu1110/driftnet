@@ -113,6 +113,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       const found = dn.store.foundLinks().filter((l) => l.parent === id).map((l) => dn.store.get(l.child)).filter((x): x is Item => !!x && !x.trashedAt);
       const detail = {
         ...row(item, dn.categories),
+        // src is this server's proxy path; url is the original, for agents that can fetch it themselves.
+        media: (item.media ?? []).map((m, i) => ({ src: `/api/media/${id}/${i}`, kind: m.kind, alt: m.alt, url: m.url })),
         use_cases: item.summary?.useCases ?? [],
         try_it: item.summary?.tryIt ?? null,
         note: item.note ?? null,

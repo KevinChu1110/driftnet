@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { applyFolderTemplate, TemplateError, BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { applyFolderTemplate, TemplateError, BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type IngestResult, type PageContent, publicItem, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
 import { applySuggested, suggestFolders } from "./plan.ts";
 import { tokenRoute } from "./tokens.ts";
@@ -15,6 +16,7 @@ import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
+import { loadMedia, MediaError } from "./media.ts";
 import { actorOf, canRead, foreignOrigin, isAdmin, isLocal, isPassword, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
 import { atomFeed, llmsTxt, openApi } from "./feeds.ts";
 
@@ -136,6 +138,11 @@ function miss(req: IncomingMessage) {
   misses.set(ip, m);
 }
 
+/** An ingest result as served: pictures become proxy paths, also for the repos found inside. */
+function pubResult(r: IngestResult): unknown {
+  return { ...r, item: publicItem(r.item), ...(r.related ? { related: r.related.map(pubResult) } : {}) };
+}
+
 function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
   const req = res.req;
   if ((status === 401 || status === 403) && req && triedCredentials(req)) miss(req);
@@ -243,12 +250,26 @@ const server = createServer(async (req, res) => {
       if (!dn.store.get(id)) return send(res, 404, { error: "not found" });
       try {
         const item = await dn.pipeline.refresh(id);
-        return item ? send(res, 200, item) : send(res, 404, { error: "not found" });
+        return item ? send(res, 200, publicItem(item)) : send(res, 404, { error: "not found" });
       } catch (err) {
         if (err instanceof RefreshBusy) return send(res, 409, { error: err.message });
         if (err instanceof RefreshTooSoon) return send(res, 429, { error: err.message });
         if (err instanceof BlockedUrl) return send(res, 422, { error: err.message });
         console.warn(`[driftnet] refresh ${id} failed:`, (err as Error).message);
+        return send(res, 502, { error: (err as Error).message });
+      }
+    }
+    // Re-extract only the card's pictures (no summary, no model): the cheap way to backfill older cards.
+    const mediaRefreshMatch = /^\/api\/items\/(\d+)\/media\/refresh$/.exec(path);
+    if (req.method === "POST" && mediaRefreshMatch) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const id = Number(mediaRefreshMatch[1]);
+      try {
+        const item = await dn.pipeline.refreshMedia(id);
+        return item ? send(res, 200, publicItem(item)) : send(res, 404, { error: "not found" });
+      } catch (err) {
+        if (err instanceof BlockedUrl) return send(res, 422, { error: err.message });
+        console.warn(`[driftnet] media refresh ${id} failed:`, (err as Error).message);
         return send(res, 502, { error: (err as Error).message });
       }
     }
@@ -258,7 +279,7 @@ const server = createServer(async (req, res) => {
       const { folder } = await readJson<{ folder?: string }>(req);
       try {
         return dn.store.moveItem(Number(moveMatch[1]), String(folder ?? ""), actorOf(req, env, dn.store))
-          ? send(res, 200, dn.store.get(Number(moveMatch[1])))
+          ? send(res, 200, publicItem(dn.store.get(Number(moveMatch[1]))!))
           : send(res, 404, { error: "not found" });
       } catch (err) {
         if (err instanceof FolderError) return send(res, 400, { error: err.message });
@@ -293,14 +314,14 @@ const server = createServer(async (req, res) => {
       const said = dn.store.chatNotes(list.map((i) => i.id));
       // The Inbox offers each card its best folders (the stored picks, or keyword overlap when there are none).
       const choices = p.get("view") === "inbox" ? dn.categories : null;
-      return send(res, 200, list.map((i) => ({ ...i, ...(choices ? { suggestions: suggestionsFor(i, choices) } : {}), found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })));
+      return send(res, 200, list.map((i) => ({ ...publicItem(i), ...(choices ? { suggestions: suggestionsFor(i, choices) } : {}), found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })));
     }
     const noteMatch = /^\/api\/items\/(\d+)\/note$/.exec(path);
     if (req.method === "PUT" && noteMatch) {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const { note } = await readJson<{ note?: string }>(req);
       const id = Number(noteMatch[1]);
-      return dn.store.setNote(id, String(note ?? "")) ? send(res, 200, dn.store.get(id)) : send(res, 404, { error: "not found" });
+      return dn.store.setNote(id, String(note ?? "")) ? send(res, 200, publicItem(dn.store.get(id)!)) : send(res, 404, { error: "not found" });
     }
 
     // ── Free-standing notes ───────────────────────────────────────────────
@@ -414,7 +435,24 @@ const server = createServer(async (req, res) => {
     const itemMatch = /^\/api\/items\/(\d+)(\/feedback)?$/.exec(path);
     if (req.method === "GET" && itemMatch && !itemMatch[2]) {
       const item = dn.store.get(Number(itemMatch[1]));
-      return item ? send(res, 200, item) : send(res, 404, { error: "not found" });
+      return item ? send(res, 200, publicItem(item)) : send(res, 404, { error: "not found" });
+    }
+    // A card's picture, through the proxy (same read rule as the card itself: the gate above). The stored URL never reaches the page.
+    const mediaMatch = /^\/api\/media\/(\d+)\/(\d+)$/.exec(path);
+    if (req.method === "GET" && mediaMatch) {
+      const ref = dn.store.get(Number(mediaMatch[1]))?.media?.[Number(mediaMatch[2])];
+      if (!ref) return send(res, 404, { error: "not found" });
+      try {
+        const m = await loadMedia(join(driftnetHome(env), "media"), ref.url, { blockDomains: env.DRIFTNET_BLOCK_DOMAINS });
+        res.writeHead(200, {
+          "content-type": m.type, "content-length": m.bytes.length, "cache-control": "private, max-age=86400",
+          "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'",
+        });
+        return res.end(m.bytes);
+      } catch (err) {
+        if (err instanceof MediaError || err instanceof BlockedUrl) return send(res, 502, { error: (err as Error).message });
+        throw err;
+      }
     }
 
     if (req.method === "POST" && path === "/api/ingest") {
@@ -436,14 +474,14 @@ const server = createServer(async (req, res) => {
         };
         const note = body.note?.slice(0, 1000);
         try {
-          return send(res, 200, [await dn.pipeline.ingest(url, { ...ctx, ...(note ? { note } : {}) }, 0, page)]);
+          return send(res, 200, [pubResult(await dn.pipeline.ingest(url, { ...ctx, ...(note ? { note } : {}) }, 0, page))]);
         } catch (err) {
           if (err instanceof BlockedUrl) return send(res, 422, { error: err.message });
           throw err;
         }
       }
       const text = [body.url, body.text, body.note].filter(Boolean).join(" ");
-      return send(res, 200, await dn.pipeline.ingestMessage(text, ctx));
+      return send(res, 200, (await dn.pipeline.ingestMessage(text, ctx)).map(pubResult));
     }
     if (req.method === "POST" && itemMatch?.[2]) {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
@@ -512,7 +550,7 @@ const server = createServer(async (req, res) => {
         action === "trash" || action === "restore"
           ? dn.store.setTrashed(id, action === "trash")
           : dn.store.setFavorite(id, action === "favorite");
-      return ok ? send(res, 200, dn.store.get(id)) : send(res, 404, { error: "not found" });
+      return ok ? send(res, 200, publicItem(dn.store.get(id)!)) : send(res, 404, { error: "not found" });
     }
 
     const enrichMatch = /^\/api\/items\/(\d+)\/enrich$/.exec(path);
@@ -522,7 +560,7 @@ const server = createServer(async (req, res) => {
       const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
       delete body.agent;
       const r = await dn.pipeline.enrich(Number(enrichMatch[1]), body, agent);
-      return r.ok ? send(res, 200, r.result) : send(res, 422, { error: r.error });
+      return r.ok ? send(res, 200, pubResult(r.result)) : send(res, 422, { error: r.error });
     }
 
     // Plain-text endpoint for scripts and bots we don't have an adapter for yet.

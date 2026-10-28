@@ -1,5 +1,6 @@
-import type { Digest, Kind } from "../types.ts";
+import type { Digest, Kind, MediaRef } from "../types.ts";
 import { decodeEntities, fetchText, metaTags } from "./http.ts";
+import { mediaKindOf, normalizeMedia } from "../media.ts";
 import { clipTokens, digestBudget, outlineHtml } from "../digest.ts";
 import { canonicalize, extractUrls, hostOf } from "../url.ts";
 
@@ -62,7 +63,44 @@ export async function extractWeb(url: string): Promise<Digest | null> {
       .filter((u) => hostOf(u) !== hostOf(url))
       .slice(0, 10),
     meta: { site: meta["og:site_name"] ?? hostOf(url) },
+    media: pageImages(page.body, page.url, meta, kind === "video", social),
   };
+}
+
+const JUNK_IMG = /logo|icon|avatar|sprite|pixel|tracking|spacer|badge|emoji|favicon|1x1|blank/i;
+
+/** og:image / twitter:image first, then (articles only) the first couple of large pictures in the body. */
+export function pageImages(html: string, base: string, meta: Record<string, string>, video: boolean, social: boolean): MediaRef[] {
+  const abs = (src: string): string | null => {
+    try {
+      const u = new URL(decodeEntities(src.trim()), base);
+      return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+    } catch { return null; }
+  };
+  const out: MediaRef[] = [];
+  for (const key of ["og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src"]) {
+    const url = meta[key] ? abs(meta[key]!) : null;
+    if (url) out.push({ url, kind: video ? "video" : mediaKindOf(url), alt: meta["og:image:alt"] ?? meta["twitter:image:alt"] ?? "" });
+  }
+  if (!social) {
+    const main = /<(article|main)[\s>][\s\S]*?<\/\1>/i.exec(html)?.[0] ?? "";
+    const body = main.replace(/<(nav|header|footer|aside|script|style)[\s>][\s\S]*?<\/\1>/gi, " ");
+    let n = 0;
+    for (const m of body.matchAll(/<img\b[^>]*>/gi)) {
+      const tag = m[0];
+      const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+      if (!src || src.startsWith("data:") || JUNK_IMG.test(src)) continue;
+      const dim = (k: string) => Number(new RegExp(`\\b${k}\\s*=\\s*["']?(\\d+)`, "i").exec(tag)?.[1] ?? NaN);
+      const w = dim("width"), h = dim("height");
+      if (w < 300 || h < 150) continue; // unknown size (NaN) passes
+      const url = abs(src);
+      if (url) {
+        out.push({ url, kind: mediaKindOf(url), alt: decodeEntities(/\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? "") });
+        if (++n >= 2) break;
+      }
+    }
+  }
+  return normalizeMedia(out);
 }
 
 /** Links inside the main content (not nav, header, footer, sidebars), absolute and canonical. */

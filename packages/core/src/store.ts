@@ -2,13 +2,14 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import type { Item, Judgement, Kind, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
+import { normalizeMedia } from "./media.ts";
+import type { Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
   is_ai_tool: number; summary: string | null; judge_engine: string; enriched_by: string | null;
-  trashed_at: string | null; favorite: number; note: string | null; user_placed: number; suggestions: string | null;
+  trashed_at: string | null; favorite: number; note: string | null; user_placed: number; suggestions: string | null; media: string | null;
   flags: string; source: string; share_count: number; created_at: string; updated_at: string;
 }
 
@@ -196,6 +197,8 @@ export class Store {
       ["claimed_actor", "TEXT"], ["moved_by", "TEXT"],
       // The classifier's top folders as JSON [{folder, score}]: what the Inbox offers as one-tap chips.
       ["suggestions", "TEXT"],
+      // Candidate pictures as JSON [{url, kind, alt}] (original URLs; the server proxies them).
+      ["media", "TEXT"],
     ] as const) {
       if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
     }
@@ -223,17 +226,17 @@ export class Store {
 
   upsert(input: {
     url: string; aliases: string[]; title: string; judgement: Judgement; summary: Summary | null;
-    flags: string[]; source: string; suggestions?: Suggestion[];
+    flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[];
   }): Item {
     const { judgement: j } = input;
     const row = this.db
       .prepare(
-        `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source, suggestions)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source, suggestions, media)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(url) DO UPDATE SET
            title = excluded.title, kind = excluded.kind, category = excluded.category, worth = excluded.worth,
            is_ai_tool = excluded.is_ai_tool, summary = excluded.summary, judge_engine = excluded.judge_engine,
-           flags = excluded.flags, source = excluded.source, suggestions = COALESCE(excluded.suggestions, suggestions),
+           flags = excluded.flags, source = excluded.source, suggestions = COALESCE(excluded.suggestions, suggestions), media = COALESCE(excluded.media, media),
            updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
          RETURNING *`,
       )
@@ -241,6 +244,7 @@ export class Store {
         input.url, input.title, j.kind, j.category, j.worth, j.isAiTool,
         input.summary ? JSON.stringify(input.summary) : null, j.engine, input.flags.join(","), input.source,
         input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
+        input.media?.length ? JSON.stringify(input.media) : null,
       ) as unknown as ItemRow;
     const alias = this.db.prepare("INSERT OR IGNORE INTO aliases (url, item_id) VALUES (?, ?)");
     for (const a of input.aliases) if (a !== input.url) alias.run(a, row.id);
@@ -252,20 +256,28 @@ export class Store {
    * reader owns: shares, note, favorite, trash state, and a folder they placed.
    */
   refreshItem(id: number, input: {
-    title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[];
+    title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[];
   }): Item | null {
     const j = input.judgement;
     const row = this.db
       .prepare(
         `UPDATE items SET title = ?, kind = ?, category = CASE WHEN user_placed = 1 THEN category ELSE ? END,
-           worth = ?, is_ai_tool = ?, summary = ?, judge_engine = ?, flags = ?, source = ?, suggestions = ?,
+           worth = ?, is_ai_tool = ?, summary = ?, judge_engine = ?, flags = ?, source = ?, suggestions = ?, media = COALESCE(?, media),
            enriched_by = NULL, claimed_at = NULL, claimed_by = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
          WHERE id = ? RETURNING *`,
       )
       .get(
         input.title, j.kind, j.category, j.worth, j.isAiTool, input.summary ? JSON.stringify(input.summary) : null,
-        j.engine, input.flags.join(","), input.source, input.suggestions?.length ? JSON.stringify(input.suggestions) : null, id,
+        j.engine, input.flags.join(","), input.source, input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
+        input.media?.length ? JSON.stringify(input.media) : null, id,
       ) as unknown as ItemRow | undefined;
+    return row ? toItem(row) : null;
+  }
+
+  /** Replace an item's pictures (empty list keeps what is there: a page that is down must not wipe them). */
+  setMedia(id: number, media: MediaRef[]): Item | null {
+    if (!media.length) return this.get(id);
+    const row = this.db.prepare("UPDATE items SET media = ? WHERE id = ? RETURNING *").get(JSON.stringify(media), id) as ItemRow | undefined;
     return row ? toItem(row) : null;
   }
 
@@ -922,10 +934,16 @@ function toItem(r: ItemRow): Item {
     ...(r.enriched_by ? { enrichedBy: r.enriched_by } : {}),
     ...(r.note ? { note: r.note } : {}),
     suggestions: parseSuggestions(r.suggestions),
+    media: parseMedia(r.media),
     placed: r.user_placed === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+function parseMedia(raw: string | null): MediaRef[] {
+  if (!raw) return [];
+  try { return normalizeMedia(JSON.parse(raw)); } catch { return []; }
 }
 
 function parseSuggestions(raw: string | null): Suggestion[] {

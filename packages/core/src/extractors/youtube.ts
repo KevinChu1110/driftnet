@@ -1,4 +1,4 @@
-import type { Digest } from "../types.ts";
+import type { Digest, MediaRef } from "../types.ts";
 import { fetchText, metaTags } from "./http.ts";
 import { clipTokens, digestBudget } from "../digest.ts";
 import { extractUrls } from "../url.ts";
@@ -7,6 +7,8 @@ import { extractUrls } from "../url.ts";
 export function matchYoutube(url: string): string | null {
   return /^https:\/\/youtube\.com\/watch\?(?:.*&)?v=([\w-]{6,})/.exec(url)?.[1] ?? null;
 }
+
+export const youtubeThumbnail = (id: string): MediaRef => ({ url: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`, kind: "video", alt: "" });
 
 // TODO(contrib): pull captions for videos with a short description — the tool
 // name is often only spoken, never written.
@@ -28,5 +30,6 @@ export async function extractYoutube(url: string): Promise<Digest | null> {
     text: clipTokens(description, digestBudget()),
     outlinks: extractUrls(description).filter((u) => !u.includes("youtube.com")).slice(0, 10),
     meta: { channel },
+    media: [youtubeThumbnail(id)],
   };
 }

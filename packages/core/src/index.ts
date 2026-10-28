@@ -18,6 +18,8 @@ export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/inde
 export { guard } from "./guard.ts";
 export { Pipeline, RefreshBusy, RefreshTooSoon } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, FOLDER_TEMPLATES, TEMPLATE_NAMES, isTemplate, loadCategories, applyFolderTemplate, TemplateError, type FolderTemplate } from "./categories.ts";
+export { normalizeMedia, publicItem, publicMedia, type PublicMedia } from "./media.ts";
+export { safeFetch } from "./extractors/net.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";
 export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation } from "./store.ts";
