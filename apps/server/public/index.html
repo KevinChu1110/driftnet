@@ -229,6 +229,30 @@
   body.map-view .toast.show { transform: translate(-50%, 0); }
   body.map-view .pickbar { bottom: auto; top: calc(env(safe-area-inset-top) + 72px); }
   .pickbar button { white-space: nowrap; }
+  /* Several cards selected: a bar at the bottom (top on the map) with what can be done to all of them. */
+  .swipe.selected .card { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+  .swipe.selected .card::after { content: "✓"; position: absolute; left: -1px; top: -1px; width: 22px; height: 22px; border-radius: 12px 0 10px 0; background: var(--accent);
+                                 color: #fff; font-size: 13px; display: grid; place-items: center; }
+  .mnode.sel { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .selbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px)); z-index: 6; display: flex; flex-wrap: wrap;
+            gap: 6px; align-items: center; background: var(--accent); color: #fff; border-radius: 14px; padding: 8px 8px 8px 16px; box-shadow: 0 8px 26px rgba(0,0,0,.28);
+            width: max-content; max-width: calc(100vw - 24px); }
+  .selbar[hidden], body.readonly .selbar { display: none !important; }
+  .selbar .sel-n { font-weight: 650; margin-right: 6px; }
+  .selbar button { border: 0; background: rgba(255,255,255,.2); color: #fff; border-radius: 10px; min-height: 40px; padding: 0 12px; font-weight: 600; white-space: nowrap;
+                   display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .selbar button:hover, .selbar button:focus-visible { background: rgba(255,255,255,.34); }
+  .selbar .ico { width: 16px; height: 16px; }
+  body.selecting main { padding-bottom: 120px; }
+  body.selecting .toast { bottom: calc(max(16px, env(safe-area-inset-bottom) + 8px) + 72px); }
+  body.map-view .selbar { bottom: auto; top: calc(env(safe-area-inset-top) + 72px); }
+  body.map-view.selecting .toast { top: calc(env(safe-area-inset-top) + 136px); bottom: auto; }
+  .pick .qk, .keys kbd { font: 600 12px/1 ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 3px 6px; color: var(--muted); background: var(--bg); }
+  .pick .qk { margin-right: 6px; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0 0 12px; font-size: 14px; align-items: center; }
+  .keys h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .keys dt { justify-self: end; white-space: nowrap; }
+  .keys dd { margin: 0; }
   .mnode .opt { position: relative; }
   .mnode .opt::before { content: ""; position: absolute; inset: -9px; }
   body.map-view main { padding-bottom: 0; }
@@ -521,6 +545,12 @@
   </form>
 </dialog>
 <div class="pickbar" id="pickbar" role="status" hidden><span id="pick-text"></span><button type="button" id="pick-cancel"></button></div>
+<div class="selbar" id="selbar" role="toolbar" hidden></div>
+<dialog id="keys-dlg" aria-labelledby="ky-title">
+  <h3 id="ky-title"></h3>
+  <dl class="keys" id="ky-body"></dl>
+  <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="ky-close" type="button"></button></div>
+</dialog>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
   const STRINGS = {
@@ -561,6 +591,14 @@
       readOnlyNudge: "You can only look here — tap Unlock at the top to change things", filterFolders: "Type to find a folder…", undoHint: "z undoes",
       addLink: "Add", addPlaceholder: "Paste a link to a tool, post or video…", added: "Saved — sorting it now",
       shortcuts: "Keys: j / k next / previous · f favorite · m move · n note · # trash · / search · g m mind map",
+      keysTitle: "Keyboard shortcuts", keysMove: "Move, favorite, trash", keysSelect: "Select several cards", keysGo: "Go to", keysQuick: "File into your most-used folders",
+      kNext: "Next / previous card", kFav: "Favorite", kMove: "Move to…", kNote: "Note", kTrash: "Trash (restore in the trash)", kSearch: "Search", kMap: "Mind map", kAll: "All cards",
+      kSelect: "Select or unselect the card", kRange: "Select a range", kHold: "Hold", kLong: "Start selecting on a phone", keysClose: "Close", kClear: "Clear the selection", kUndo: "Undo the last action", kHelp: "This list",
+      kQuickNone: "Move a card into a folder first; the nine you use most get a number here.", kQuickN: (f) => `Move into ${f}`,
+      nSelected: (n) => `${n} selected`, selectAll: "Select all", clearSel: "Clear", trashShort: "Trash",
+      moveTitleMany: (n) => `Move ${n} cards to`, pickedMany: (n) => `Picked up ${n} cards — tap the folder they go into`,
+      bulkMoved: (n, f) => `Moved ${n} cards to ${f}`, bulkRemoved: (n) => `${n} cards moved to the trash`, bulkRestored: (n) => `${n} cards restored`,
+      bulkFaved: (n) => `${n} cards added to favorites`, bulkUnfaved: (n) => `${n} cards removed from favorites`,
       st: {
         title: "Settings", save: "Save", welcome: "Welcome! Pick a model below to get summaries — or none: links are still sorted into folders, just without a summary. Then paste a link.",
         display: "This browser", sort: "Order", sorts: { best: "Best first", newest: "Newest first", shared: "Most shared first" },
@@ -652,6 +690,14 @@
       readOnlyNudge: "目前只能看。要修改，請點上方的「解鎖」", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
       addLink: "收錄", addPlaceholder: "貼上工具、貼文或影片的連結…", added: "收到，正在整理",
       shortcuts: "快捷鍵：j／k 下一張／上一張 · f 最愛 · m 移動 · n 筆記 · # 垃圾桶 · / 搜尋 · g m 樹狀圖",
+      keysTitle: "快捷鍵", keysMove: "移動、最愛、垃圾桶", keysSelect: "一次選多張卡片", keysGo: "切換畫面", keysQuick: "放進最常用的資料夾",
+      kNext: "下一張／上一張", kFav: "最愛", kMove: "移動到…", kNote: "筆記", kTrash: "垃圾桶（在垃圾桶裡是還原）", kSearch: "搜尋", kMap: "樹狀圖", kAll: "全部卡片",
+      kSelect: "選取／取消選取這張", kRange: "選取一段範圍", kHold: "長按", kLong: "在手機上開始選取卡片", keysClose: "關閉", kClear: "取消全部選取", kUndo: "復原上一個動作", kHelp: "顯示這份清單",
+      kQuickNone: "先把卡片移進某個資料夾；最常用的九個資料夾會在這裡得到數字鍵。", kQuickN: (f) => `移到 ${f}`,
+      nSelected: (n) => `已選 ${n} 張`, selectAll: "全選", clearSel: "清除", trashShort: "垃圾桶",
+      moveTitleMany: (n) => `把 ${n} 張卡片移動到`, pickedMany: (n) => `已拿起 ${n} 張卡片，點要放進去的資料夾`,
+      bulkMoved: (n, f) => `已將 ${n} 張卡片移到 ${f}`, bulkRemoved: (n) => `已將 ${n} 張卡片移到垃圾桶`, bulkRestored: (n) => `已還原 ${n} 張卡片`,
+      bulkFaved: (n) => `已將 ${n} 張卡片加入最愛`, bulkUnfaved: (n) => `已將 ${n} 張卡片移出最愛`,
       st: {
         title: "設定", save: "儲存", welcome: "歡迎！在下面選一個模型就會有摘要；不選也可以，連結一樣會分進資料夾，只是沒有摘要。接著貼一個連結試試看。",
         display: "這個瀏覽器", sort: "排序", sorts: { best: "值得看的在前", newest: "最新的在前", shared: "最多人分享的在前" },
@@ -1002,15 +1048,40 @@
   }
 
   // ── Move a card: picker (phones) or drag onto the sidebar (desktop) ───────
-  let moving = null;
+  let moving = null, movingMany = null;
+  /** The nine folders cards were filed into most often (this browser), in tree order on a tie: keys 1–9 file a card there. */
+  function quickFolders() {
+    let counts = {};
+    try { counts = JSON.parse(store.get("driftnet-quick") ?? "{}") || {}; } catch {}
+    const order = []; (function walk(p) { for (const f of kids(p)) { order.push(f.id); walk(f.id); } })(null);
+    return order.map((id, at) => ({ id, at, n: Number(counts[id]) || 0 })).filter((f) => f.n > 0)
+      .sort((a, b) => b.n - a.n || a.at - b.at).slice(0, 9).map((f) => f.id);
+  }
+  function bumpQuick(folder, by = 1) {
+    let counts = {};
+    try { counts = JSON.parse(store.get("driftnet-quick") ?? "{}") || {}; } catch {}
+    counts[folder] = (Number(counts[folder]) || 0) + by;
+    store.set("driftnet-quick", JSON.stringify(counts));
+  }
   function openMovePicker(id) {
     const item = find(id);
     if (!item) return;
-    moving = id;
+    moving = id; movingMany = null;
+    $("mv-title").textContent = T().moveTitle(nameOf(item));
+    showMovePicker(item.category);
+  }
+  /** Move to… for several cards at once (the selection). */
+  function openMovePickerFor(ids) {
+    if (ids.length === 1) return openMovePicker(ids[0]);
+    moving = null; movingMany = ids;
+    $("mv-title").textContent = T().moveTitleMany(ids.length);
+    showMovePicker(null);
+  }
+  function showMovePicker(current) {
     const t = T();
-    $("mv-title").textContent = t.moveTitle(nameOf(item));
+    const quick = quickFolders();
     const rows = (p, depth) => kids(p).map((f) => `<button type="button" data-to="${esc(f.id)}" style="--depth:${depth}"
-        aria-current="${f.id === item.category}"><span>${esc(catLabel(f.id))}</span><span class="count">${subtotal(f) || ""}</span></button>` + rows(f.id, depth + 1)).join("");
+        aria-current="${f.id === current}"><span>${esc(catLabel(f.id))}</span><span>${quick.includes(f.id) ? `<kbd class="qk" title="${esc(t.kQuickN(catLabel(f.id)))}">${quick.indexOf(f.id) + 1}</kbd>` : ""}<span class="count">${subtotal(f) || ""}</span></span></button>` + rows(f.id, depth + 1)).join("");
     $("mv-list").innerHTML = rows(null, 0);
     $("mv-cancel").textContent = t.cancel;
     $("mv-filter").value = "";
@@ -1025,7 +1096,7 @@
     const q = $("mv-filter").value.trim().toLowerCase();
     const rows = [...$("mv-list").querySelectorAll("[data-to]")];
     // Match what the reader sees; the hidden id (e.g. "coding-agent") only when no visible name matches.
-    const byName = rows.filter((b) => b.textContent.toLowerCase().includes(q));
+    const byName = rows.filter((b) => b.firstElementChild.textContent.toLowerCase().includes(q));
     const shown = new Set(q ? (byName.length ? byName : rows.filter((b) => b.dataset.to.includes(q))) : rows);
     for (const b of rows) b.hidden = !shown.has(b);
   });
@@ -1048,7 +1119,8 @@
     const b = e.target.closest("[data-to]");
     if (!b) return;
     $("move-dlg").close();
-    moveItem(moving, b.dataset.to);
+    if (movingMany) bulkApply("move", movingMany, b.dataset.to);
+    else moveItem(moving, b.dataset.to);
   };
 
   async function moveItem(id, to, quiet = false) {
@@ -1076,7 +1148,7 @@
     const onMap = mapItems.find((x) => x.id === id);
     if (onMap && onMap !== item) onMap.category = to;
     if (state.view === "map") drawMap();
-    if (!quiet) toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); });
+    if (!quiet) { bumpQuick(to); toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); }); }
   }
   const subtreeOf = (id) => { const out = new Set([id]); for (const q = [id]; q.length;) for (const k of kids(q.pop())) { out.add(k.id); q.push(k.id); } return out; };
   /** Re-draw just the tree's counts after a move. */
@@ -1471,7 +1543,7 @@
       const more = n.type === "folder" ? `<span class="opt" data-edit="${esc(n.id)}" aria-hidden="true" title="${esc(T().editFolder)}">${ic("dots")}</span>` : "";
       const name = n.type === "folder" ? T().a11yFolder(n.label, n.count) : n.type === "item" ? T().a11yCard(n.label) : n.label;
       const aria = ` aria-label="${esc(name)}" aria-level="${n.depth + 1}"` + (n.type === "folder" && n.hasKids ? ` aria-expanded="${!!n.open}"` : "");
-      return `<div class="mnode ${n.type} ${level} ${n.type === "folder" && !n.hasKids ? "vacant" : ""} ${n.hit ? "hit" : ""}" role="button" tabindex="0"${aria}
+      return `<div class="mnode ${n.type} ${level} ${n.type === "folder" && !n.hasKids ? "vacant" : ""} ${n.hit ? "hit" : ""} ${n.type === "item" && selected.has(Number(n.key.slice(2))) ? "sel" : ""}" role="button" tabindex="0"${aria}
         data-key="${esc(n.key)}" style="--c:${n.color}">${tw}${star}<span class="t">${esc(n.label)}</span>${cnt}${more}</div>`;
     }).join("");
     const el = new Map([...canvas.querySelectorAll(".mnode")].map((d) => [d.dataset.key, d]));
@@ -1693,10 +1765,13 @@
       if (p.touch && p.armed && !p.drag) { endPress(); if (p.movable) pickUp(p.key); return; }
       const target = p.drag ? document.querySelector(".mnode.drop") : null;
       endPress();
+      if (!p.drag && e.shiftKey && role === "admin" && p.key.startsWith("i:")) return toggleSelect(Number(p.key.slice(2)));
       if (!p.drag) return tapNode(p.key, !p.touch);
       if (!target) return;
       const to = target.dataset.key === "root" ? null : target.dataset.key.slice(2);
-      if (p.key.startsWith("i:")) await mapMoveItem(Number(p.key.slice(2)), to);
+      // Dragging one of several selected cards takes them all.
+      if (p.key.startsWith("i:") && selected.has(Number(p.key.slice(2))) && selected.size > 1) { if (to) await bulkApply("move", [...selected], to); }
+      else if (p.key.startsWith("i:")) await mapMoveItem(Number(p.key.slice(2)), to);
       else await mapMoveFolder(p.key.slice(2), to);
     };
     $("list").addEventListener("pointerup", finish);
@@ -1717,15 +1792,23 @@
   let picked = null;
   function pickUp(key) {
     picked = key;
-    const t = T();
+    if (key.startsWith("i:")) selected.add(Number(key.slice(2)));
+    renderPickText();
+    syncSelection();
+  }
+  /** While a card is picked up on a phone, tapping more cards adds them; the next folder tapped receives all. */
+  function renderPickText() {
+    const key = picked, t = T();
+    const many = key.startsWith("i:") && selected.size > 1;
     const label = key.startsWith("i:") ? nameOf(mapItems.find((i) => i.id === Number(key.slice(2))) ?? { title: "" }) : catLabel(key.slice(2));
-    $("pick-text").textContent = t.pickedUp(label);
+    $("pick-text").textContent = many ? t.pickedMany(selected.size) : t.pickedUp(label);
     $("pick-cancel").textContent = t.cancel;
     $("pickbar").hidden = false;
     $("map-canvas")?.querySelector(`.mnode[data-key="${CSS.escape(key)}"]`)?.classList.add("picked");
   }
   let justDropped = false;
   function dropPicked() {
+    if (picked?.startsWith("i:")) clearSelection();
     picked = null;
     justDropped = true;
     setTimeout(() => (justDropped = false), 400);   // the click that follows the tap isn't an edit
@@ -1736,9 +1819,12 @@
     if (picked) {
       const what = picked;
       if (key === what) return dropPicked();
+      if (what.startsWith("i:") && key.startsWith("i:")) { toggleSelect(Number(key.slice(2))); if (selected.size) renderPickText(); else dropPicked(); return; }
       if (key.startsWith("f:") || (key === "root" && what.startsWith("f:"))) {
+        const ids = what.startsWith("i:") && selected.size > 1 ? [...selected] : null;
         dropPicked();
         const to = key === "root" ? null : key.slice(2);
+        if (ids) return to ? bulkApply("move", ids, to) : undefined;
         return what.startsWith("i:") ? mapMoveItem(Number(what.slice(2)), to) : mapMoveFolder(what.slice(2), to);
       }
     }
@@ -1803,6 +1889,7 @@
     // Filing many cards in a row: the target stays as it was (no sudden expansion); its count pulses instead.
     drawMap();
     pulse(`f:${to}`);
+    bumpQuick(to);
     toast(T().moved(nameOf(item), folderPath(to)), async () => {
       if (await mapWrite(`/api/items/${id}/move`, "POST", { folder: from })) { item.category = from; drawMap(); refreshFolders(); }
     });
@@ -2066,6 +2153,8 @@
 
   async function render() {
     updateCrumb();
+    const viewKey = [state.view, state.category, state.kind, state.q].join("|");
+    if (viewKey !== lastViewKey) { lastViewKey = viewKey; selected.clear(); selAnchor = null; }
     document.body.classList.toggle("map-view", state.view === "map");
     if (state.view !== "map" && picked) dropPicked();
     if (state.view === "notes") return renderNotes();
@@ -2086,6 +2175,7 @@
     $("add-form")?.addEventListener("submit", addLink);
     $("list").querySelector("[data-connect-empty]")?.addEventListener("click", () => openConnect());
     for (const el of $("list").querySelectorAll(".swipe")) attachSwipe(el);
+    syncSelection();
     restoreFocus();
     // Only #item-<n> is ours; anything else in the hash must not break the page.
     if (/^#item-\d+$/.test(location.hash)) {
@@ -2196,7 +2286,99 @@
     set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash);
   }
 
+  // ── Select several cards: x, Shift-click or a long press; then act on all of them ──
+  const selected = new Set();
+  let selAnchor = null, lastViewKey = "";
+  const visibleIds = () => [...$("list").querySelectorAll(".swipe")].map((el) => Number(el.dataset.id));
+  const focusedId = () => Number(document.activeElement?.closest?.(".swipe")?.dataset.id) || null;
+  function toggleSelect(id, on = !selected.has(id)) {
+    if (role !== "admin") return;
+    if (on) selected.add(id); else selected.delete(id);
+    selAnchor = id;
+    syncSelection();
+  }
+  function selectRange(id) {
+    const ids = visibleIds();
+    const a = ids.indexOf(selAnchor ?? focusedId() ?? id), b = ids.indexOf(id);
+    if (a < 0 || b < 0) return toggleSelect(id, true);
+    for (const x of ids.slice(Math.min(a, b), Math.max(a, b) + 1)) selected.add(x);
+    selAnchor = id;
+    syncSelection();
+  }
+  function clearSelection() { selected.clear(); selAnchor = null; syncSelection(); }
+  /** Paint the selection on whatever is drawn (list or map) and refresh the bar. */
+  function syncSelection() {
+    const here = new Set(state.view === "map" ? mapItems.map((i) => i.id) : visibleIds());
+    for (const id of [...selected]) if (!here.has(id)) selected.delete(id);
+    for (const el of $("list").querySelectorAll(".swipe")) el.classList.toggle("selected", selected.has(Number(el.dataset.id)));
+    for (const n of $("list").querySelectorAll(".mnode.item")) n.classList.toggle("sel", selected.has(Number(n.dataset.key.slice(2))));
+    document.body.classList.toggle("selecting", selected.size > 0 && role === "admin");
+    renderSelbar();
+  }
+  function renderSelbar() {
+    const bar = $("selbar"), n = selected.size, t = T();
+    bar.hidden = !n || role !== "admin" || (state.view === "map" && !!picked);
+    if (bar.hidden) return;
+    const keep = document.activeElement?.closest?.("#selbar")?.dataset?.sel ?? document.activeElement?.dataset?.sel;
+    const trash = state.view === "trash", map = state.view === "map";
+    const allFav = [...selected].every((id) => find(id)?.favorite);
+    bar.setAttribute("aria-label", t.nSelected(n));
+    bar.innerHTML = `<span class="sel-n" role="status">${esc(t.nSelected(n))}</span>` +
+      (trash ? "" : `<button type="button" data-sel="move">${ic("move")} ${esc(t.moveTo)}</button>
+        <button type="button" data-sel="fav" aria-pressed="${allFav}" title="${esc(allFav ? t.unfavorite : t.favorite)}" aria-label="${esc(allFav ? t.unfavorite : t.favorite)}">${ic("star", allFav ? "filled" : "")}</button>`) +
+      `<button type="button" data-sel="trash">${ic(trash ? "undo" : "trash")} ${esc(trash ? t.restore : t.trashShort)}</button>` +
+      (map ? "" : `<button type="button" data-sel="all">${esc(t.selectAll)}</button>`) +
+      `<button type="button" data-sel="clear">${esc(t.clearSel)}</button>`;
+    if (keep) bar.querySelector(`[data-sel="${keep}"]`)?.focus({ preventScroll: true });
+  }
+  $("selbar").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-sel]");
+    if (!b) return;
+    const ids = [...selected], a = b.dataset.sel;
+    if (a === "move") openMovePickerFor(ids);
+    else if (a === "fav") bulkApply(ids.every((id) => find(id)?.favorite) ? "unfavorite" : "favorite", ids);
+    else if (a === "trash") bulkApply(state.view === "trash" ? "restore" : "trash", ids);
+    else if (a === "all") { for (const id of visibleIds()) selected.add(id); syncSelection(); }
+    else clearSelection();
+  });
+  /** One request for the whole batch; Undo sends back what the server said was there before. */
+  async function bulkApply(action, ids, folder) {
+    if (!ids.length) return;
+    const t = T(), n = ids.length;
+    const r = await mapWrite("/api/items/bulk", "POST", { action, ids, ...(action === "move" ? { folder } : {}) });
+    if (!r) return;
+    clearSelection();
+    if (action === "move") bumpQuick(folder, n);
+    await refreshFolders();
+    await render();
+    refreshCounts();
+    if (action === "move" && state.view === "map") pulse(`f:${folder}`);
+    const text = { move: () => t.bulkMoved(n, folderPath(folder)), trash: () => t.bulkRemoved(n), restore: () => t.bulkRestored(n),
+                   favorite: () => t.bulkFaved(n), unfavorite: () => t.bulkUnfaved(n) }[action]();
+    toast(text, async () => {
+      if (!(await mapWrite("/api/items/bulk/undo", "POST", { previous: r.previous }))) return;
+      await refreshFolders();
+      await render();
+      refreshCounts();
+    });
+  }
+  /** Keys 1–9: file the selection, or else the focused card, into the nth most-used folder. */
+  function quickMove(n) {
+    const to = quickFolders()[n - 1];
+    if (!to) return false;
+    if (selected.size) bulkApply("move", [...selected], to);
+    else if (focusedId() && state.view !== "map") moveItem(focusedId(), to);
+    else return false;
+    return true;
+  }
   $("list").addEventListener("click", (e) => {
+    // With cards selected a click picks or drops the card; Shift-click selects a range. Links and buttons don't fire meanwhile.
+    const sw = e.target.closest(".swipe");
+    if (sw && role === "admin" && (e.shiftKey || selected.size) && !e.target.closest(".tool, .link-btn")) {
+      e.preventDefault();
+      if (e.shiftKey) selectRange(Number(sw.dataset.id)); else toggleSelect(Number(sw.dataset.id));
+      return;
+    }
     const n = e.target.closest('.link-btn[data-act="note"]');
     if (n) return openItemNote(Number(n.closest(".swipe").dataset.id));
     const b = e.target.closest(".tool");
@@ -2282,8 +2464,21 @@
     };
     cardEl.addEventListener("pointerup", end);
     cardEl.addEventListener("pointercancel", end);
-    // A drag that ends on a link must not open it.
-    cardEl.addEventListener("click", (e) => { if (Math.abs(dx) > 8) { e.preventDefault(); e.stopPropagation(); } }, true);
+    // Holding a card on a phone (~0.5 s, without moving) starts selecting.
+    let hold = null, held = false, hx = 0, hy = 0;
+    const cancelHold = () => { clearTimeout(hold); hold = null; };
+    cardEl.addEventListener("pointerdown", (e) => {
+      held = false;
+      if (e.pointerType !== "touch" || e.button !== 0 || e.target.closest(".tool, .link-btn")) return;
+      hx = e.clientX; hy = e.clientY;
+      hold = setTimeout(() => { hold = null; held = true; navigator.vibrate?.(12); toggleSelect(Number(el.dataset.id), true); }, 500);
+    });
+    cardEl.addEventListener("pointermove", (e) => { if (hold && Math.hypot(e.clientX - hx, e.clientY - hy) > 8) cancelHold(); });
+    cardEl.addEventListener("pointerup", cancelHold);
+    cardEl.addEventListener("pointercancel", cancelHold);
+    cardEl.addEventListener("contextmenu", (e) => { if (hold || held) e.preventDefault(); });
+    // A drag that ends on a link must not open it, nor must the lift of a long press.
+    cardEl.addEventListener("click", (e) => { if (Math.abs(dx) > 8 || held) { held = false; e.preventDefault(); e.stopPropagation(); } }, true);
   }
 
   // ── Toast with undo ──────────────────────────────────────────────────────
@@ -2305,6 +2500,21 @@
     if (el) el.focus({ preventScroll: true });
   }
   for (const d of document.querySelectorAll("dialog")) d.addEventListener("close", () => setTimeout(restoreFocus, 0));
+  /** The ? dialog: every shortcut, and which folder each number key files into. */
+  function openKeys() {
+    const t = T(), quick = quickFolders();
+    const row = (keys, text) => `<dt>${keys.map((k) => `<kbd>${esc(k)}</kbd>`).join(" ")}</dt><dd>${esc(text)}</dd>`;
+    $("ky-title").textContent = t.keysTitle;
+    $("ky-close").textContent = t.keysClose;
+    $("ky-body").innerHTML =
+      `<h4>${esc(t.keysMove)}</h4>` + row(["j", "k"], t.kNext) + row(["f"], t.kFav) + row(["m"], t.kMove) + row(["n"], t.kNote) + row(["#"], t.kTrash) +
+      `<h4>${esc(t.keysSelect)}</h4>` + row(["x"], t.kSelect) + row(["Shift", "click"], t.kRange) + row([t.kHold], t.kLong) + row(["Esc"], t.kClear) +
+      `<h4>${esc(t.keysQuick)}</h4>` + (quick.length ? quick.map((id, i) => row([String(i + 1)], t.kQuickN(catLabel(id)))).join("") : `<dd style="grid-column:1/-1">${esc(t.kQuickNone)}</dd>`) +
+      `<h4>${esc(t.keysGo)}</h4>` + row(["/"], t.kSearch) + row(["g", "m"], t.kMap) + row(["g", "a"], t.kAll) + row(["z"], t.kUndo) + row(["?"], t.kHelp);
+    $("keys-dlg").showModal();
+  }
+  $("ky-close").onclick = () => $("keys-dlg").close();
+  $("keys-dlg").addEventListener("click", (e) => { if (e.target === $("keys-dlg")) $("keys-dlg").close(); });
   /** The newest undoable action, so z (or ⌘/Ctrl+Z) can undo it from the keyboard. */
   let lastUndo = null;
   function toast(text, undo) {
@@ -2337,9 +2547,12 @@
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "")) return;
     const k = e.key, prev = lastKey;
     lastKey = k;
+    if (k === "Escape" && selected.size) { clearSelection(); return; }
     if (k === "/") { e.preventDefault(); $("q").focus(); return; }
     if ((k === "z" || k === "u") && lastUndo) { e.preventDefault(); $("toast-undo").click(); return; }
-    if (k === "?") { toast(T().shortcuts); return; }
+    if (k === "?") { openKeys(); return; }
+    if (/^[1-9]$/.test(k) && role === "admin" && !document.activeElement?.isContentEditable && quickMove(Number(k))) { e.preventDefault(); return; }
+    if (k === "x" && role === "admin" && !document.activeElement?.isContentEditable && focusedId() && state.view !== "map") { e.preventDefault(); toggleSelect(focusedId()); return; }
     if (prev === "g" && k === "m") { Object.assign(state, { view: "map", category: "" }); load(); return; }
     if (prev === "g" && k === "a") { Object.assign(state, { view: "all", category: "" }); load(); return; }
     const cards = [...$("list").querySelectorAll(".swipe .card")];
