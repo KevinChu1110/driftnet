@@ -197,8 +197,15 @@ plan's limits.
 
 ### Read, save and vote
 
-Claude Code, Claude Desktop, pi, Hermes, OpenClaw or any MCP client connects to `/mcp`
-(Streamable HTTP) or runs `pnpm --filter @driftnet/server mcp` (stdio). ChatGPT custom GPTs import
+In Claude Code, the plugin brings the skill and a local MCP server in one step:
+
+```bash
+/plugin install driftnet --marketplace KevinChu1110/driftnet
+```
+
+Claude Desktop, pi, Hermes, OpenClaw or any MCP client connects to `/mcp` (Streamable HTTP) or runs
+`npx -y driftnet mcp` (stdio; also in the [MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.KevinChu1110/driftnet`). ChatGPT custom GPTs import
 `/openapi.json`; anything that can fetch a URL reads `/llms.txt`.
 
 ```bash

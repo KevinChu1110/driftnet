@@ -179,8 +179,14 @@ DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 
 ### 查詢、收錄、投票
 
-Claude Code、Claude Desktop、pi、Hermes、OpenClaw 或任何 MCP 用戶端連 `/mcp`（Streamable HTTP），或執行
-`pnpm --filter @driftnet/server mcp`（stdio）。ChatGPT 自訂 GPT 匯入 `/openapi.json`；任何能抓網址的程式讀 `/llms.txt`。
+在 Claude Code 裡，裝插件就一次帶入 skill 和本機 MCP：
+
+```bash
+/plugin install driftnet --marketplace KevinChu1110/driftnet
+```
+
+Claude Desktop、pi、Hermes、OpenClaw 或任何 MCP 用戶端連 `/mcp`（Streamable HTTP），或執行 `npx -y driftnet mcp`
+（stdio；也登記在 [MCP Registry](https://registry.modelcontextprotocol.io)，名稱 `io.github.KevinChu1110/driftnet`）。ChatGPT 自訂 GPT 匯入 `/openapi.json`；任何能抓網址的程式讀 `/llms.txt`。
 
 ```bash
 claude mcp add --transport http driftnet http://localhost:8787/mcp \

@@ -44,6 +44,8 @@ cpSync(join(root, "examples"), join(out, "examples"), { recursive: true });
 writeFileSync(join(out, "package.json"), JSON.stringify({
   name: "driftnet",
   version,
+  // The official MCP Registry checks this against server.json.
+  mcpName: "io.github.KevinChu1110/driftnet",
   description: rootPkg.description,
   license: rootPkg.license,
   type: "module",

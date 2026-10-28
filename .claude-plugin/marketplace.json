@@ -1,0 +1,16 @@
+{
+  "name": "driftnet",
+  "description": "driftnet: a catalogue of the AI tools people share in chats, for Claude Code.",
+  "owner": {
+    "name": "Kevin Chu",
+    "url": "https://github.com/KevinChu1110"
+  },
+  "plugins": [
+    {
+      "name": "driftnet",
+      "source": "./",
+      "description": "Look up, save and rate AI tools people shared in group chats.",
+      "version": "0.1.1"
+    }
+  ]
+}

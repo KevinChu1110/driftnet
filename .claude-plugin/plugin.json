@@ -1,0 +1,13 @@
+{
+  "name": "driftnet",
+  "version": "0.1.1",
+  "description": "Look up, save and rate AI tools people shared in group chats — a local catalogue your agent can search before picking a tool, and help keep tidy.",
+  "author": { "name": "Kevin Chu", "url": "https://github.com/KevinChu1110" },
+  "homepage": "https://github.com/KevinChu1110/driftnet",
+  "repository": "https://github.com/KevinChu1110/driftnet",
+  "license": "MIT",
+  "keywords": ["bookmarks", "links", "ai-tools", "catalogue", "mcp"],
+  "mcpServers": {
+    "driftnet": { "command": "npx", "args": ["-y", "driftnet", "mcp"] }
+  }
+}
