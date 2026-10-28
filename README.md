@@ -250,7 +250,7 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 ```
 
 Give each agent its own key instead of the admin password: **Settings → Access → Agent tokens** (or the
-*Create a token for this agent* button on a Connect card). Use the token where `$DRIFTNET_TOKEN` is.
+*Create a token for this agent* button on a Connect card, where you can edit the name first). Use the token where `$DRIFTNET_TOKEN` is.
 
 | MCP tool | Use |
 |---|---|
@@ -367,7 +367,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
-`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id` (admin password only) · `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -386,8 +386,8 @@ listens on `127.0.0.1`. Everything below is on the page under **⚙ Settings →
    without the password; the page keeps it and removes it from the address bar.
 4. **Agent tokens.** One named key per agent (Hermes, Claude Code, OpenClaw…) instead of the admin
    password: *write* can add, move and tidy, *read* can only look. A token is shown once when you
-   create it and only its hash is stored. *Revoke* cuts off that one agent at once; changing the admin
-   password does not touch them. Tokens work as a Bearer header only, never in a URL, and cannot
+   create it and only its hash is stored. *Revoke* cuts off that one agent at once, and *Remove* clears a revoked one from the list (revoked
+   tokens also drop out after 30 days); changing the admin password does not touch them. Tokens work as a Bearer header only, never in a URL, and cannot
    change settings or make more tokens. The queue and card moves record which token did it.
 5. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
    Cloudflare (no account; install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
