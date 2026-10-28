@@ -520,6 +520,53 @@ try {
     console.log("✓ mind map: expand, drag a card onto a folder (mouse), phone layout");
   }
 
+  // Command palette (⌘K / Ctrl+K) and the split view.
+  {
+    await viewport(1280, 820, false);
+    await open();
+    const folders = await api("/api/folders");
+    const f = folders.find((x) => x.id !== "other" && x.label?.[LANG]) ?? folders[0];
+    const pressK = async () => {
+      await cdp("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "k", code: "KeyK", windowsVirtualKeyCode: 75, modifiers: 2 }, s);
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "k", code: "KeyK", windowsVirtualKeyCode: 75, modifiers: 2 }, s);
+    };
+    await pressK();
+    await waitFor(s, `document.getElementById("cmd-dlg").open && document.activeElement.id === "cmd-input"`, "palette opened with Ctrl+K");
+    assert.equal(await evaluate(s, `document.getElementById("cmd-input").getAttribute("role")`), "combobox");
+    assert.equal(await evaluate(s, `document.getElementById("cmd-list").getAttribute("role")`), "listbox");
+    await cdp("Input.insertText", { text: f.label?.[LANG] ?? f.id }, s);
+    await waitFor(s, `!!document.querySelector('#cmd-list [aria-selected="true"]') && document.getElementById("cmd-input").getAttribute("aria-activedescendant") === document.querySelector('#cmd-list [aria-selected="true"]').id`, "a folder is highlighted");
+    await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 }, s);
+    await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 }, s);
+    await waitFor(s, `!document.getElementById("cmd-dlg").open && document.querySelector('[data-field="category"][data-value="${f.id}"]')?.getAttribute("aria-pressed") === "true"`, "Enter jumped to the folder");
+    console.log("✓ command palette: Ctrl+K opens it, a folder name + Enter jumps there");
+    // Back to everything, then the split view at a wide window: cards on the left, the map on the right.
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "all cards");
+    await evaluate(s, `document.querySelector("[data-split]").click()`);
+    await waitFor(s, `document.body.classList.contains("split-view") && document.querySelectorAll("#split-list .swipe").length > 1 && !!document.querySelector('#split-map .mnode[data-key="root"]')`, "list and map together");
+    const sides = await evaluate(s, `(() => { const a = document.getElementById("split-list").getBoundingClientRect(), b = document.getElementById("split-map").getBoundingClientRect(); return { listRight: a.right, mapLeft: b.left, w: a.width, mw: b.width }; })()`);
+    assert.ok(sides.listRight <= sides.mapLeft + 1 && sides.w > 300 && sides.mw > 400, `list left, map right (${JSON.stringify(sides)})`);
+    assert.equal(await evaluate(s, `localStorage.getItem("driftnet-split")`), "1", "the choice is remembered");
+    await shoot(`web-split-${LANG}.png`);
+    // Moving a card from the list keeps both sides in step.
+    const mv = await evaluate(s, `Number(document.querySelector("#split-list .swipe").dataset.id)`);
+    const before = (await api(`/api/items/${mv}`)).category;
+    const to = folders.find((x) => x.id !== before && x.id !== "other")?.id ?? "other";
+    await evaluate(s, `moveItem(${mv}, ${JSON.stringify(to)}, true)`);
+    await waitFor(s, `mapItems.find((i) => i.id === ${mv})?.category === ${JSON.stringify(to)} && document.querySelector("#item-${mv} .badge.folder")?.textContent.length > 0`, "both sides know the move");
+    await evaluate(s, `moveItem(${mv}, ${JSON.stringify(before)}, true)`);
+    await waitFor(s, `mapItems.find((i) => i.id === ${mv})?.category === ${JSON.stringify(before)}`, "moved back");
+    // Narrower than 1200px: the toggle is hidden and the page falls back to the list alone.
+    await viewport(1000, 820, false);
+    await waitFor(s, `!document.querySelector("#split-map") && document.querySelectorAll(".swipe").length > 1 && getComputedStyle(document.querySelector("[data-split]")).display === "none"`, "single view below 1200px");
+    await viewport(1280, 820, false);
+    await waitFor(s, `!!document.querySelector("#split-map")`, "split is back when wide again");
+    await evaluate(s, `document.querySelector("[data-split]").click()`);
+    await waitFor(s, `!document.querySelector("#split-map") && localStorage.getItem("driftnet-split") === "0"`, "split switched off");
+    console.log("✓ split view: list and map side by side at 1280px, moves keep both in step, single view below 1200px");
+  }
+
   // No password yet: another website's page must not write into (or read) the catalogue.
   {
     const res = await fetch(`http://127.0.0.1:${port}/api/ingest`, { method: "POST", headers: { origin: "https://evil.test", "content-type": "text/plain" },

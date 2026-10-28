@@ -256,6 +256,25 @@
   .mnode .opt { position: relative; }
   .mnode .opt::before { content: ""; position: absolute; inset: -9px; }
   body.map-view main { padding-bottom: 0; }
+  /* Split view (wide screens): cards on the left, the mind map on the right. */
+  nav .split-btn { display: none; }
+  @media (min-width: 1200px) { nav .split-btn { display: flex; } }
+  body.split-view .layout { max-width: none; }
+  .split { display: grid; grid-template-columns: minmax(340px, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+  .split-list { overflow: auto; padding-right: 6px; min-width: 0; }
+  .split-map { min-width: 0; }
+  /* Command palette (⌘K / Ctrl+K). */
+  dialog.cmd { width: min(560px, calc(100vw - 24px)); padding: 0; margin: 12vh auto auto; }
+  dialog.cmd input#cmd-input { border: 0; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; padding: 14px 16px; font-size: 16px; width: 100%; background: transparent; outline: none; }
+  #cmd-list { max-height: min(52vh, 420px); overflow: auto; padding: 6px; }
+  .cmd-h { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 10px 4px; }
+  .cmd-o { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+  .cmd-o[aria-selected="true"] { background: var(--accent-soft); }
+  .cmd-o .sub { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .cmd-o .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmd-o .lab::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c, transparent); margin-right: 8px; }
+  .cmd-empty { padding: 14px 12px; color: var(--muted); }
+  @media (max-width: 720px) { #palette-btn { display: none; } }
   .map-wrap { user-select: none; -webkit-user-select: none; }
   .mghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -130%) rotate(-2deg); opacity: .95; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
   .peek h3 { margin: 0 0 8px; font-size: 18px; }
@@ -462,6 +481,7 @@
     <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+    <symbol id="i-split" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M12 4.5v15"/></symbol>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   </defs>
 </svg>
@@ -474,6 +494,7 @@
   <span class="stats" id="stats"></span>
   <input id="q" class="search" type="search" enterkeyhint="search">
   <button id="lock" class="lock" type="button" hidden></button>
+  <button id="palette-btn" class="lang" type="button" aria-haspopup="dialog"></button>
   <button id="lang" class="lang" type="button"></button>
 </header>
 <button id="crumb" class="crumb" type="button" aria-controls="nav"></button>
@@ -556,6 +577,10 @@
 </dialog>
 <div class="pickbar" id="pickbar" role="status" hidden><span id="pick-text"></span><button type="button" id="pick-cancel"></button></div>
 <div class="selbar" id="selbar" role="toolbar" hidden></div>
+<dialog id="cmd-dlg" class="cmd">
+  <input id="cmd-input" type="text" role="combobox" aria-expanded="true" aria-controls="cmd-list" aria-autocomplete="list" autocomplete="off" spellcheck="false">
+  <div id="cmd-list" role="listbox"></div>
+</dialog>
 <dialog id="keys-dlg" aria-labelledby="ky-title">
   <h3 id="ky-title"></h3>
   <dl class="keys" id="ky-body"></dl>
@@ -603,6 +628,8 @@
       shortcuts: "Keys: j / k next / previous · f favorite · m move · n note · # trash · / search · g m mind map",
       keysTitle: "Keyboard shortcuts", keysMove: "Move, favorite, trash", keysSelect: "Select several cards", keysGo: "Go to", keysQuick: "File into your most-used folders",
       kNext: "Next / previous card", kFav: "Favorite", kMove: "Move to…", kNote: "Note", kTrash: "Trash (restore in the trash)", kSearch: "Search", kMap: "Mind map", kAll: "All cards",
+      palette: "Command palette", palPlaceholder: "Jump to a folder, find a card, or run a command…", palGroups: { folders: "Folders", cards: "Cards", commands: "Commands" }, palNone: "Nothing matches", kPalette: "Command palette",
+      split: "Split", splitHelp: "Cards and mind map side by side", splitCards: "Cards",
       kSelect: "Select or unselect the card", kRange: "Select a range", kHold: "Hold", kLong: "Start selecting on a phone", keysClose: "Close", kClear: "Clear the selection", kUndo: "Undo the last action", kHelp: "This list",
       kQuickNone: "Move a card into a folder first; the nine you use most get a number here.", kQuickN: (f) => `Move into ${f}`,
       nSelected: (n) => `${n} selected`, selectAll: "Select all", clearSel: "Clear", trashShort: "Trash",
@@ -710,6 +737,8 @@
       shortcuts: "快捷鍵：j／k 下一張／上一張 · f 最愛 · m 移動 · n 筆記 · # 垃圾桶 · / 搜尋 · g m 樹狀圖",
       keysTitle: "快捷鍵", keysMove: "移動、最愛、垃圾桶", keysSelect: "一次選多張卡片", keysGo: "切換畫面", keysQuick: "放進最常用的資料夾",
       kNext: "下一張／上一張", kFav: "最愛", kMove: "移動到…", kNote: "筆記", kTrash: "垃圾桶（在垃圾桶裡是還原）", kSearch: "搜尋", kMap: "樹狀圖", kAll: "全部卡片",
+      palette: "命令面板", palPlaceholder: "跳到資料夾、找卡片，或執行指令…", palGroups: { folders: "資料夾", cards: "卡片", commands: "指令" }, palNone: "沒有符合的項目", kPalette: "命令面板",
+      split: "並排", splitHelp: "卡片列表與樹狀圖並排顯示", splitCards: "卡片",
       kSelect: "選取／取消選取這張", kRange: "選取一段範圍", kHold: "長按", kLong: "在手機上開始選取卡片", keysClose: "關閉", kClear: "取消全部選取", kUndo: "復原上一個動作", kHelp: "顯示這份清單",
       kQuickNone: "先把卡片移進某個資料夾；最常用的九個資料夾會在這裡得到數字鍵。", kQuickN: (f) => `移到 ${f}`,
       nSelected: (n) => `已選 ${n} 張`, selectAll: "全選", clearSel: "清除", trashShort: "垃圾桶",
@@ -781,11 +810,23 @@
     },
   };
   const state = { view: "all", category: "", kind: "", q: "" };
-  const $ = (id) => document.getElementById(id);
+  /** While a pane renders (split view), $("list") means that pane, so the list and map renderers can share the page unchanged. */
+  let paneFor = null, paneLock = Promise.resolve();
+  const $ = (id) => (paneFor && id === "list" ? paneFor : document.getElementById(id));
+  function inPane(pane, fn) {
+    const go = async () => { paneFor = pane; try { return await fn(); } finally { paneFor = null; } };
+    return (paneLock = paneLock.catch(() => {}).then(go));
+  }
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const safeUrl = (u) => (/^https?:\/\//.test(u) ? u : "#");
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  /** Split view: the saved choice; it only shows on wide screens, and only beside the card views. */
+  let split = store.get("driftnet-split") === "1";
+  const wideQuery = matchMedia("(min-width: 1200px)");
+  const splitOn = () => split && wideQuery.matches && (state.view === "all" || state.view === "favorites");
+  const mapShown = () => state.view === "map" || splitOn();
 
   let locale = "en";
   let catLabels = {};
@@ -875,6 +916,8 @@
     $("q").placeholder = T().search;
     $("q").setAttribute("aria-label", T().search);
     $("lang").textContent = T().switchTo;
+    $("palette-btn").textContent = isMac ? "⌘K" : "Ctrl K";
+    $("palette-btn").title = $("palette-btn").ariaLabel = T().palette;
     $("nav").setAttribute("aria-label", T().nav);
     $("menu").setAttribute("aria-label", T().menu);
   }
@@ -942,6 +985,7 @@
       `<div class="row">` +
       btn("view", "all", T().all, stats.items, "all") + btn("view", "favorites", T().favorites, stats.favorites, "star") +
       btn("view", "map", T().map, "", "map") +
+      `<button type="button" class="split-btn" data-split aria-pressed="${split}" title="${esc(T().splitHelp)}"><span class="lbl">${ic("split")}<span>${esc(T().split)}</span></span><span class="count"></span></button>` +
       btn("view", "notes", T().notes, stats.notes || "", "note") +
       btn("view", "trash", T().trash, stats.trash || "", "trash") +
       `</div><div class="folders-head" data-drop-root><h2>${esc(T().folders)}</h2>` +
@@ -972,7 +1016,14 @@
       if (b.dataset.login !== undefined) { if (isDrawer()) setMenu(false); return openLogin(); }
       if (b.dataset.logout !== undefined) { store.set("driftnet-token", ""); return load(); }
       if (b.dataset.new !== undefined) return openFolderDialog(null, b.dataset.new || null);
+      if (b.dataset.split !== undefined) {
+        split = !split;
+        store.set("driftnet-split", split ? "1" : "0");
+        if (state.view !== "all" && state.view !== "favorites") state.view = "all";
+        return load();
+      }
       const { field, value } = b.dataset;
+      if (field === "view" && value === "map" && split) { split = false; store.set("driftnet-split", "0"); }
       // Choosing a category stays inside the current view; choosing a view clears the category.
       if (field === "view") state.category = "";
       // The map has its own folders: picking one in the sidebar shows its cards.
@@ -1100,6 +1151,39 @@
     $("mv-title").textContent = T().moveTitleMany(ids.length);
     showMovePicker(null);
   }
+  // <fuzzy>
+  /**
+   * Rank entries against a query (empty query = all, in order). Tiers: exact, prefix, word start, substring, letters in order
+   * (3+ characters, first field only); text in later fields counts a bit less. Only matches come back, best first.
+   */
+  function fuzzyRank(query, entries, fields) {
+    const q = query.trim().toLowerCase();
+    if (!q) return [...entries];
+    const inOrder = (f) => { let at = 0; for (const ch of f) if (ch === q[at] && ++at === q.length) return true; return false; };
+    const scored = [];
+    entries.forEach((e, at) => {
+      let best = null;
+      fields(e).forEach((raw, i) => {
+        const f = String(raw ?? "").toLowerCase();
+        if (!f) return;
+        let tier = null;
+        if (f === q) tier = -1;
+        else if (f.startsWith(q)) tier = 0;
+        else if (f.split(/[\s\-_/›.,:]+/).some((w) => w.startsWith(q))) tier = 1;
+        else if (f.includes(q)) tier = 2;
+        else if (i === 0 && q.length >= 3 && inOrder(f)) tier = 4;
+        if (tier === null) return;
+        const score = tier + (i > 0 ? 3 : 0);
+        if (best === null || score < best) best = score;
+      });
+      if (best !== null) scored.push({ e, best, at });
+    });
+    return scored.sort((a, b) => a.best - b.best || a.at - b.at).map((x) => x.e);
+  }
+  // </fuzzy>
+  /** What the folder pickers search: its name, full path, description and id. */
+  const folderFields = (id) => [catLabel(id), folderPath(id), folderById(id)?.description, id];
+  let moveBest = null;
   function showMovePicker(current) {
     const t = T();
     const quick = quickFolders();
@@ -1108,6 +1192,7 @@
     $("mv-list").innerHTML = rows(null, 0);
     $("mv-cancel").textContent = t.cancel;
     $("mv-filter").value = "";
+    moveBest = null;
     $("mv-filter").placeholder = t.filterFolders;
     $("mv-filter").setAttribute("aria-label", t.filterFolders);
     $("move-dlg").showModal();
@@ -1116,16 +1201,15 @@
   }
   $("mv-cancel").onclick = () => $("move-dlg").close();
   $("mv-filter").addEventListener("input", () => {
-    const q = $("mv-filter").value.trim().toLowerCase();
     const rows = [...$("mv-list").querySelectorAll("[data-to]")];
-    // Match what the reader sees; the hidden id (e.g. "coding-agent") only when no visible name matches.
-    const byName = rows.filter((b) => b.firstElementChild.textContent.toLowerCase().includes(q));
-    const shown = new Set(q ? (byName.length ? byName : rows.filter((b) => b.dataset.to.includes(q))) : rows);
+    const hit = fuzzyRank($("mv-filter").value, rows, (b) => folderFields(b.dataset.to));
+    const shown = new Set(hit);
     for (const b of rows) b.hidden = !shown.has(b);
+    moveBest = $("mv-filter").value.trim() ? hit[0] ?? null : null;   // Enter files into the best match
   });
   $("mv-filter").addEventListener("keydown", (e) => {
     const visible = [...$("mv-list").querySelectorAll("[data-to]:not([hidden])")];
-    if (e.key === "Enter") { e.preventDefault(); visible[0]?.click(); }
+    if (e.key === "Enter") { e.preventDefault(); (moveBest ?? visible[0])?.click(); }
     else if (e.key === "ArrowDown") { e.preventDefault(); visible[0]?.focus(); }
   });
   $("mv-list").addEventListener("keydown", (e) => {
@@ -1170,7 +1254,7 @@
     // The list and the map hold their own copies of the item: keep both in step.
     const onMap = mapItems.find((x) => x.id === id);
     if (onMap && onMap !== item) onMap.category = to;
-    if (state.view === "map") drawMap();
+    if (mapShown()) drawMap();
     bumpUse(to);
     if (!quiet) { toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); }); }
   }
@@ -1571,7 +1655,7 @@
     const wrap = $("map-wrap");
     if (wrap) wrap.style.height = `${Math.max(320, innerHeight - wrap.getBoundingClientRect().top - 12)}px`;
   }
-  addEventListener("resize", () => { if (state.view === "map") sizeMap(); });
+  addEventListener("resize", () => { if (mapShown()) sizeMap(); if (splitOn()) sizeSplit(); });
 
   /** Root → folders → sub-folders and cards, laid out left to right like XMind. */
   function drawMap() {
@@ -2253,10 +2337,77 @@
     updateCrumb();
     const viewKey = [state.view, state.category, state.kind, state.q].join("|");
     if (viewKey !== lastViewKey) { lastViewKey = viewKey; selected.clear(); selAnchor = null; }
-    document.body.classList.toggle("map-view", state.view === "map");
-    if (state.view !== "map" && picked) dropPicked();
+    document.body.classList.toggle("map-view", mapShown());
+    document.body.classList.toggle("split-view", splitOn());
+    if (!mapShown() && picked) dropPicked();
     if (state.view === "notes") return renderNotes();
     if (state.view === "map") return renderMap();
+    if (splitOn()) return renderSplit();
+    return renderCards();
+  }
+  let splitQueue = Promise.resolve();
+  /** Cards on the left, the mind map on the right: each renderer fills its own pane. */
+  function renderSplit() {
+    const run = async () => {
+      if (!splitOn()) return renderCards();
+      $("list").innerHTML = `<div class="split"><section class="split-list" id="split-list" aria-label="${esc(T().splitCards)}"></section><section class="split-map" id="split-map"></section></div>`;
+      await renderMap();   // the map first: the selection check then knows both sides
+      await inPane($("split-list"), renderCards);
+      sizeSplit();
+      syncSelection();
+    };
+    return (splitQueue = splitQueue.catch(() => {}).then(run));
+  }
+  function sizeSplit() {
+    const p = document.getElementById("split-list");
+    if (p) p.style.height = `${Math.max(320, innerHeight - p.getBoundingClientRect().top - 12)}px`;
+  }
+  // The map renderer and the map's own moves write into whatever "list" is: send them to the map pane while split.
+  const renderMapBase = renderMap, drawMapBase = drawMap;
+  renderMap = () => { const pane = document.getElementById("split-map"); return pane && splitOn() ? inPane(pane, renderMapBase) : renderMapBase(); };
+  drawMap = () => { drawMapBase(); if (splitOn()) syncListWithMap(); };
+  /** A card moved on the map: bring the list beside it in step (no refetch). */
+  function syncListWithMap() {
+    const by = new Map(mapItems.map((i) => [i.id, i]));
+    const gone = new Set();
+    for (const i of items) {
+      const m = by.get(i.id);
+      if (!m || m.category === i.category) continue;
+      i.category = m.category;
+      const el = document.getElementById(`item-${i.id}`);
+      if (!el) continue;
+      if (state.category && !subtreeOf(state.category).has(i.category)) { gone.add(i.id); el.remove(); }
+      else { el.outerHTML = card(i); attachSwipe(document.getElementById(`item-${i.id}`)); }
+    }
+    if (gone.size) items = items.filter((i) => !gone.has(i.id));
+    syncSelection();
+  }
+  wideQuery.addEventListener("change", () => { if (split && (state.view === "all" || state.view === "favorites")) render(); });
+  // Dragging a card from the list onto a folder of the map files it there (the whole selection, if it is part of one).
+  (() => {
+    const node = (e) => e.target.closest?.(".mnode.folder, .mnode.root");
+    const clear = () => document.querySelectorAll(".mnode.drop").forEach((d) => d.classList.remove("drop"));
+    $("list").addEventListener("dragover", (e) => {
+      const n = node(e);
+      if (!n || !e.dataTransfer.types.includes("text/x-driftnet-item")) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (!n.classList.contains("drop")) { clear(); n.classList.add("drop"); }
+    });
+    $("list").addEventListener("dragleave", (e) => { if (!$("list").contains(e.relatedTarget)) clear(); });
+    document.addEventListener("dragend", clear);
+    $("list").addEventListener("drop", (e) => {
+      const n = node(e), id = Number(e.dataTransfer.getData("text/x-driftnet-item"));
+      clear();
+      if (!n || !id || n.dataset.key === "root") return;
+      e.preventDefault();
+      const to = n.dataset.key.slice(2);
+      if (selected.has(id) && selected.size > 1) bulkApply("move", [...selected], to);
+      else if (mapItems.some((i) => i.id === id)) mapMoveItem(id, to);
+      else moveItem(id, to);
+    });
+  })();
+  async function renderCards() {
     const p = new URLSearchParams({ limit: "300" });
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
     if (state.view !== "all") p.set("view", state.view);
@@ -2281,7 +2432,7 @@
       if (target) {
         // Clear the sticky header (taller on a phone), then flash the card so it's obvious which one was meant.
         const top = target.getBoundingClientRect().top + scrollY - document.querySelector("header").offsetHeight - ($("crumb").offsetHeight || 0) - 12;
-        scrollTo({ top });
+        if (splitOn()) target.scrollIntoView({ block: "center" }); else scrollTo({ top });
         target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
       }
     }
@@ -2328,7 +2479,9 @@
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  const find = (id) => items.find((x) => x.id === id) ?? mapItems.find((x) => x.id === id);
+  /** Cards found by the palette that neither the list nor the map holds (so the preview and Move to… can still reach them). */
+  const extraItems = new Map();
+  const find = (id) => items.find((x) => x.id === id) ?? mapItems.find((x) => x.id === id) ?? extraItems.get(id);
   const nameOf = (i) => (i.summary?.name ?? i.title).slice(0, 40);
 
   async function act(id, action) {
@@ -2406,7 +2559,7 @@
   function clearSelection() { selected.clear(); selAnchor = null; syncSelection(); }
   /** Paint the selection on whatever is drawn (list or map) and refresh the bar. */
   function syncSelection() {
-    const here = new Set(state.view === "map" ? mapItems.map((i) => i.id) : visibleIds());
+    const here = new Set([...(mapShown() ? mapItems.map((i) => i.id) : []), ...(state.view === "map" ? [] : visibleIds())]);
     for (const id of [...selected]) if (!here.has(id)) selected.delete(id);
     for (const el of $("list").querySelectorAll(".swipe")) el.classList.toggle("selected", selected.has(Number(el.dataset.id)));
     for (const n of $("list").querySelectorAll(".mnode.item")) n.classList.toggle("sel", selected.has(Number(n.dataset.key.slice(2))));
@@ -2597,6 +2750,116 @@
     if (el) el.focus({ preventScroll: true });
   }
   for (const d of document.querySelectorAll("dialog")) d.addEventListener("close", () => setTimeout(restoreFocus, 0));
+  // ── Commands and the palette (⌘K / Ctrl+K) ────────────────────────────────
+  /** Everything the palette can run. keys (two keys = "g" then …) and help (a STRINGS key) also feed the ? dialog. */
+  function showLayout(kind) {
+    split = kind === "split";
+    store.set("driftnet-split", split ? "1" : "0");
+    Object.assign(state, { view: kind === "map" ? "map" : "all", category: "" });
+    load();
+  }
+  function toggleDark() {
+    const dark = document.documentElement.dataset.theme === "dark" || (prefs.theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    prefs.theme = dark ? "light" : "dark";
+    store.set("driftnet-prefs", JSON.stringify(prefs));
+    applyPrefs();
+  }
+  const commands = [
+    { id: "view-list", label: { en: "Show the card list", "zh-TW": "顯示卡片列表" }, keys: ["g", "a"], help: "kAll", run: () => showLayout("list") },
+    { id: "view-map", label: { en: "Show the mind map", "zh-TW": "顯示樹狀圖" }, keys: ["g", "m"], help: "kMap", run: () => showLayout("map") },
+    { id: "view-split", label: { en: "Show cards and mind map side by side", "zh-TW": "並排顯示卡片與樹狀圖" }, when: () => wideQuery.matches, run: () => showLayout("split") },
+    { id: "move", label: { en: "Move the focused card…", "zh-TW": "移動目前選取的卡片…" }, when: () => role === "admin" && !!pal.focused, run: () => openMovePicker(pal.focused) },
+    { id: "new-folder", label: { en: "New folder", "zh-TW": "新增資料夾" }, when: () => role === "admin", run: () => openFolderDialog(null, null) },
+    { id: "export-md", label: { en: "Download a backup (Markdown)", "zh-TW": "下載備份（Markdown）" }, run: () => download("markdown") },
+    { id: "export-vault", label: { en: "Download for Obsidian / Notion", "zh-TW": "下載給 Obsidian／Notion" }, run: () => download("vault") },
+    { id: "settings", label: { en: "Settings", "zh-TW": "設定" }, run: () => openSettings() },
+    { id: "dark", label: { en: "Toggle dark mode", "zh-TW": "切換深色模式" }, run: toggleDark },
+    { id: "language", label: { en: "Switch language", "zh-TW": "切換語言" }, run: () => $("lang").click() },
+    { id: "keys", label: { en: "Keyboard shortcuts", "zh-TW": "快捷鍵" }, keys: ["?"], help: "kHelp", run: () => openKeys() },
+  ];
+  const cmdLabel = (c) => c.label[locale] ?? c.label.en;
+  const goFolder = (id) => { Object.assign(state, { view: "all", category: id, kind: "" }); load(); };
+  const pal = { rows: [], at: 0, gen: 0, timer: 0, cards: [], focused: null };
+  function paletteRows(q) {
+    const rows = [];
+    const fl = q ? fuzzyRank(q, folders, (f) => folderFields(f.id)) : quickFolders().map(folderById).filter(Boolean);
+    for (const f of fl.slice(0, q ? 6 : 5)) rows.push({ group: "folders", label: catLabel(f.id), sub: folderPath(f.id) === catLabel(f.id) ? "" : folderPath(f.id), color: folderColor(f.id), run: () => goFolder(f.id) });
+    if (q) for (const i of pal.cards) rows.push({ group: "cards", label: nameOf(i), sub: folderPath(i.category), run: () => { extraItems.set(i.id, i); openPeek(i.id); } });
+    const avail = commands.filter((c) => !c.when || c.when());
+    for (const c of fuzzyRank(q, avail, (c) => [cmdLabel(c), c.id]).slice(0, q ? 8 : 20))
+      rows.push({ group: "commands", label: cmdLabel(c), sub: c.keys?.join(" ") ?? "", run: c.run });
+    return rows;
+  }
+  function renderPalette() {
+    const t = T(), input = $("cmd-input");
+    pal.rows = paletteRows(input.value);
+    pal.at = Math.min(pal.at, Math.max(0, pal.rows.length - 1));
+    let html = "", last = "";
+    pal.rows.forEach((r, i) => {
+      if (r.group !== last) { last = r.group; html += `<div class="cmd-h" role="presentation">${esc(t.palGroups[r.group])}</div>`; }
+      html += `<div class="cmd-o" role="option" id="cmd-o-${i}" data-i="${i}" aria-selected="${i === pal.at}"><span class="lab" ${r.color ? `style="--c:${r.color}"` : ""}>${esc(r.label)}</span>` +
+        (r.sub ? `<span class="sub">${esc(r.sub)}</span>` : "") + `</div>`;
+    });
+    $("cmd-list").innerHTML = html || `<div class="cmd-empty" role="presentation">${esc(t.palNone)}</div>`;
+    if (pal.rows.length) input.setAttribute("aria-activedescendant", `cmd-o-${pal.at}`); else input.removeAttribute("aria-activedescendant");
+    $("cmd-o-" + pal.at)?.scrollIntoView({ block: "nearest" });
+  }
+  function openPalette() {
+    if (document.querySelector("dialog[open]")) return;
+    const t = T();
+    pal.focused = focusedId();
+    pal.at = 0; pal.cards = []; pal.gen++;
+    $("cmd-input").value = "";
+    $("cmd-input").placeholder = t.palPlaceholder;
+    $("cmd-input").setAttribute("aria-label", t.palette);
+    $("cmd-list").setAttribute("aria-label", t.palette);
+    renderPalette();
+    $("cmd-dlg").showModal();
+    $("cmd-input").focus();
+  }
+  function runPalette(i) {
+    const r = pal.rows[i];
+    if (!r) return;
+    $("cmd-dlg").close();
+    setTimeout(r.run, 0);   // after the dialog has let go of focus
+  }
+  $("cmd-input").addEventListener("input", () => {
+    const q = $("cmd-input").value.trim(), gen = ++pal.gen;
+    pal.at = 0;
+    clearTimeout(pal.timer);
+    if (q.length < 2) pal.cards = [];
+    else pal.timer = setTimeout(async () => {
+      const found = await api(`/api/items?${new URLSearchParams({ q, limit: "6" })}`).catch(() => []);
+      if (gen !== pal.gen) return;
+      pal.cards = found;
+      renderPalette();
+    }, 150);
+    renderPalette();
+  });
+  $("cmd-input").addEventListener("keydown", (e) => {
+    const n = pal.rows.length;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (n) { pal.at = (pal.at + (e.key === "ArrowDown" ? 1 : n - 1)) % n; renderPalette(); }
+    } else if (e.key === "Enter") { e.preventDefault(); runPalette(pal.at); }
+  });
+  $("cmd-list").addEventListener("click", (e) => { const o = e.target.closest("[data-i]"); if (o) runPalette(Number(o.dataset.i)); });
+  $("cmd-list").addEventListener("pointermove", (e) => {
+    const o = e.target.closest("[data-i]");
+    if (!o || Number(o.dataset.i) === pal.at) return;
+    $("cmd-o-" + pal.at)?.setAttribute("aria-selected", "false");
+    pal.at = Number(o.dataset.i);
+    o.setAttribute("aria-selected", "true");
+    $("cmd-input").setAttribute("aria-activedescendant", o.id);
+  });
+  $("cmd-dlg").addEventListener("click", (e) => { if (e.target === $("cmd-dlg")) $("cmd-dlg").close(); });
+  $("cmd-dlg").addEventListener("close", () => { clearTimeout(pal.timer); pal.gen++; });
+  $("palette-btn").onclick = openPalette;
+  addEventListener("keydown", (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return;
+    e.preventDefault();
+    if ($("cmd-dlg").open) $("cmd-dlg").close(); else openPalette();
+  });
   /** The ? dialog: every shortcut, and which folder each number key files into. */
   function openKeys() {
     const t = T(), quick = quickFolders();
@@ -2607,7 +2870,8 @@
       `<h4>${esc(t.keysMove)}</h4>` + row(["j", "k"], t.kNext) + row(["f"], t.kFav) + row(["m"], t.kMove) + row(["n"], t.kNote) + row(["#"], t.kTrash) +
       `<h4>${esc(t.keysSelect)}</h4>` + row(["x"], t.kSelect) + row(["Shift", "click"], t.kRange) + row([t.kHold], t.kLong) + row(["Esc"], t.kClear) +
       `<h4>${esc(t.keysQuick)}</h4>` + (quick.length ? quick.map((id, i) => row([String(i + 1)], t.kQuickN(catLabel(id)))).join("") : `<dd style="grid-column:1/-1">${esc(t.kQuickNone)}</dd>`) +
-      `<h4>${esc(t.keysGo)}</h4>` + row(["/"], t.kSearch) + row(["g", "m"], t.kMap) + row(["g", "a"], t.kAll) + row(["z"], t.kUndo) + row(["?"], t.kHelp);
+      `<h4>${esc(t.keysGo)}</h4>` + row([isMac ? "⌘" : "Ctrl", "K"], t.kPalette) + row(["/"], t.kSearch) +
+      commands.filter((c) => c.keys).map((c) => row(c.keys, t[c.help])).join("") + row(["z"], t.kUndo);
     $("keys-dlg").showModal();
   }
   $("ky-close").onclick = () => $("keys-dlg").close();
@@ -2650,8 +2914,8 @@
     if (k === "?") { openKeys(); return; }
     if (/^[1-9]$/.test(k) && role === "admin" && !document.activeElement?.isContentEditable && quickMove(Number(k))) { e.preventDefault(); return; }
     if (k === "x" && role === "admin" && !document.activeElement?.isContentEditable && focusedId() && state.view !== "map") { e.preventDefault(); toggleSelect(focusedId()); return; }
-    if (prev === "g" && k === "m") { Object.assign(state, { view: "map", category: "" }); load(); return; }
-    if (prev === "g" && k === "a") { Object.assign(state, { view: "all", category: "" }); load(); return; }
+    const chord = commands.find((c) => c.keys?.length === 2 && c.keys[0] === prev && c.keys[1] === k);
+    if (chord) { chord.run(); return; }
     const cards = [...$("list").querySelectorAll(".swipe .card")];
     if (!cards.length) return;
     const cur = document.activeElement?.closest?.(".card");
