@@ -118,6 +118,9 @@ where to read it on the web page. Want the summary in the chat instead, or no re
 Every link lands on a page you can search, filter by folder and kind, and open from a phone. On a
 phone the sidebar folds into a ☰ drawer, and a line under the search box says what you're looking at.
 
+- **Inbox.** New links the AI filed on its own wait in **Inbox (N)** at the top of the sidebar, each with
+  two or three suggested folders. One tap (or `1`–`3`) files it, `s` skips, `m` opens the full picker;
+  once you've placed a card it leaves the Inbox, and Undo brings it back.
 - **Your folders are the categories.** Add, nest, rename and describe them from the sidebar (＋ and ⋯);
   the AI files new links by each folder's path and description, so “Games › MapleStory — Artale
   helpers” gets the MapleStory tools. Move a card with 📁 **Move to…**, or drag it by ⠿ onto a folder
@@ -127,7 +130,16 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   it, tap a card to preview it, and drag a card onto a folder to file it (on a phone, hold it a moment
   first, so a quick swipe still pans). Shift-click adds cards to a selection (on a phone, hold one, let
   go, then tap more cards) and dragging any of them onto a folder files them all. Drag a folder onto
-  another to nest it. Search highlights the matches; big folders fold into “+N”.
+  another to nest it. Search highlights the matches; big folders fold into “+N”. Double-click a folder
+  (or `z`) to focus on it: only its branch is drawn, a breadcrumb leads back up, and `Esc` goes up one
+  level; the focus is in the address, so a link opens on it. With the keyboard the map is a tree:
+  arrows walk it, → / ← open and close, Home / End, or type a name to jump.
+- **Split view.** On a wide screen, **Split** shows the card list and the mind map side by side; drag
+  cards (or a whole selection) from the list onto a folder in the map.
+- **AI tidy-up.** ✨ next to ＋ in the folders header asks the model for a plan: new folders, renames,
+  merges and cards to move, each with its reason. Nothing changes until you tick lines and press
+  **Apply selected**; cards you placed yourself and folders you made are never touched, and one Undo
+  reverts the whole plan.
 - **Swipe right** to add a favorite, **swipe left** to move to the trash; a short swipe does nothing,
   and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.
 - **Select many cards.** `x` selects the focused card, Shift-click selects a range, and on a phone a long
@@ -147,7 +159,8 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
 - **Shared links open read-only.** A card link from a chat bot or an agent carries the read-only share
   key, so it opens on a phone without a password; edit buttons appear after **Unlock** with the admin
   password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
-- **Keyboard.** `j`/`k` step through cards, `f` favorite, `m` move (type to find the folder), `n` note,
+- **Keyboard.** `⌘K` / `Ctrl+K` opens the command palette (jump to a folder or card, switch view,
+  export, settings…). `j`/`k` step through cards, `f` favorite, `m` move (type to find the folder), `n` note,
   `#` trash, `x` select, `z` undo, `/` search, `g m` mind map, `?` the list. `1`–`9` file the focused card
   (or the selection) into the nine folders you file into most; `?` shows which number is which, and the
   **Move to…** picker marks them too.
@@ -160,6 +173,14 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
 <p align="center"><img src="assets/select-en.jpg" alt="Three cards selected; the bar at the bottom offers Move to…, favorite, trash, select all and clear for all of them" width="100%"></p>
 
 <p align="center"><img src="assets/tokens-en.jpg" alt="Settings → Access → Agent tokens: a new token shown once, the list with scope and last use, and Revoke" width="100%"></p>
+
+<p align="center"><img src="assets/inbox-en.jpg" alt="The Inbox: new cards with one-tap folder suggestions, keys 1–3 and m for any other folder" width="100%"></p>
+
+<p align="center"><img src="assets/split-en.jpg" alt="Split view: the card list on the left and the mind map on the right" width="100%"></p>
+
+<p align="center"><img src="assets/palette-en.jpg" alt="The command palette (Ctrl+K): folders to jump to and commands" width="100%"></p>
+
+<p align="center"><img src="assets/pair-en.jpg" alt="Settings → Access → Unlock a phone: a one-time QR code with a five-minute countdown" width="100%"></p>
 
 ### Chrome extension
 
@@ -262,6 +283,7 @@ Give each agent its own key instead of the admin password: **Settings → Access
 | `driftnet_get_item` | One card in full: summary, use cases, your note, what people said in chat, tools found inside |
 | `driftnet_list_folders` / `driftnet_move_item` | Read your folder tree, file items into it |
 | `driftnet_undo` | Put a batch move back, using the undo id `driftnet_move_item` returned |
+| `driftnet_suggest_folders` | Ask the model for a tidy-up plan for the folder tree (proposes only; the human applies it on the page) |
 | `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | Add, rename or re-describe, and delete folders (contents move up; the one tool marked destructive) |
 | `driftnet_trash_item` / `driftnet_restore_item` / `driftnet_favorite_item` / `driftnet_set_note` | Tidy cards: trash (always restorable), star, write the note |
 
@@ -390,7 +412,10 @@ listens on `127.0.0.1`. Everything below is on the page under **⚙ Settings →
    create it and only its hash is stored. *Revoke* cuts off that one agent at once, and *Remove* clears a revoked one from the list (revoked
    tokens also drop out after 30 days); changing the admin password does not touch them. Tokens work as a Bearer header only, never in a URL, and cannot
    change settings or make more tokens. The queue and card moves record which token did it.
-5. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
+5. **Unlock a phone.** Show a QR code on the computer, scan it with the phone, and the phone is
+   unlocked with its own device token (read or write) — no password typed on the phone. The code works
+   once and for five minutes, and the phone appears in the token list where you can revoke it.
+6. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
    Cloudflare (no account; install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
    yourself, driftnet never downloads it). It needs the password, turns reading private, and closes
    when driftnet stops.

@@ -21,6 +21,7 @@ LINE / Slack / Discord / Telegram. Every item is sorted into a category, rated f
 | `driftnet_enrich` | You read a queued link and are returning its summary |
 | `driftnet_get_item` | You need one card in full (note, chat context, tools found inside) |
 | `driftnet_undo` | You filed a batch with `ids` and the human says it was wrong: pass the undo id `driftnet_move_item` returned |
+| `driftnet_suggest_folders` | The human asks to tidy or reorganise the folders: get a plan (it changes nothing) and show it; they apply it on the page |
 | `driftnet_list_folders` / `driftnet_move_item` | The human asks you to file something (one card, or several at once with `ids`), or an item is clearly in the wrong folder |
 | `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | The human asks you to reorganise their folders — never on your own; delete only when asked |
 | `driftnet_trash_item` / `driftnet_restore_item` / `driftnet_favorite_item` / `driftnet_set_note` | The human asks you to remove, restore, star or annotate a card |
