@@ -32,6 +32,7 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_LOCALE", group: "language", choices: ["", "en", "zh-TW"] },
   { key: "DRIFTNET_REPLY", group: "chat", choices: ["", "link", "full", "off"] },
   { key: "DRIFTNET_PUBLIC_URL", group: "chat" },
+  { key: "DRIFTNET_SUMMARY_DEPTH", group: "model", choices: ["", "brief", "standard", "detailed"] },
   { key: "DRIFTNET_SUMMARY_RULES", group: "rules", multiline: true, max: 1000 },
   { key: "DRIFTNET_BLOCK_DOMAINS", group: "rules", max: 2000 },
   // Outgoing webhook: the URL is secret-ish (tokens often live in it), so it is masked like a key.
