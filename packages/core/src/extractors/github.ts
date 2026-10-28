@@ -1,6 +1,7 @@
-import type { Digest } from "../types.ts";
-import { fetchText } from "./http.ts";
+import type { Digest, MediaRef } from "../types.ts";
+import { decodeEntities, fetchText, metaTags } from "./http.ts";
 import { digestBudget, outlineMarkdown } from "../digest.ts";
+import { mediaKindOf, normalizeMedia } from "../media.ts";
 import { extractUrls } from "../url.ts";
 
 
@@ -22,13 +23,20 @@ export async function extractGithub(url: string): Promise<Digest | null> {
   const repo = JSON.parse(repoRes.body) as {
     full_name: string; description: string | null; stargazers_count: number; language: string | null;
     topics?: string[]; homepage: string | null; pushed_at: string; license?: { spdx_id: string } | null;
-    archived: boolean;
+    archived: boolean; default_branch?: string;
   };
 
   const readmeRes = await fetchText(`${api}/readme`, {
     headers: { ...headers, accept: "application/vnd.github.raw+json" },
   });
-  const readme = readmeRes.status === 200 ? cleanReadme(readmeRes.body) : "";
+  const raw = readmeRes.status === 200 ? readmeRes.body : "";
+  const readme = cleanReadme(raw);
+  const media = readmeImages(raw, ref.owner, ref.repo, repo.default_branch ?? "HEAD");
+  // No pictures in the README: the repo's own social preview (GitHub's generic card is low value, so last and alone).
+  if (!media.length) {
+    const og = await repoSocialImage(`https://github.com/${repo.full_name}`).catch(() => null);
+    if (og) media.push({ url: og, kind: "image", alt: "" });
+  }
 
   return {
     url: `https://github.com/${repo.full_name}`.toLowerCase(),
@@ -44,7 +52,53 @@ export async function extractGithub(url: string): Promise<Digest | null> {
       pushedAt: repo.pushed_at.slice(0, 10),
       ...(repo.archived ? { archived: "yes" } : {}),
     },
+    media,
   };
+}
+
+async function repoSocialImage(pageUrl: string): Promise<string | null> {
+  const page = await fetchText(pageUrl);
+  if (page.status !== 200) return null;
+  const og = metaTags(page.body)["og:image"];
+  return og && /^https?:\/\//i.test(og) ? og : null;
+}
+
+const BADGE_HOSTS = /(^|\.)(shields\.io|badge\.fury\.io|badgen\.net|travis-ci\.(org|com)|codecov\.io|coveralls\.io|circleci\.com|buymeacoffee\.com|ko-fi\.com|liberapay\.com|opencollective\.com|sonarcloud\.io|snyk\.io|bestpractices\.dev|app\.fossa\.com|api\.codacy\.com|readthedocs\.org|visitor-badge\.[\w.]+|hits\.seeyoufarm\.com|komarev\.com|api\.star-history\.com)$/i;
+const BADGE_PATH = /badge|sponsor|buy-?me-?a-?coffee|donate|\/workflows\/.*\.svg|favicon|\/avatars?\//i;
+
+/**
+ * Pictures and GIFs a README shows, in order: markdown ![](x) and <img src>.
+ * Relative paths resolve against raw.githubusercontent.com; badges, sponsor
+ * buttons, SVGs (never proxied) and tiny icons are dropped. At most 6.
+ */
+export function readmeImages(md: string, owner: string, repo: string, branch: string): MediaRef[] {
+  const text = md.replace(/<!--[\s\S]*?-->/g, "").replace(/```[\s\S]*?```/g, "");
+  const found: { at: number; src: string; alt: string; w?: number; h?: number }[] = [];
+  for (const m of text.matchAll(/!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^)]*)?\)/g)) found.push({ at: m.index!, src: m[2]!, alt: m[1]! });
+  for (const m of text.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!src) continue;
+    const num = (k: string) => { const v = new RegExp(`\\b${k}\\s*=\\s*["']?(\\d+)(?!%)`, "i").exec(tag)?.[1]; return v ? Number(v) : undefined; };
+    found.push({ at: m.index!, src: decodeEntities(src), alt: decodeEntities(/\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? ""), w: num("width"), h: num("height") });
+  }
+  found.sort((a, b) => a.at - b.at);
+  const base = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/`;
+  const out: MediaRef[] = [];
+  for (const f of found) {
+    if ((f.w !== undefined && f.w < 64) || (f.h !== undefined && f.h < 64)) continue;
+    let url: string;
+    try {
+      url = /^[a-z][a-z0-9+.-]*:|^\/\//i.test(f.src) ? new URL(f.src, "https://x/").href : new URL(f.src.replace(/^\.?\//, ""), base).href;
+    } catch { continue; }
+    // github.com/o/r/blob/main/x.png is an HTML page; /raw/ redirects to the file.
+    url = url.replace(/^(https:\/\/github\.com\/[^/]+\/[^/]+)\/blob\//, "$1/raw/");
+    if (!/^https?:\/\//.test(url)) continue;
+    const u = new URL(url);
+    if (BADGE_HOSTS.test(u.hostname) || BADGE_PATH.test(u.pathname) || /\.svg$/i.test(u.pathname)) continue;
+    out.push({ url, kind: mediaKindOf(url), alt: f.alt.trim() });
+  }
+  return normalizeMedia(out);
 }
 
 /**

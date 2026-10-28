@@ -18,6 +18,16 @@ export interface Digest {
   /** Links found inside the content (e.g. the GitHub repo a Threads post talks about). */
   outlinks: string[];
   meta: Record<string, string | number>;
+  /** Candidate pictures (original URLs), best first. */
+  media?: MediaRef[];
+}
+
+/** A picture or GIF that shows what the thing looks like. `url` is the third-party original; pages only ever see the proxy path. */
+export interface MediaRef {
+  url: string;
+  /** "video": the image is a thumbnail and the card links to the video. */
+  kind: "image" | "gif" | "video";
+  alt: string;
 }
 
 export interface Judgement {
@@ -76,6 +86,8 @@ export interface Item {
   suggestions?: Suggestion[];
   /** True once the reader (or an agent) filed the card by hand; the Inbox holds the ones that are not. */
   placed?: boolean;
+  /** Up to 6 pictures, best first (original URLs; see publicMedia for what the API exposes). */
+  media?: MediaRef[];
   createdAt: string;
   updatedAt: string;
 }

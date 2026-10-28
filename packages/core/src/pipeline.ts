@@ -1,6 +1,7 @@
 import { BlockedUrl, extract, isSocial } from "./extractors/index.ts";
 import { findGithubRepo, matchGithub } from "./extractors/github.ts";
 import { safeFetch } from "./extractors/net.ts";
+import { normalizeMedia } from "./media.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
@@ -151,6 +152,7 @@ export class Pipeline {
     const item = store.upsert({
       url: digest.url, aliases: [url], title: summary?.name ?? digest.title, judgement: a.judgement, summary,
       flags: a.flags, source: a.source, suggestions: a.suggestions,
+      media: normalizeMedia(digest.media),
     });
     store.recordShare(item.id, ctx);
     // Stored without a model counts too (an agent's later summary is announced as item.updated by enrich()).
@@ -229,12 +231,26 @@ export class Pipeline {
       const item = store.refreshItem(id, {
         title: a.summary?.name ?? a.digest.title, judgement: a.judgement, summary: a.summary,
         flags: a.flags, source: a.source, suggestions: a.suggestions,
+        media: normalizeMedia(a.digest.media),
       });
       if (item) this.done(item, "item.updated");
       return item;
     } finally {
       this.refreshing.delete(id);
     }
+  }
+
+  /**
+   * Re-extract only the pictures of an item: no summary, no judge, no model call.
+   * Keeps the old pictures when the page now offers none.
+   */
+  async refreshMedia(id: number): Promise<Item | null> {
+    const { store } = this.opts;
+    const old = store.get(id);
+    if (!old) return null;
+    if (this.refused(old.url)) throw new BlockedUrl(`${hostOf(old.url)} is blocked in your settings`);
+    const digest = await this.followToTool(await extract(old.url));
+    return store.setMedia(id, normalizeMedia(digest.media));
   }
 
   /**
