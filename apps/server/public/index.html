@@ -67,7 +67,8 @@
     en: {
       title: "driftnet", search: "Search tools, tags, links…", all: "All", any: "Any",
       tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
-      categories: "Categories", kind: "Kind", switchTo: "中文",
+      categories: "Categories", kind: "Kind", switchTo: "中文", pending: "⏳ waiting for a summary",
+      enrichedBy: (a) => `summary by ${a}`,
       stats: (n, s) => `${n} items · shared ${s}×`, shared: (n) => `shared ${n}×`,
       empty: "Nothing here yet — drop a link in your chat.",
       kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
@@ -77,7 +78,8 @@
     "zh-TW": {
       title: "driftnet", search: "搜尋工具、標籤、連結…", all: "全部", any: "不限",
       tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
-      categories: "分類", kind: "類型", switchTo: "EN",
+      categories: "分類", kind: "類型", switchTo: "EN", pending: "⏳ 等待摘要",
+      enrichedBy: (a) => `由 ${a} 整理`,
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
       empty: "還沒有內容，把連結丟進聊天室吧。",
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
@@ -174,6 +176,7 @@
         <a class="name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
         <span class="badge">${esc(catLabel(i.category))}</span>
         <span class="badge worth-${esc(i.worth)}">${esc(T().worth[i.worth] ?? i.worth)}</span>
+        ${i.pending ? `<span class="badge">${esc(T().pending)}</span>` : ""}
       </div>
       ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
       ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
@@ -181,6 +184,7 @@
       <div class="meta">
         <span>#${i.id}</span><span>${esc(T().kinds[i.kind] ?? i.kind)}</span><span>${esc(T().shared(i.shareCount))}</span>
         <span>${esc(i.createdAt.slice(0, 10))}</span>
+        ${i.enrichedBy ? `<span>${esc(T().enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}
         ${s?.tags?.length ? `<span>${s.tags.map((t) => "#" + esc(t)).join(" ")}</span>` : ""}
       </div>
     </article>`;

@@ -17,6 +17,7 @@ export function renderText(r: IngestResult, baseUrl?: string, t: Messages = mess
   }
   if (item.flags.includes("injection")) lines.push(t.injection);
   else if (item.flags.includes("low-reputation")) lines.push(t.lowReputation);
+  if (item.pending) lines.push(t.queued);
   lines.push(s?.primaryUrl || item.url);
   if (s?.mentions?.length) lines.push(t.mentions + s.mentions.map((m) => m.name).join(t.listSep));
   if (r.cached) lines.push(t.cached(item.shareCount));

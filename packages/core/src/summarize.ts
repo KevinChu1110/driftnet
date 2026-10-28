@@ -30,6 +30,27 @@ function withJudgement(categories: string[]) {
 
 type Parsed = z.infer<typeof SummarySchema> & Partial<z.infer<ReturnType<typeof withJudgement>>>;
 
+/**
+ * What an agent working the queue sends back: the same fields the built-in
+ * summariser produces, plus an optional re-classification once it has actually
+ * read the thing.
+ */
+export function enrichSchema(categories: string[]) {
+  return SummarySchema.extend({
+    mentions: SummarySchema.shape.mentions.default([]),
+    primary_url: SummarySchema.shape.primary_url.default(""),
+    use_cases: SummarySchema.shape.use_cases.default([]),
+    tags: SummarySchema.shape.tags.default([]),
+    category: z.enum(categories as [string, ...string[]]).optional(),
+    worth: z.enum(WORTH).optional(),
+  });
+}
+
+/** Same lenient-in, strict-out cleaning as model output. */
+export function normalizeSummary(out: z.infer<typeof SummarySchema>): Summary {
+  return normalize(out as Parsed).summary!;
+}
+
 export interface SummarizeResult {
   summary: Summary | null;
   judgement?: Judgement;

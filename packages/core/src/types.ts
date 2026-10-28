@@ -56,6 +56,10 @@ export interface Item {
   /** Who published it (GitHub owner, YouTube channel, domain) — the unit reputation is kept for. */
   source: string;
   shareCount: number;
+  /** Worth reading but not summarised yet: waiting for a model or an agent. */
+  pending: boolean;
+  /** The agent that wrote the summary, when it came from the queue. */
+  enrichedBy?: string;
   createdAt: string;
   updatedAt: string;
 }

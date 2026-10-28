@@ -5,7 +5,7 @@ import type { Item, Judgement, Kind, ShareContext, Summary, Worth } from "./type
 
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
-  is_ai_tool: number; summary: string | null; judge_engine: string;
+  is_ai_tool: number; summary: string | null; judge_engine: string; enriched_by: string | null;
   flags: string; source: string; share_count: number; created_at: string; updated_at: string;
 }
 
@@ -80,6 +80,11 @@ export class Store {
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
     `);
+    // Columns added after the first release.
+    const cols = new Set((this.db.prepare("PRAGMA table_info(items)").all() as { name: string }[]).map((c) => c.name));
+    for (const [name, type] of [["claimed_at", "TEXT"], ["claimed_by", "TEXT"], ["enriched_by", "TEXT"]] as const) {
+      if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
+    }
   }
 
   /** Looks up by canonical URL or any URL that previously resolved to the same item. */
@@ -167,6 +172,52 @@ export class Store {
     this.db.prepare("INSERT INTO state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
   }
 
+  /**
+   * Hand out up to `limit` pending items to an agent and lease them for
+   * `leaseMinutes`, so two agents working the queue don't do the same item.
+   * Most-shared first, then oldest.
+   */
+  claimPending(agent: string, limit: number, leaseMinutes = 30): Item[] {
+    const rows = this.db
+      .prepare(
+        `UPDATE items SET claimed_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), claimed_by = ?
+         WHERE id IN (
+           SELECT id FROM items
+           WHERE ${PENDING_SQL}
+             AND (claimed_at IS NULL OR claimed_at <= strftime('%Y-%m-%dT%H:%M:%SZ','now', ?))
+           ORDER BY share_count DESC, created_at ASC LIMIT ?)
+         RETURNING *`,
+      )
+      .all(agent, `-${leaseMinutes} minutes`, Math.min(Math.max(limit, 1), 20)) as unknown as ItemRow[];
+    return rows.map(toItem).sort((a, b) => b.shareCount - a.shareCount || a.createdAt.localeCompare(b.createdAt));
+  }
+
+  pendingCount(): number {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM items WHERE ${PENDING_SQL}`).get() as { n: number }).n;
+  }
+
+  /** Notes people shared the link with: the context an agent needs to read it. */
+  notes(itemId: number, limit = 5): string[] {
+    return (
+      this.db.prepare("SELECT note FROM shares WHERE item_id = ? AND note IS NOT NULL ORDER BY at DESC LIMIT ?").all(itemId, limit) as {
+        note: string;
+      }[]
+    ).map((r) => r.note);
+  }
+
+  /** Store an agent's summary; optionally its classification. Releases the lease. */
+  enrich(id: number, summary: Summary, by: string, classify?: { category?: string; worth?: Worth }): Item {
+    const row = this.db
+      .prepare(
+        `UPDATE items SET summary = ?, title = ?, enriched_by = ?, claimed_at = NULL, claimed_by = NULL,
+           category = COALESCE(?, category), worth = COALESCE(?, worth),
+           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+         WHERE id = ? RETURNING *`,
+      )
+      .get(JSON.stringify(summary), summary.name, by, classify?.category ?? null, classify?.worth ?? null, id) as unknown as ItemRow;
+    return toItem(row);
+  }
+
   /** Net votes per item, for hiding items the community voted down. */
   private static readonly NET_VOTES = "(SELECT COALESCE(SUM(vote), 0) FROM feedback f WHERE f.item_id = items.id)";
 
@@ -208,6 +259,14 @@ export class Store {
   }
 }
 
+/** SQL twin of isPending(). */
+const PENDING_SQL = "summary IS NULL AND worth <> 'skip' AND flags NOT LIKE '%injection%' AND flags NOT LIKE '%low-reputation%'";
+
+/** Worth reading, not blocked, and nobody has summarised it yet. */
+function isPending(r: ItemRow): boolean {
+  return r.summary === null && r.worth !== "skip" && !/injection|low-reputation/.test(r.flags);
+}
+
 function toItem(r: ItemRow): Item {
   return {
     id: r.id,
@@ -222,6 +281,8 @@ function toItem(r: ItemRow): Item {
     flags: r.flags ? r.flags.split(",") : [],
     source: r.source,
     shareCount: r.share_count,
+    pending: isPending(r),
+    ...(r.enriched_by ? { enrichedBy: r.enriched_by } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

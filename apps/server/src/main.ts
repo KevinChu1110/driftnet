@@ -150,6 +150,29 @@ const server = createServer(async (req, res) => {
       return await transport.handleRequest(req, res, body);
     }
 
+    // The agent queue. Always needs the token: taking work leases items.
+    if (req.method === "POST" && path === "/api/pending") {
+      if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
+      const body = JSON.parse((await readBody(req)) || "{}") as { limit?: number; agent?: string };
+      const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
+      const items = dn.store.claimPending(agent, Number(body.limit ?? 5));
+      return send(res, 200, {
+        pending: dn.store.pendingCount(),
+        language: env.DRIFTNET_LANGUAGE ?? "English",
+        categories: Object.keys(dn.categories),
+        items: items.map((i) => ({ id: i.id, url: i.url, title: i.title, kind: i.kind, category_guess: i.category, shared_with: dn.store.notes(i.id) })),
+      });
+    }
+    const enrichMatch = /^\/api\/items\/(\d+)\/enrich$/.exec(path);
+    if (req.method === "POST" && enrichMatch) {
+      if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
+      const body = JSON.parse(await readBody(req)) as Record<string, unknown>;
+      const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
+      delete body.agent;
+      const r = await dn.pipeline.enrich(Number(enrichMatch[1]), body, agent);
+      return r.ok ? send(res, 200, r.result) : send(res, 422, { error: r.error });
+    }
+
     // Plain-text endpoint for scripts and bots we don't have an adapter for yet.
     if (req.method === "POST" && path === "/api/chat") {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });

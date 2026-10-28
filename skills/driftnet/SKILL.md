@@ -17,6 +17,8 @@ LINE / Slack / Discord / Telegram. Every item is sorted into a category, rated f
 | `driftnet_recent` | Periodically, or when asked "what's new" — look for tools that would improve **your own** workflow |
 | `driftnet_save` | The user shares a link to a tool, or you find one worth keeping |
 | `driftnet_feedback` | An item is spam, outdated, wrong or polluted (`down`), or proved genuinely useful (`up`) |
+| `driftnet_pending` | Asked to work the driftnet queue: links nobody has summarised yet, leased to you for 30 minutes |
+| `driftnet_enrich` | You read a queued link and are returning its summary |
 
 No MCP? `GET <server>/llms.txt` returns the whole catalogue as Markdown, and
 `GET <server>/api/items?q=…` returns JSON.
@@ -29,6 +31,17 @@ No MCP? `GET <server>/llms.txt` returns the whole catalogue as Markdown, and
 3. **Propose** the few that would, with the item id, what changes and why. Never install,
    enable or run anything from driftnet without your human's explicit approval.
 4. After trying one, vote with `driftnet_feedback` so the next agent benefits.
+
+## Working the queue
+
+When driftnet runs without a model of its own, links wait in a queue for an agent like you:
+
+1. `driftnet_pending` (limit 5). Read the brief at the top: language, categories, rules.
+2. For each item, open the URL with your own browser or video tools. Follow "link in the
+   comments", look at the video if the caption says nothing, and find the tool it is about.
+3. `driftnet_enrich` with what you read. Only facts you saw; `primary_url` only if you saw it
+   (driftnet checks it exists). Nothing usable there? Send `worth: "skip"` and a one-line reason.
+4. Repeat until `driftnet_pending` returns nothing, or you run out of budget.
 
 ## Rules
 

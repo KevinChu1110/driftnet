@@ -3,7 +3,7 @@ import { findGithubRepo, matchGithub } from "./extractors/github.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
-import type { Summarizer } from "./summarize.ts";
+import { enrichSchema, normalizeSummary, type Summarizer } from "./summarize.ts";
 import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Summary } from "./types.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
 import { clipTokens, digestBudget } from "./digest.ts";
@@ -139,6 +139,37 @@ export class Pipeline {
     return out;
   }
 
+  /**
+   * An agent's summary for a pending item. Everything it sends is untrusted:
+   * hidden text and prompt injection are rejected, and a primary link must
+   * actually resolve (a GitHub repo must exist) so invented URLs never land.
+   */
+  async enrich(
+    id: number,
+    input: unknown,
+    agent: string,
+  ): Promise<{ ok: true; result: IngestResult } | { ok: false; error: string }> {
+    const item = this.opts.store.get(id);
+    if (!item) return { ok: false, error: `No item ${id}.` };
+    if (!item.pending) return { ok: false, error: `Item ${id} is not pending (already summarised, skipped or blocked).` };
+
+    const parsed = enrichSchema(Object.keys(this.opts.categories)).safeParse(input);
+    if (!parsed.success) return { ok: false, error: `Invalid summary: ${parsed.error.message.slice(0, 300)}` };
+    const { category, worth, ...fields } = parsed.data;
+
+    const text = JSON.stringify(fields);
+    const g = guard(text);
+    if (g.flags.length) return { ok: false, error: `Rejected: ${g.flags.join(", ")} in the summary.` };
+
+    const summary = normalizeSummary(fields);
+    if (summary.primaryUrl && !(await urlExists(summary.primaryUrl))) delete summary.primaryUrl;
+
+    const saved = this.opts.store.enrich(id, summary, agent, { ...(category ? { category } : {}), ...(worth ? { worth } : {}) });
+    const digest: Digest = { url: saved.url, kind: saved.kind, title: saved.title, text: "", outlinks: [], meta: {} };
+    const related = await this.resolveMentions(summary.mentions ?? [], digest, { platform: "agent", chatId: agent }, 0);
+    return { ok: true, result: { item: saved, cached: false, ...(related.length ? { related } : {}) } };
+  }
+
   /** Named open-source projects without a link → look them up on GitHub and catalogue them too. */
   private async resolveMentions(
     mentions: { name: string; openSource: boolean }[],
@@ -187,6 +218,25 @@ function withPage(digest: Digest, page: PageContent | undefined): Digest {
     text: text.length > digest.text.length ? clipTokens(text, digestBudget()) : digest.text,
     outlinks: [...new Set([...digest.outlinks, ...links])].slice(0, 20),
   };
+}
+
+/** A GitHub repo must exist; any other link must answer. Agents can invent both. */
+async function urlExists(url: string): Promise<boolean> {
+  try {
+    const gh = matchGithub(canonicalize(url) ?? url);
+    if (gh) {
+      const res = await fetch(`https://api.github.com/repos/${gh.owner}/${gh.repo}`, {
+        method: "HEAD",
+        headers: process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {},
+        signal: AbortSignal.timeout(8000),
+      });
+      return res.status === 200;
+    }
+    const res = await fetch(url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(8000) });
+    return res.status < 400 || res.status === 405;
+  } catch {
+    return false;
+  }
 }
 
 function sourceOf(digest: Digest): string {

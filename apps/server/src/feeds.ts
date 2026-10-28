@@ -54,6 +54,46 @@ export function openApi(serverUrl: string) {
           responses: { "200": { description: "Ingest results" } },
         },
       },
+      "/api/pending": {
+        post: {
+          operationId: "takePendingWork",
+          summary: "Lease links nobody has summarised yet (30 min). Open each URL yourself, then call enrichItem.",
+          requestBody: {
+            content: { "application/json": { schema: { type: "object", properties: { limit: { type: "integer", maximum: 20 }, agent: { type: "string" } } } } },
+          },
+          responses: { "200": { description: "Leased items, the language to write in and the allowed categories" } },
+        },
+      },
+      "/api/items/{id}/enrich": {
+        post: {
+          operationId: "enrichItem",
+          summary: "Store the summary for a leased item. Validated, injection-checked; links must exist.",
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["name", "one_liner", "highlights"],
+                  properties: {
+                    name: { type: "string" },
+                    one_liner: { type: "string" },
+                    highlights: { type: "array", items: { type: "string" } },
+                    use_cases: { type: "array", items: { type: "string" } },
+                    tags: { type: "array", items: { type: "string" } },
+                    primary_url: { type: "string" },
+                    mentions: { type: "array", items: { type: "object", properties: { name: { type: "string" }, open_source: { type: "boolean" } } } },
+                    category: { type: "string" },
+                    worth: { type: "string", enum: ["skip", "low", "normal", "must-see"] },
+                    agent: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Saved" }, "422": { description: "Rejected, with the reason" } },
+        },
+      },
       "/api/items/{id}/feedback": {
         post: {
           operationId: "voteItem",
