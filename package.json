@@ -16,7 +16,8 @@
     "service:install": "scripts/service.sh install",
     "service:uninstall": "scripts/service.sh uninstall",
     "service:status": "scripts/service.sh status",
-    "e2e:extension": "node apps/chrome-extension/e2e.mjs"
+    "e2e:extension": "node apps/chrome-extension/e2e.mjs",
+    "e2e:web": "node apps/server/e2e/web.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

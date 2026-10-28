@@ -58,6 +58,10 @@ export interface Item {
   shareCount: number;
   /** Worth reading but not summarised yet: waiting for a model or an agent. */
   pending: boolean;
+  /** Starred by the reader. */
+  favorite: boolean;
+  /** Set while the item is in the trash. */
+  trashedAt?: string;
   /** The agent that wrote the summary, when it came from the queue. */
   enrichedBy?: string;
   createdAt: string;

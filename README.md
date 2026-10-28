@@ -93,6 +93,18 @@ where to read it on the web page. Want the summary in the chat instead, or no re
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet answering a Discord message with two links: one line per link, each pointing to its page" width="80%"></p>
 <sub>A real run in Discord (<code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>): two links in one message, one line back for each. Name and server address hidden.</sub>
 
+### The web page
+
+<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the catalogue, a card being swiped left to the trash, and the trash with an undo prompt" width="100%"></p>
+
+Every link lands on a page you can search, filter by shelf and kind, and open from a phone.
+
+- **Swipe right** to add a favorite, **swipe left** to move to the trash; a short swipe does nothing,
+  and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.
+- **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
+  agents and `/llms.txt` too; if someone shares one again, it comes back.
+- **Add to Home Screen** to open it like an app.
+
 ### Chrome extension
 
 <p align="center"><img src="assets/extension-en.jpg" alt="The driftnet popup over a social post: saved, with category, worth and a three-point summary" width="100%"></p>
@@ -275,7 +287,8 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack (Socket Mode, or webhook) |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
-**HTTP:** `GET /` · `GET /api/items[/:id]` · `POST /api/items/:id/feedback` · `POST /api/ingest` ·
+**HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
+`POST /api/items/:id/{trash,restore,favorite,unfavorite}` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
@@ -320,6 +333,7 @@ assets · scripts       logo, banners, service installer
 ```bash
 pnpm typecheck && pnpm test
 CHROME=/path/to/chromium pnpm e2e:extension   # the extension in a real browser (Chrome for Testing or Chromium)
+CHROME=/path/to/chrome pnpm e2e:web             # the web page on a phone-sized screen, with real touch swipes
 ```
 
 Extend it: a site (`registerExtractor()`), a model (`LlmProvider`), a judge (`Judge`), a chat

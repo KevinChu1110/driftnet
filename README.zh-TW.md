@@ -85,6 +85,16 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
 <sub>Discord 實測畫面：一則訊息兩個連結，各回一行。使用者名稱和伺服器網址已隱藏。</sub>
 
+### 網頁
+
+<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：清單、一張卡片往左滑向垃圾桶、垃圾桶和復原提示" width="100%"></p>
+
+每個連結都會整理到一個網頁上，可以搜尋、依分類和類型篩選，手機也能開。
+
+- **往右滑**加入最愛，**往左滑**移到垃圾桶；滑太短不會觸發，上下捲動也不會被當成滑動。電腦上可以按 ☆ 和 🗑，或用滑鼠拖曳。
+- 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
+- 用瀏覽器的**加入主畫面**，就能像 App 一樣打開。
+
 ### Chrome 擴充
 
 <p align="center"><img src="assets/extension-zh-TW.jpg" alt="driftnet 彈出視窗疊在一則社群貼文上：已收錄，附分類、評價和三點摘要" width="100%"></p>
@@ -256,7 +266,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack（Socket Mode 或 webhook） |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
-**HTTP：** `GET /` · `GET /api/items[/:id]` · `POST /api/items/:id/feedback` · `POST /api/ingest` ·
+**HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
+`POST /api/items/:id/{trash,restore,favorite,unfavorite}` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
@@ -300,6 +311,7 @@ assets · scripts       logo、主視覺、服務安裝
 ```bash
 pnpm typecheck && pnpm test
 CHROME=/path/to/chromium pnpm e2e:extension   # 在真的瀏覽器裡測擴充（Chrome for Testing 或 Chromium）
+CHROME=/path/to/chrome pnpm e2e:web             # 用手機尺寸和真的觸控滑動測網頁
 ```
 
 可以擴充：網站（`registerExtractor()`）、模型（`LlmProvider`）、判斷器（`Judge`）、聊天平台（`handleChatText()`）、

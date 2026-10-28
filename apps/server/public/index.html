@@ -2,138 +2,209 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1b1a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="driftnet">
 <title>driftnet</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <style>
   :root {
     --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
-    --accent: #2f6fdb; --accent-soft: #e8effc; --warn: #b4540a; --star: #c58a00;
+    --accent: #2f6fdb; --accent-soft: #e8effc; --warn: #b4540a; --star: #c58a00; --star-soft: #fff4d6;
+    --danger: #c62828; --danger-soft: #fde8e8; --ok: #2e7d32; --ok-soft: #e6f4ea;
     font-family: ui-sans-serif, system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #121211; --panel: #1b1b1a; --text: #ececea; --muted: #9a9a94; --line: #2d2d2b;
-            --accent: #7aa7ff; --accent-soft: #1e2a40; --warn: #f0a050; --star: #f2c14e; }
+            --accent: #7aa7ff; --accent-soft: #1e2a40; --warn: #f0a050; --star: #f2c14e; --star-soft: #3a3016;
+            --danger: #ef9a9a; --danger-soft: #3b1d1d; --ok: #81c784; --ok-soft: #1d3322; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
-  header { display: flex; gap: 16px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
-  .brand { display: flex; align-items: center; gap: 8px; }
-  header .stats { color: var(--muted); font-size: 13px; }
-  .lang { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-  header input { flex: 1; min-width: 180px; max-width: 420px; margin-left: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; }
+
+  header { display: flex; gap: 12px 16px; align-items: center; padding: 12px 20px; padding-top: max(12px, env(safe-area-inset-top));
+           border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 3; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+  .stats { color: var(--muted); font-size: 13px; }
+  .search { flex: 1; min-width: 180px; max-width: 420px; margin-left: auto; padding: 9px 12px; border: 1px solid var(--line);
+            border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+  .lang { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; min-height: 40px; }
+
   .layout { display: grid; grid-template-columns: 220px 1fr; max-width: 1200px; margin: 0 auto; }
-  nav { padding: 16px 12px; border-right: 1px solid var(--line); position: sticky; top: 61px; align-self: start; max-height: calc(100vh - 61px); overflow: auto; }
-  nav button { display: flex; justify-content: space-between; width: 100%; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  nav { padding: 16px 12px; border-right: 1px solid var(--line); position: sticky; top: 65px; align-self: start; max-height: calc(100vh - 65px); overflow: auto; }
+  nav .row { display: contents; }
+  nav button { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0;
+               border-radius: 8px; background: none; text-align: left; cursor: pointer; }
   nav button:hover { background: var(--accent-soft); }
   nav button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-  nav .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+  nav .count { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 400; }
   nav h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 10px 6px; }
+
   main { padding: 16px 20px 48px; display: grid; gap: 12px; align-content: start; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; scroll-margin-top: 80px; }
-  .card:target { outline: 2px solid var(--accent); }
-  .card .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-  .card a.name { color: var(--text); font-weight: 650; font-size: 16px; text-decoration: none; }
-  .card a.name:hover { color: var(--accent); }
-  .badge { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+  .hint { color: var(--muted); font-size: 13px; margin: -4px 2px 0; }
+
+  /* A card sits on top of two action strips that show while it is dragged. */
+  .swipe { position: relative; border-radius: 12px; overflow: hidden; scroll-margin-top: 90px; transition: height .25s ease, margin .25s ease, opacity .25s ease; }
+  .swipe.gone { opacity: 0; }
+  .act { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 22px; font-weight: 600; font-size: 14px; }
+  .act.right { justify-content: flex-start; background: var(--star-soft); color: var(--star); }
+  .act.left { justify-content: flex-end; background: var(--danger-soft); color: var(--danger); }
+  .act.restore { background: var(--ok-soft); color: var(--ok); }
+  .swipe[data-dir="right"] .act.left, .swipe[data-dir="left"] .act.right, .swipe:not([data-dir]) .act { visibility: hidden; }
+  .swipe.armed .act { filter: saturate(1.6); }
+  .swipe.armed .act span { transform: scale(1.12); }
+  .act span { transition: transform .15s ease; }
+  .card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+          touch-action: pan-y; user-select: none; -webkit-user-select: none; transition: transform .22s ease; }
+  .card.dragging { transition: none; }
+  .swipe:target .card { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding-right: 84px; }
+  a.name { color: var(--text); font-weight: 650; font-size: 16px; text-decoration: none; }
+  a.name:hover { color: var(--accent); }
+  .badge { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
   .worth-must-see { color: var(--star); }
   .card p { margin: 6px 0; }
   .card ul { margin: 6px 0; padding-left: 20px; }
-  .meta { color: var(--muted); font-size: 13px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .meta { color: var(--muted); font-size: 13px; display: flex; gap: 4px 12px; flex-wrap: wrap; }
   .flag { color: var(--warn); font-size: 13px; }
-  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+  .tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; }
+  .tool { width: 40px; height: 40px; border: 0; border-radius: 10px; background: none; cursor: pointer; font-size: 18px; line-height: 1;
+          display: grid; place-items: center; color: var(--muted); }
+  .tool:hover, .tool:focus-visible { background: var(--bg); color: var(--text); }
+  .tool.on { color: var(--star); }
+  .empty { color: var(--muted); padding: 48px 0; text-align: center; }
+
+  .toast { position: fixed; left: 50%; bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px)); transform: translate(-50%, 140%);
+           background: var(--text); color: var(--panel); border-radius: 12px; padding: 10px 10px 10px 16px; display: flex; gap: 14px;
+           align-items: center; box-shadow: 0 6px 24px rgba(0,0,0,.25); transition: transform .25s ease; z-index: 5;
+           width: max-content; max-width: min(520px, calc(100vw - 32px)); }
+  .toast span { flex: 1; min-width: 0; }
+  .toast.show { transform: translate(-50%, 0); }
+  .toast button { border: 0; background: none; color: var(--accent-soft); font-weight: 650; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+                  min-height: 40px; white-space: nowrap; flex-shrink: 0; }
+  @media (prefers-color-scheme: dark) { .toast button { color: var(--accent); } }
+
   @media (max-width: 720px) {
+    header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); gap: 8px 10px; }
+    .stats { display: none; }
+    .lang { margin-left: auto; }
+    .search { order: 3; flex-basis: 100%; max-width: none; margin: 0; font-size: 16px; /* 16px: iOS doesn't zoom in */ }
     .layout { grid-template-columns: 1fr; }
-    nav { position: static; border-right: 0; border-bottom: 1px solid var(--line); max-height: none; display: flex; overflow-x: auto; gap: 4px; padding: 8px 16px; }
+    nav { position: static; background: var(--bg); border: 0; border-bottom: 1px solid var(--line);
+          max-height: none; padding: 8px 0; display: grid; gap: 6px; }
     nav h2 { display: none; }
-    nav button { width: auto; white-space: nowrap; gap: 6px; }
-    main { padding: 12px 16px 40px; }
-    header { padding: 12px 16px; }
+    nav .row { display: flex; overflow-x: auto; gap: 6px; padding: 0 16px; scrollbar-width: none; }
+    nav .row::-webkit-scrollbar { display: none; }
+    nav button { width: auto; white-space: nowrap; padding: 7px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); min-height: 36px; }
+    nav button[aria-pressed="true"] { border-color: var(--accent); }
+    nav .kinds button { font-size: 13px; min-height: 32px; padding: 4px 10px; }
+    main { padding: 12px 12px calc(40px + env(safe-area-inset-bottom)); gap: 10px; }
+    .card { padding: 13px 14px; }
+    .top { padding-right: 0; }
+    .tools { position: static; justify-content: flex-end; margin: 4px -6px -8px 0; }
+    .card ul { padding-left: 18px; }
   }
+  @media (prefers-reduced-motion: reduce) { .card, .swipe, .toast { transition: none; } }
 </style>
 </head>
 <body>
 <header>
   <h1 class="brand"><img src="/favicon.svg" alt="" width="26" height="26">driftnet</h1>
   <span class="stats" id="stats"></span>
-  <input id="q" type="search">
+  <input id="q" class="search" type="search" enterkeyhint="search">
   <button id="lang" class="lang" type="button"></button>
 </header>
 <div class="layout">
-  <nav id="nav" aria-label="Categories"></nav>
+  <nav id="nav"></nav>
   <main id="list" aria-live="polite"></main>
 </div>
+<div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
   const STRINGS = {
     en: {
-      title: "driftnet", search: "Search tools, tags, links…", all: "All", any: "Any",
-      tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
-      categories: "Categories", kind: "Kind", switchTo: "中文", pending: "⏳ waiting for a summary",
-      enrichedBy: (a) => `summary by ${a}`,
+      search: "Search tools, tags, links…", all: "All", favorites: "Favorites", trash: "Trash", any: "Any",
+      categories: "Categories", kind: "Kind", switchTo: "中文", nav: "Views and categories",
       stats: (n, s) => `${n} items · shared ${s}×`, shared: (n) => `shared ${n}×`,
-      empty: "Nothing here yet — drop a link in your chat.",
+      empty: "Nothing here yet — drop a link in your chat.", emptyFav: "No favorites yet — swipe a card right, or tap ☆.",
+      emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
       kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
-      worth: { skip: "skip", low: "low", normal: "normal", "must-see": "★ must-see" },
+      worth: { skip: "skip", low: "low", normal: "worth a look", "must-see": "★ must-see" },
       flags: { injection: "prompt injection", "hidden-chars": "hidden characters", "low-reputation": "low-reputation source" },
+      pending: "⏳ waiting for a summary", enrichedBy: (a) => `summary by ${a}`,
+      favorite: "Add to favorites", unfavorite: "Remove from favorites", remove: "Move to trash", restore: "Restore",
+      swipeFav: "☆ Favorite", swipeUnfav: "★ Unfavorite", swipeTrash: "Remove 🗑", swipeRestore: "↩ Restore",
+      removed: (n) => `“${n}” moved to the trash`, restored: (n) => `“${n}” restored`, faved: (n) => `★ “${n}” added to favorites`,
+      undo: "Undo", tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
+      failed: "Couldn't save — check your connection.",
     },
     "zh-TW": {
-      title: "driftnet", search: "搜尋工具、標籤、連結…", all: "全部", any: "不限",
-      tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
-      categories: "分類", kind: "類型", switchTo: "EN", pending: "⏳ 等待摘要",
-      enrichedBy: (a) => `由 ${a} 整理`,
+      search: "搜尋工具、標籤、連結…", all: "全部", favorites: "最愛", trash: "垃圾桶", any: "不限",
+      categories: "分類", kind: "類型", switchTo: "EN", nav: "檢視與分類",
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
-      empty: "還沒有內容，把連結丟進聊天室吧。",
+      empty: "還沒有內容，把連結丟進聊天室吧。", emptyFav: "還沒有最愛，把卡片往右滑或按 ☆。",
+      emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
       worth: { skip: "略過", low: "普通", normal: "值得看", "must-see": "★ 必看" },
       flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源" },
+      pending: "⏳ 等待摘要", enrichedBy: (a) => `由 ${a} 整理`,
+      favorite: "加入最愛", unfavorite: "移出最愛", remove: "移到垃圾桶", restore: "還原",
+      swipeFav: "☆ 加入最愛", swipeUnfav: "★ 移出最愛", swipeTrash: "移到垃圾桶 🗑", swipeRestore: "↩ 還原",
+      removed: (n) => `已將「${n}」移到垃圾桶`, restored: (n) => `已還原「${n}」`, faved: (n) => `★ 已將「${n}」加入最愛`,
+      undo: "復原", tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
+      failed: "沒有存成功，請檢查網路。",
     },
   };
-  const state = { category: "", kind: "", q: "" };
+  const state = { view: "all", category: "", kind: "", q: "" };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const safeUrl = (u) => (/^https?:\/\//.test(u) ? u : "#");
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 
-  // Private instances need the token on every read; it stays in this browser only.
-  async function api(path) {
+  let locale = "en";
+  let catLabels = {};
+  let items = [];
+  const T = () => STRINGS[locale] ?? STRINGS.en;
+  const catLabel = (id) => catLabels[id]?.[locale] ?? id;
+
+  // Private instances need the token on every request; it stays in this browser only.
+  async function api(path, init = {}) {
     const token = store.get("driftnet-token");
-    const res = await fetch(path, token ? { headers: { authorization: `Bearer ${token}` } } : {});
+    const res = await fetch(path, { ...init, headers: { ...(init.headers ?? {}), ...(token ? { authorization: `Bearer ${token}` } : {}) } });
     if (res.status === 401) throw Object.assign(new Error("unauthorized"), { unauthorized: true });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
-  function askToken() {
+  function askToken(then) {
     $("nav").innerHTML = "";
     $("list").innerHTML = `<form class="card" id="token-form">
       <p>${esc(T().tokenPrompt)}</p>
-      <input id="token" type="password" autocomplete="current-password" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+      <input id="token" class="search" style="max-width:none;width:100%" type="password" autocomplete="current-password">
       <p><button class="lang" type="submit">${esc(T().tokenSave)}</button></p></form>`;
     $("token-form").onsubmit = (e) => {
       e.preventDefault();
       store.set("driftnet-token", $("token").value.trim());
-      load();
+      (then ?? load)();
     };
   }
-
-  let locale = "en";
-  let catLabels = {};
-  const T = () => STRINGS[locale] ?? STRINGS.en;
-  const catLabel = (id) => catLabels[id]?.[locale] ?? id;
 
   function applyLocale() {
     document.documentElement.lang = locale;
     $("q").placeholder = T().search;
     $("q").setAttribute("aria-label", T().search);
     $("lang").textContent = T().switchTo;
+    $("nav").setAttribute("aria-label", T().nav);
   }
 
   async function load() {
-    // Words on screen before any data arrives (the token prompt needs them too).
-    const saved0 = store.get("driftnet-locale");
-    if (STRINGS[saved0]) locale = saved0;
+    const saved = store.get("driftnet-locale");
+    if (STRINGS[saved]) locale = saved;
     applyLocale();
     let stats, ui;
     try {
@@ -143,25 +214,28 @@
       throw err;
     }
     catLabels = ui.categories;
-    // The viewer's choice wins over the server default.
-    const saved = store.get("driftnet-locale");
-    locale = STRINGS[saved] ? saved : STRINGS[ui.locale] ? ui.locale : "en";
+    if (!STRINGS[saved] && STRINGS[ui.locale]) locale = ui.locale;
     applyLocale();
     $("stats").textContent = T().stats(stats.items, stats.shares);
-    const btn = (key, label, n, field) =>
-      `<button data-field="${field}" data-value="${esc(key)}" aria-pressed="${state[field] === key}">
+    const btn = (field, key, label, n) =>
+      `<button type="button" data-field="${field}" data-value="${esc(key)}" aria-pressed="${state[field] === key}">
          <span>${esc(label)}</span><span class="count">${n ?? ""}</span></button>`;
     $("nav").innerHTML =
-      btn("", T().all, stats.items, "category") +
+      `<div class="row">` +
+      btn("view", "all", T().all, stats.items) + btn("view", "favorites", `★ ${T().favorites}`, stats.favorites) +
+      btn("view", "trash", `🗑 ${T().trash}`, stats.trash || "") +
       `<h2>${esc(T().categories)}</h2>` +
-      Object.keys(catLabels).filter((k) => stats.byCategory[k]).map((k) => btn(k, catLabel(k), stats.byCategory[k], "category")).join("") +
-      `<h2>${esc(T().kind)}</h2>` + btn("", T().any, "", "kind") +
-      Object.entries(T().kinds).map(([k, v]) => btn(k, v, "", "kind")).join("");
+      Object.keys(catLabels).filter((k) => stats.byCategory[k]).map((k) => btn("category", k, catLabel(k), stats.byCategory[k])).join("") +
+      `</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
+      Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>`;
     $("nav").onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
-      state[b.dataset.field] = b.dataset.value;
-      $("nav").querySelectorAll(`[data-field="${b.dataset.field}"]`).forEach((x) => x.setAttribute("aria-pressed", x === b));
+      const { field, value } = b.dataset;
+      // Choosing a category stays inside the current view; choosing a view clears the category.
+      if (field === "view") state.category = "";
+      state[field] = field !== "view" && state[field] === value ? "" : value;
+      $("nav").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", state[x.dataset.field] === x.dataset.value));
       render();
     };
     render();
@@ -169,33 +243,173 @@
 
   async function render() {
     const p = new URLSearchParams({ limit: "300" });
+    if (state.view !== "all") p.set("view", state.view);
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
-    const items = await api(`/api/items?${p}`);
-    $("list").innerHTML = items.length ? items.map(card).join("") : `<div class="empty">${esc(T().empty)}</div>`;
+    items = await api(`/api/items?${p}`);
+    const t = T();
+    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : t.empty;
+    $("list").innerHTML = items.length
+      ? `<p class="hint">${esc(state.view === "trash" ? t.hintTrash : t.hint)}</p>` + items.map(card).join("")
+      : `<div class="empty">${esc(empty)}</div>`;
+    for (const el of $("list").querySelectorAll(".swipe")) attachSwipe(el);
     // Only #item-<n> is ours; anything else in the hash must not break the page.
     if (/^#item-\d+$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   }
 
   function card(i) {
     const s = i.summary;
+    const t = T();
     const url = safeUrl(s?.primaryUrl || i.url);
-    return `<article class="card" id="item-${i.id}">
-      <div class="top">
-        <a class="name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
-        <span class="badge">${esc(catLabel(i.category))}</span>
-        <span class="badge worth-${esc(i.worth)}">${esc(T().worth[i.worth] ?? i.worth)}</span>
-        ${i.pending ? `<span class="badge">${esc(T().pending)}</span>` : ""}
-      </div>
-      ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
-      ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-      ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => T().flags[f] ?? f).join(", "))}</div>` : ""}
-      <div class="meta">
-        <span>#${i.id}</span><span>${esc(T().kinds[i.kind] ?? i.kind)}</span><span>${esc(T().shared(i.shareCount))}</span>
-        <span>${esc(i.createdAt.slice(0, 10))}</span>
-        ${i.enrichedBy ? `<span>${esc(T().enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}
-        ${s?.tags?.length ? `<span>${s.tags.map((t) => "#" + esc(t)).join(" ")}</span>` : ""}
-      </div>
-    </article>`;
+    const inTrash = state.view === "trash";
+    const tools = inTrash
+      ? `<button class="tool" type="button" data-act="restore" title="${esc(t.restore)}" aria-label="${esc(t.restore)}">↩</button>`
+      : `<button class="tool ${i.favorite ? "on" : ""}" type="button" data-act="favorite" aria-pressed="${i.favorite}"
+           title="${esc(i.favorite ? t.unfavorite : t.favorite)}" aria-label="${esc(i.favorite ? t.unfavorite : t.favorite)}">${i.favorite ? "★" : "☆"}</button>
+         <button class="tool" type="button" data-act="trash" title="${esc(t.remove)}" aria-label="${esc(t.remove)}">🗑</button>`;
+    return `<div class="swipe" id="item-${i.id}" data-id="${i.id}">
+      <div class="act right ${inTrash ? "restore" : ""}"><span>${esc(inTrash ? t.swipeRestore : i.favorite ? t.swipeUnfav : t.swipeFav)}</span></div>
+      <div class="act left"><span>${esc(inTrash ? "" : t.swipeTrash)}</span></div>
+      <article class="card">
+        <div class="top">
+          <a class="name" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
+          <span class="badge">${esc(catLabel(i.category))}</span>
+          <span class="badge worth-${esc(i.worth)}">${esc(t.worth[i.worth] ?? i.worth)}</span>
+          ${i.pending ? `<span class="badge">${esc(t.pending)}</span>` : ""}
+        </div>
+        ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
+        ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+        ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
+        <div class="meta">
+          <span>#${i.id}</span><span>${esc(t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
+          <span>${esc(i.createdAt.slice(0, 10))}</span>
+          ${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}
+          ${s?.tags?.length ? `<span>${s.tags.map((x) => "#" + esc(x)).join(" ")}</span>` : ""}
+        </div>
+        <div class="tools">${tools}</div>
+      </article>
+    </div>`;
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const find = (id) => items.find((x) => x.id === id);
+  const nameOf = (i) => (i.summary?.name ?? i.title).slice(0, 40);
+
+  async function act(id, action) {
+    try {
+      return await api(`/api/items/${id}/${action}`, { method: "POST" });
+    } catch (err) {
+      if (err.unauthorized) return new Promise((resolve) => askToken(async () => { await load(); resolve(null); }));
+      toast(T().failed);
+      throw err;
+    }
+  }
+
+  /** Collapse a card out of the list, then refresh the counts. */
+  function dismiss(el) {
+    el.style.height = `${el.offsetHeight}px`;
+    requestAnimationFrame(() => {
+      el.classList.add("gone");
+      el.style.height = "0px";
+      el.style.marginBottom = "-12px";
+    });
+    setTimeout(() => el.remove(), 260);
+  }
+
+  async function run(el, action) {
+    const id = Number(el.dataset.id);
+    const item = find(id);
+    if (!item) return;
+    const t = T();
+    if (action === "trash" || action === "restore") {
+      el.querySelector(".card").style.transform = `translateX(${action === "trash" ? "-110%" : "110%"})`;
+      dismiss(el);
+      await act(id, action);
+      const back = action === "trash" ? "restore" : "trash";
+      toast(action === "trash" ? t.removed(nameOf(item)) : t.restored(nameOf(item)), async () => { await act(id, back); load(); });
+    } else {
+      const on = !item.favorite;
+      await act(id, on ? "favorite" : "unfavorite");
+      item.favorite = on;
+      if (state.view === "favorites" && !on) dismiss(el);
+      else el.outerHTML = card(item), attachSwipe(document.getElementById(`item-${id}`));
+      if (on) toast(t.faved(nameOf(item)));
+    }
+    refreshCounts();
+  }
+
+  async function refreshCounts() {
+    const stats = await api("/api/stats").catch(() => null);
+    if (!stats) return;
+    $("stats").textContent = T().stats(stats.items, stats.shares);
+    const set = (v, n) => { const c = $("nav").querySelector(`[data-field="view"][data-value="${v}"] .count`); if (c) c.textContent = n || (v === "all" ? "0" : ""); };
+    set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash);
+  }
+
+  $("list").addEventListener("click", (e) => {
+    const b = e.target.closest(".tool");
+    if (b) run(b.closest(".swipe"), b.dataset.act);
+  });
+
+  // ── Swipe: right = favorite (restore in the trash), left = trash ─────────
+  function attachSwipe(el) {
+    if (!el) return;
+    const cardEl = el.querySelector(".card");
+    let x0 = 0, y0 = 0, dx = 0, active = false, horizontal = null;
+    const limit = () => Math.min(140, el.offsetWidth * 0.32);
+    const inTrash = state.view === "trash";
+    cardEl.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || e.target.closest("a, button")) return;
+      x0 = e.clientX; y0 = e.clientY; dx = 0; active = true; horizontal = null;
+    });
+    cardEl.addEventListener("pointermove", (e) => {
+      if (!active) return;
+      const mx = e.clientX - x0, my = e.clientY - y0;
+      if (horizontal === null) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+        horizontal = Math.abs(mx) > Math.abs(my);
+        if (!horizontal) return void (active = false); // a scroll, not a swipe
+        cardEl.setPointerCapture(e.pointerId);
+        cardEl.classList.add("dragging");
+      }
+      // In the trash only a right swipe means something; resist the other way.
+      dx = inTrash && mx < 0 ? mx / 5 : mx;
+      cardEl.style.transform = `translateX(${dx}px)`;
+      el.dataset.dir = dx > 0 ? "right" : "left";
+      el.classList.toggle("armed", Math.abs(dx) > limit());
+    });
+    const end = () => {
+      if (!active) return;
+      active = false;
+      cardEl.classList.remove("dragging");
+      const armed = Math.abs(dx) > limit() && horizontal;
+      el.classList.remove("armed");
+      if (armed && dx < 0 && !inTrash) return run(el, "trash");
+      if (armed && dx > 0) {
+        if (inTrash) return run(el, "restore");
+        cardEl.style.transform = "";
+        delete el.dataset.dir;
+        return run(el, "favorite");
+      }
+      cardEl.style.transform = "";
+      setTimeout(() => delete el.dataset.dir, 220);
+    };
+    cardEl.addEventListener("pointerup", end);
+    cardEl.addEventListener("pointercancel", end);
+    // A drag that ends on a link must not open it.
+    cardEl.addEventListener("click", (e) => { if (Math.abs(dx) > 8) { e.preventDefault(); e.stopPropagation(); } }, true);
+  }
+
+  // ── Toast with undo ──────────────────────────────────────────────────────
+  let toastTimer;
+  function toast(text, undo) {
+    $("toast-text").textContent = text;
+    const u = $("toast-undo");
+    u.hidden = !undo;
+    u.textContent = T().undo;
+    u.onclick = async () => { $("toast").classList.remove("show"); await undo?.(); };
+    $("toast").classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $("toast").classList.remove("show"), 5000);
   }
 
   $("lang").onclick = () => {
@@ -203,11 +417,8 @@
     store.set("driftnet-locale", locale);
     load();
   };
-  let t;
-  $("q").oninput = (e) => { clearTimeout(t); t = setTimeout(() => {
-    state.q = e.target.value.trim();
-    render();
-  }, 200); };
+  let timer;
+  $("q").oninput = (e) => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 200); };
   load();
 </script>
 </body>

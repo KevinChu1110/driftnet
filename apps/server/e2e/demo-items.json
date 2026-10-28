@@ -1,0 +1,327 @@
+{
+ "zh-TW": [
+  {
+   "url": "https://github.com/paperclipai/paperclip",
+   "title": "Paperclip",
+   "kind": "repo",
+   "category": "agent-framework",
+   "worth": "normal",
+   "summary": {
+    "name": "Paperclip",
+    "oneLiner": "開源的 AI 代理團隊編排控制平面，可自架，不需帳號。",
+    "highlights": [
+     "任何代理、任何執行環境都能接入同一張組織圖，只要能接收 heartbeat 即可被「雇用」",
+     "身分與權限：支援受信任本機與需驗證兩種部署模式、人類角色權限、代理 API 金鑰、短效 run JWT、公司成員與邀請流程",
+     "以任務、組織、訓練、基礎設施四大支柱組織 AI 代理團隊的工作"
+    ],
+    "useCases": [
+     "想把多個 AI 代理組成有組織架構的團隊，分配任務並追蹤產出時",
+     "想自架一套 AI 代理管理後台，並控管代理權限與責任歸屬時"
+    ],
+    "tags": [
+     "ai-agents",
+     "multi-agent",
+     "orchestration",
+     "open-source",
+     "self-hosted"
+    ],
+    "primaryUrl": "https://github.com/paperclipai/paperclip"
+   }
+  },
+  {
+   "url": "https://github.com/jetbrains/thinkrail",
+   "title": "ThinkRail",
+   "kind": "repo",
+   "category": "coding-agent",
+   "worth": "normal",
+   "summary": {
+    "name": "ThinkRail",
+    "oneLiner": "以 pi 驅動的輕量 IDE，會依工作習慣自我客製化",
+    "highlights": [
+     "以 pi agent 進行 vibe coding 的輕量 IDE",
+     "介面會依使用者的工作方式自我調整（依頁面描述）",
+     "主題標籤標示支援 spec-driven 開發與 agent skills"
+    ],
+    "useCases": [
+     "想用 pi agent 寫程式、但偏好輕量 IDE 的開發者",
+     "想採用規格驅動（spec-driven）開發流程的人"
+    ],
+    "tags": [
+     "ai-coding",
+     "ide",
+     "spec-driven",
+     "pi-agent",
+     "typescript"
+    ],
+    "primaryUrl": "https://github.com/jetbrains/thinkrail"
+   }
+  },
+  {
+   "url": "https://github.com/stackedlol/ascii-sharks",
+   "title": "ascii-sharks",
+   "kind": "repo",
+   "category": "design-frontend",
+   "worth": "normal",
+   "summary": {
+    "name": "ascii-sharks",
+    "oneLiner": "以 TypeScript 在 canvas 上繪製 ASCII 魚與鯊魚的元件庫。",
+    "highlights": [
+     "在 canvas 上以 ASCII 字元繪製魚與鯊魚",
+     "以 TypeScript 撰寫的元件",
+     "零依賴，不需安裝其他套件"
+    ],
+    "useCases": [
+     "想在網頁加入 ASCII 風格的魚或鯊魚裝飾",
+     "需要輕量、無依賴的 TypeScript canvas 繪圖元件"
+    ],
+    "tags": [
+     "typescript",
+     "canvas",
+     "ascii",
+     "github",
+     "前端元件"
+    ],
+    "primaryUrl": "https://github.com/stackedlol/ascii-sharks"
+   }
+  },
+  {
+   "url": "https://github.com/elayadesign/ai-design-skills",
+   "title": "ai-design-skills",
+   "kind": "repo",
+   "category": "design-frontend",
+   "worth": "normal",
+   "summary": {
+    "name": "ai-design-skills",
+    "oneLiner": "一組給 AI 寫碼工具用的設計技能（skills）合集，以 markdown 規則檔形式提供。",
+    "highlights": [
+     "相容 Claude Code、Cursor、Codex、Windsurf 等任何能讀取 markdown 規則檔的工具",
+     "設計值（字型、顏色、間距、動效）集中在每個技能檔案底部的同一區段，方便統一修改",
+     "可直接複製檔案內容貼到 Settings → Rules for AI 使用，或以資料夾名稱安裝單一技能"
+    ],
+    "useCases": [
+     "想讓 AI 寫碼工具產出風格一致的落地頁或網站設計時",
+     "想依自家品牌調整設計規範，fork 後修改設計值區段即可沿用"
+    ],
+    "tags": [
+     "ai-skills",
+     "設計規範",
+     "claude-code",
+     "cursor",
+     "markdown"
+    ],
+    "mentions": [
+     {
+      "name": "Leonxlnx/taste-skill",
+      "openSource": true
+     }
+    ],
+    "primaryUrl": "https://github.com/elayadesign/ai-design-skills"
+   }
+  },
+  {
+   "url": "https://github.com/sufyanimtiaz/leonxlnx-taste-skill",
+   "title": "Taste Skill",
+   "kind": "repo",
+   "category": "agent-framework",
+   "worth": "normal",
+   "summary": {
+    "name": "Taste Skill",
+    "oneLiner": "給 AI 代理使用的前端設計技能包，主打避開千篇一律的 AI 風格。",
+    "highlights": [
+     "提供程式碼實作類技能，讓 AI 代理輸出前端程式碼",
+     "另有影像生成技能，只產出設計參考圖，不含程式碼",
+     "透過 npx skills add 安裝，建議先從 taste-skill 開始"
+    ],
+    "useCases": [
+     "讓 AI 代理生成前端頁面時，避免套用通用的 AI 設計風格",
+     "在 ChatGPT Images 或 Codex 等工具中先產出設計參考圖"
+    ],
+    "tags": [
+     "ai-agent",
+     "frontend",
+     "design",
+     "skills",
+     "image-generation"
+    ],
+    "mentions": [
+     {
+      "name": "ChatGPT Images",
+      "openSource": false
+     },
+     {
+      "name": "Codex",
+      "openSource": false
+     }
+    ],
+    "primaryUrl": "https://github.com/sufyanimtiaz/leonxlnx-taste-skill"
+   }
+  },
+  {
+   "url": "https://github.com/gathin23/cleanyourtv",
+   "title": "CleanYourTV",
+   "kind": "repo",
+   "category": "automation",
+   "worth": "normal",
+   "summary": {
+    "name": "CleanYourTV",
+    "oneLiner": "透過 Wi-Fi 精簡 Android/Google TV，換上 Apple TV 風格首頁",
+    "highlights": [
+     "透過 Wi-Fi 與 ADB 除錯功能精簡 Android TV / Google TV 的內建應用程式",
+     "附原生首頁啟動器，約 532 KB、純 Java，不需網路權限也沒有背景服務",
+     "提供手動操作步驟與還原說明；非 Android 電視則有遙控器逐步關閉追蹤的指南"
+    ],
+    "useCases": [
+     "想關閉 Android TV / Google TV 的追蹤與預載應用，又不想刷機的人",
+     "想在記憶體只有 1GB 的舊電視上換用輕量、簡潔的首頁"
+    ],
+    "tags": [
+     "android-tv",
+     "google-tv",
+     "debloat",
+     "adb",
+     "launcher"
+    ],
+    "primaryUrl": "https://github.com/gathin23/cleanyourtv"
+   }
+  }
+ ],
+ "en": [
+  {
+   "url": "https://github.com/paperclipai/paperclip",
+   "title": "Paperclip",
+   "kind": "repo",
+   "category": "agent-framework",
+   "worth": "normal",
+   "summary": {
+    "name": "Paperclip",
+    "oneLiner": "Open-source, self-hosted control plane for orchestrating teams of AI agents.",
+    "highlights": [
+     "Bring Your Own Agent: any runtime that can receive a heartbeat can be added to one org chart"
+    ],
+    "useCases": [
+     "Running a team of autonomous AI agents as an organization with an org chart and assigned tasks",
+     "Self-hosting a managed workspace where humans and agents share roles, permissions, and attribution"
+    ],
+    "tags": [
+     "agent-orchestration",
+     "multi-agent",
+     "ai-agents",
+     "self-hosted",
+     "typescript"
+    ],
+    "primaryUrl": "https://github.com/paperclipai/paperclip"
+   }
+  },
+  {
+   "url": "https://github.com/jetbrains/thinkrail",
+   "title": "ThinkRail",
+   "kind": "repo",
+   "category": "coding-agent",
+   "worth": "normal",
+   "summary": {
+    "name": "ThinkRail",
+    "oneLiner": "Apache-2.0 agentic IDE for vibe coding with pi, living specs, and git worktree workspaces.",
+    "highlights": [
+     "Opens any git repo as a project and creates isolated workspaces as git worktrees",
+     "Ships as a desktop installer and a standalone thinkrail CLI, with SHA256 checksum verification in the installer",
+     "Learns the project through living specs (spec-driven development)"
+    ],
+    "useCases": [
+     "Vibe coding on a git repo inside a lightweight IDE built around the pi agent",
+     "Running separate tasks in isolated git worktree workspaces cut from one repo"
+    ],
+    "tags": [
+     "agentic-ai",
+     "ai-ide",
+     "spec-driven",
+     "coding-agent",
+     "typescript"
+    ],
+    "primaryUrl": "https://github.com/jetbrains/thinkrail"
+   }
+  },
+  {
+   "url": "https://github.com/stackedlol/ascii-sharks",
+   "title": "ascii-sharks",
+   "kind": "repo",
+   "category": "design-frontend",
+   "worth": "normal",
+   "summary": {
+    "name": "ascii-sharks",
+    "oneLiner": "TypeScript components that draw fish and sharks as ASCII art on a canvas.",
+    "highlights": [
+     "Draws fish and sharks as ASCII characters on a canvas",
+     "Zero dependencies",
+     "Written in TypeScript and released under the MIT license"
+    ],
+    "useCases": [
+     "Adding ASCII shark or fish art to a TypeScript web project's canvas",
+     "Dependency-free ASCII art experiments"
+    ],
+    "tags": [
+     "typescript",
+     "ascii-art",
+     "canvas",
+     "zero-dependencies",
+     "mit"
+    ],
+    "primaryUrl": "https://github.com/stackedlol/ascii-sharks"
+   }
+  },
+  {
+   "url": "https://github.com/elayadesign/ai-design-skills",
+   "title": "AI Design Skills",
+   "kind": "repo",
+   "category": "design-frontend",
+   "worth": "must-see",
+   "summary": {
+    "name": "AI Design Skills",
+    "oneLiner": "MIT-licensed collection of design skill files for AI coding tools that read rules.",
+    "highlights": [
+     "Each skill is a self-contained folder with a SKILL.md file to copy into a tool's project rules",
+     "Design values (fonts, colors, spacing, motion) sit in one editable section near the bottom of each skill"
+    ],
+    "useCases": [
+     "Giving an AI coding assistant consistent design guidance when building landing pages or UI",
+     "Forking the repo to customize a team's fonts, colors, and spacing for AI-generated front-end work"
+    ],
+    "tags": [
+     "design",
+     "ai-agents",
+     "claude-code",
+     "cursor",
+     "rules-file"
+    ],
+    "primaryUrl": "https://github.com/elayadesign/ai-design-skills"
+   }
+  },
+  {
+   "url": "https://github.com/gathin23/cleanyourtv",
+   "title": "cleanyourtv",
+   "kind": "repo",
+   "category": "automation",
+   "worth": "normal",
+   "summary": {
+    "name": "cleanyourtv",
+    "oneLiner": "Debloats Android/Google TVs over Wi-Fi and installs a lightweight Apple TV-style home screen.",
+    "highlights": [
+     "Removes bloatware over network ADB on port 5555 using Python 3 scripts (tools/tv.py), with no extra dependencies",
+     "Native Android TV launcher of about 532 KB in plain Java, built for 1 GB RAM TVs",
+     "Launcher has no blur, video, network permission, or background services; includes a restore section"
+    ],
+    "useCases": [
+     "Speeding up a slow Android TV or Google TV by stripping preinstalled apps",
+     "Replacing a cluttered TV home screen with a minimal, Apple TV-style one"
+    ],
+    "tags": [
+     "android-tv",
+     "debloat",
+     "adb",
+     "launcher",
+     "privacy"
+    ],
+    "primaryUrl": "https://github.com/gathin23/cleanyourtv"
+   }
+  }
+ ]
+}

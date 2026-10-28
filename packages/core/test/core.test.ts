@@ -59,7 +59,7 @@ test("bot strings follow DRIFTNET_LANGUAGE unless DRIFTNET_LOCALE is set", () =>
   assert.equal(resolveLocale({ DRIFTNET_LANGUAGE: "Traditional Chinese (Taiwan)", DRIFTNET_LOCALE: "en" }), "en");
   const item = {
     id: 3, url: "https://github.com/a/b", title: "b", kind: "repo" as const, category: "news", worth: "normal" as const,
-    isAiTool: 1, judgeEngine: "jev" as const, flags: [], source: "github:a", shareCount: 2, pending: false, createdAt: "", updatedAt: "",
+    isAiTool: 1, judgeEngine: "jev" as const, flags: [], source: "github:a", shareCount: 2, pending: false, favorite: false, createdAt: "", updatedAt: "",
     summary: { name: "b", oneLiner: "x", highlights: [], useCases: [], tags: [], mentions: [{ name: "P", openSource: true }, { name: "Q", openSource: false }] },
   };
   const zh = renderText({ item, cached: true }, undefined, messages("zh-TW"));

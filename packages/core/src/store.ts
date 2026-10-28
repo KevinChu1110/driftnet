@@ -6,6 +6,7 @@ import type { Item, Judgement, Kind, ShareContext, Summary, Worth } from "./type
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
   is_ai_tool: number; summary: string | null; judge_engine: string; enriched_by: string | null;
+  trashed_at: string | null; favorite: number;
   flags: string; source: string; share_count: number; created_at: string; updated_at: string;
 }
 
@@ -18,6 +19,8 @@ export interface Reputation {
 }
 
 export interface ListQuery {
+  /** all (default, trash excluded), favorites, or trash. */
+  view?: "all" | "favorites" | "trash";
   q?: string;
   category?: string;
   kind?: Kind;
@@ -89,7 +92,10 @@ export class Store {
     `);
     // Columns added after the first release.
     const cols = new Set((this.db.prepare("PRAGMA table_info(items)").all() as { name: string }[]).map((c) => c.name));
-    for (const [name, type] of [["claimed_at", "TEXT"], ["claimed_by", "TEXT"], ["enriched_by", "TEXT"]] as const) {
+    for (const [name, type] of [
+      ["claimed_at", "TEXT"], ["claimed_by", "TEXT"], ["enriched_by", "TEXT"],
+      ["trashed_at", "TEXT"], ["favorite", "INTEGER NOT NULL DEFAULT 0"],
+    ] as const) {
       if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
     }
   }
@@ -136,7 +142,21 @@ export class Store {
     this.db
       .prepare("INSERT INTO shares (item_id, platform, chat_id, user_id, note) VALUES (?, ?, ?, ?, ?)")
       .run(itemId, ctx.platform, ctx.chatId, ctx.userId ?? null, ctx.note?.slice(0, 1000) ?? null);
-    this.db.prepare("UPDATE items SET share_count = share_count + 1 WHERE id = ?").run(itemId);
+    // Shared again after being trashed: someone wants it, so it comes back.
+    this.db.prepare("UPDATE items SET share_count = share_count + 1, trashed_at = NULL WHERE id = ?").run(itemId);
+  }
+
+  /** Soft delete: hidden everywhere, restorable from the trash. Returns false if there is no such item. */
+  setTrashed(id: number, trashed: boolean): boolean {
+    return (
+      this.db
+        .prepare("UPDATE items SET trashed_at = CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ','now') ELSE NULL END WHERE id = ?")
+        .run(trashed ? 1 : 0, id).changes > 0
+    );
+  }
+
+  setFavorite(id: number, favorite: boolean): boolean {
+    return this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(favorite ? 1 : 0, id).changes > 0;
   }
 
   /** One vote per voter per item; voting again replaces the earlier vote. */
@@ -229,8 +249,9 @@ export class Store {
   private static readonly NET_VOTES = "(SELECT COALESCE(SUM(vote), 0) FROM feedback f WHERE f.item_id = items.id)";
 
   list(query: ListQuery = {}): Item[] {
-    const where: string[] = [];
+    const where: string[] = [query.view === "trash" ? "trashed_at IS NOT NULL" : "trashed_at IS NULL"];
     const args: (string | number)[] = [];
+    if (query.view === "favorites") where.push("favorite = 1");
     if (query.category) { where.push("category = ?"); args.push(query.category); }
     if (query.kind) { where.push("kind = ?"); args.push(query.kind); }
     if (query.since) { where.push("created_at >= ?"); args.push(query.since); }
@@ -245,33 +266,43 @@ export class Store {
       const like = `%${query.q}%`;
       args.push(like, like, like);
     }
-    const sql = `SELECT * FROM items ${where.length ? "WHERE " + where.join(" AND ") : ""}
-                 ORDER BY ${WORTH_ORDER} DESC, updated_at DESC LIMIT ?`;
+    // The trash lists what was removed last first; elsewhere the best comes first.
+    const order = query.view === "trash" ? "trashed_at DESC" : `${WORTH_ORDER} DESC, updated_at DESC`;
+    const sql = `SELECT * FROM items WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`;
     args.push(clampInt(query.limit, 1, 500, 50));
     return (this.db.prepare(sql).all(...args) as unknown as ItemRow[]).map(toItem);
   }
 
-  stats(): { items: number; shares: number; byCategory: Record<string, number> } {
+  stats(): { items: number; shares: number; favorites: number; trash: number; byCategory: Record<string, number> } {
     const t = this.db
-      .prepare("SELECT COUNT(*) AS items, COALESCE(SUM(share_count), 0) AS shares FROM items")
-      .get() as { items: number; shares: number };
-    const rows = this.db.prepare("SELECT category, COUNT(*) AS n FROM items GROUP BY category").all() as {
+      .prepare(
+        `SELECT COUNT(*) FILTER (WHERE trashed_at IS NULL) AS items,
+                COALESCE(SUM(share_count) FILTER (WHERE trashed_at IS NULL), 0) AS shares,
+                COUNT(*) FILTER (WHERE trashed_at IS NULL AND favorite = 1) AS favorites,
+                COUNT(*) FILTER (WHERE trashed_at IS NOT NULL) AS trash
+         FROM items`,
+      )
+      .get() as { items: number; shares: number; favorites: number; trash: number };
+    const rows = this.db.prepare("SELECT category, COUNT(*) AS n FROM items WHERE trashed_at IS NULL GROUP BY category").all() as {
       category: string; n: number;
     }[];
     return {
       items: t.items,
       shares: t.shares,
+      favorites: t.favorites,
+      trash: t.trash,
       byCategory: Object.fromEntries(rows.map((r) => [r.category, r.n])),
     };
   }
 }
 
 /** SQL twin of isPending(). */
-const PENDING_SQL = "summary IS NULL AND worth <> 'skip' AND flags NOT LIKE '%injection%' AND flags NOT LIKE '%low-reputation%'";
+const PENDING_SQL =
+  "summary IS NULL AND worth <> 'skip' AND flags NOT LIKE '%injection%' AND flags NOT LIKE '%low-reputation%' AND trashed_at IS NULL";
 
 /** Worth reading, not blocked, and nobody has summarised it yet. */
 function isPending(r: ItemRow): boolean {
-  return r.summary === null && r.worth !== "skip" && !/injection|low-reputation/.test(r.flags);
+  return r.summary === null && r.worth !== "skip" && !/injection|low-reputation/.test(r.flags) && r.trashed_at === null;
 }
 
 function toItem(r: ItemRow): Item {
@@ -289,6 +320,8 @@ function toItem(r: ItemRow): Item {
     source: r.source,
     shareCount: r.share_count,
     pending: isPending(r),
+    favorite: r.favorite === 1,
+    ...(r.trashed_at ? { trashedAt: r.trashed_at } : {}),
     ...(r.enriched_by ? { enrichedBy: r.enriched_by } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,

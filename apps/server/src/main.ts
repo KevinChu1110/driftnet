@@ -32,6 +32,8 @@ const indexHtml = readFileSync(new URL("../public/index.html", import.meta.url),
 const STATIC: Record<string, [Buffer, string]> = {
   "/favicon.svg": [readFileSync(new URL("../public/favicon.svg", import.meta.url)), "image/svg+xml"],
   "/apple-touch-icon.png": [readFileSync(new URL("../public/apple-touch-icon.png", import.meta.url)), "image/png"],
+  "/icon-512.png": [readFileSync(new URL("../public/icon-512.png", import.meta.url)), "image/png"],
+  "/manifest.webmanifest": [readFileSync(new URL("../public/manifest.webmanifest", import.meta.url)), "application/manifest+json"],
 };
 
 /** Writes (ingest, feedback, MCP) need DRIFTNET_TOKEN when it is set; reads are public. */
@@ -99,6 +101,7 @@ const server = createServer(async (req, res) => {
         ...(p.get("kind") ? { kind: p.get("kind") as Kind } : {}),
         ...(minWorth && (WORTH as readonly string[]).includes(minWorth) ? { minWorth: minWorth as Worth } : {}),
         ...(p.get("since") ? { since: p.get("since")! } : {}),
+        ...(p.get("view") === "favorites" || p.get("view") === "trash" ? { view: p.get("view") as "favorites" | "trash" } : {}),
         clean: p.get("all") !== "1",
         limit: Number(p.get("limit") ?? 200),
       }));
@@ -190,6 +193,19 @@ const server = createServer(async (req, res) => {
         items: items.map((i) => ({ id: i.id, url: i.url, title: i.title, kind: i.kind, category_guess: i.category, shared_with: dn.store.notes(i.id) })),
       });
     }
+    // Library actions from the web page: trash / restore / favorite / unfavorite.
+    const actionMatch = /^\/api\/items\/(\d+)\/(trash|restore|favorite|unfavorite)$/.exec(path);
+    if (req.method === "POST" && actionMatch) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const id = Number(actionMatch[1]);
+      const action = actionMatch[2];
+      const ok =
+        action === "trash" || action === "restore"
+          ? dn.store.setTrashed(id, action === "trash")
+          : dn.store.setFavorite(id, action === "favorite");
+      return ok ? send(res, 200, dn.store.get(id)) : send(res, 404, { error: "not found" });
+    }
+
     const enrichMatch = /^\/api\/items\/(\d+)\/enrich$/.exec(path);
     if (req.method === "POST" && enrichMatch) {
       if (!TOKEN || !authorized(req)) return send(res, 401, { error: "unauthorized (set DRIFTNET_TOKEN)" });
