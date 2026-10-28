@@ -129,6 +129,32 @@
   .set-row small { color: var(--muted); }
   .set-status { font-size: 13px; color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; }
   .set-scroll { max-height: min(70vh, 640px); overflow: auto; margin: 0 -18px; padding: 0 18px; }
+  /* The mind map: folders branch out to the right; drag cards onto folders. */
+  .map-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .map-bar .btn { min-height: 36px; padding: 6px 12px; }
+  .map-bar .spacer { flex: 1; }
+  .map-wrap { position: relative; overflow: auto; height: calc(100vh - 170px); min-height: 360px; border: 1px solid var(--line);
+              border-radius: 14px; background: var(--panel); touch-action: pan-x pan-y; overscroll-behavior: contain; }
+  .map-canvas { position: relative; transform-origin: 0 0; }
+  .map-canvas svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  .map-canvas path { fill: none; stroke-width: 2.2; stroke-linecap: round; opacity: .75; }
+  .mnode { position: absolute; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 17px;
+           white-space: nowrap; font-size: 14px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none;
+           background: var(--panel); border: 2px solid var(--c); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.06);
+           transition: transform .12s ease, box-shadow .12s ease; }
+  .mnode:hover { box-shadow: 0 3px 10px rgba(0,0,0,.12); }
+  .mnode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mnode.root { height: 42px; border-radius: 21px; padding: 0 18px; font-size: 16px; font-weight: 700; color: #fff;
+                background: linear-gradient(135deg, #2459e0, #0f9f8f); border: 0; }
+  .mnode.folder { font-weight: 600; background: color-mix(in srgb, var(--c) 13%, var(--panel)); }
+  .mnode.item { height: 30px; border-width: 1px; font-size: 13px; padding: 0 12px; border-style: solid; }
+  .mnode.item .w { color: var(--star); }
+  .mnode .cnt { font-size: 12px; color: var(--muted); font-weight: 500; background: var(--bg); border-radius: 99px; padding: 0 7px; }
+  .mnode .tw { font-size: 10px; color: var(--c); transition: transform .15s ease; }
+  .mnode .tw.open { transform: rotate(90deg); }
+  .mnode.drop { transform: scale(1.08); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent); }
+  .mnode.dragging { opacity: .35; }
+  .mghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -120%) rotate(-2deg); opacity: .95; }
   .keyrow { display: flex; gap: 6px; align-items: center; }
   .keyrow input { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
   .keyrow .btn { min-height: 38px; padding: 6px 10px; white-space: nowrap; }
@@ -273,6 +299,16 @@
       <button class="btn" id="st-cancel" type="button"></button><button class="btn primary" id="st-save" type="submit"></button></div>
   </form>
 </dialog>
+<dialog id="login-dlg">
+  <form id="login-form" method="dialog">
+    <h3 id="lg-title"></h3>
+    <p class="dlg-error" id="lg-error"></p>
+    <label><span id="lg-label"></span><input id="lg-pw" type="password" autocomplete="current-password"></label>
+    <p class="hint" id="lg-help"></p>
+    <div class="dlg-actions"><span class="spacer"></span>
+      <button class="btn" id="lg-cancel" type="button"></button><button class="btn primary" id="lg-ok" type="submit"></button></div>
+  </form>
+</dialog>
 <dialog id="connect-dlg" class="wide">
   <h3 id="cx-title"></h3>
   <div class="set-scroll" id="cx-body"></div>
@@ -322,6 +358,9 @@
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
+      map: "Mind map", mapHint: "Tap a folder to open it. Drag a card onto a folder to file it, or a folder onto another to nest it. Long-press a folder to rename it.",
+      expandAll: "Expand all", collapseAll: "Collapse all", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", openCard: "Open card",
+      needPassword: "Changing things needs the admin password.",
       notes: "Notes", note: "Note", addNote: "📝 Add a note", editNote: "📝 Edit note", noteFor: (n) => `Note on “${n}”`,
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "＋ New note", noteTitle: "Title",
       noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
@@ -350,6 +389,9 @@
         tunnelInstall: "Needs cloudflared (driftnet never downloads it for you):", tunnelPrivate: "Opening it switches reading to “only with the password or the share key”.",
         tunnelStarting: "Starting the tunnel… (up to 30 s)", saveFirst: "Save first, then open the public URL.",
         connect: "🔌 Connect an AI",
+        login: "🔑 Enter admin password", logout: "Log out on this device", loginTitle: "Admin password", loginOk: "Unlock",
+        loginWrong: "That's not the admin password.",
+        loginHelp: "Forgot it? Open driftnet on the computer it runs on (http://localhost:8787): there ⚙ Settings lets you set a new one without the old one. On a server, reach it with: ssh -L 8787:127.0.0.1:8787 your-server, then open http://localhost:8787.",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["Model provider", "Summaries. None: links are still sorted, only without a summary."],
           DRIFTNET_LLM_MODEL: ["Model", "e.g. claude-haiku-5-5, gpt-5-mini, gemini-3.8-flash, qwen3"],
@@ -397,6 +439,9 @@
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
+      map: "樹狀圖", mapHint: "點資料夾展開。把卡片拖到資料夾就能整理，資料夾拖到另一個資料夾底下就變子資料夾。長按資料夾可以改名。",
+      expandAll: "全部展開", collapseAll: "全部收合", zoomIn: "放大", zoomOut: "縮小", fit: "符合畫面", openCard: "開啟卡片",
+      needPassword: "要修改需要管理密碼。",
       notes: "筆記", note: "筆記", addNote: "📝 加筆記", editNote: "📝 改筆記", noteFor: (n) => `「${n}」的筆記`,
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "＋ 新筆記", noteTitle: "標題",
       noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
@@ -425,6 +470,9 @@
         tunnelInstall: "需要 cloudflared（driftnet 不會自動幫你下載）：", tunnelPrivate: "開啟後，「誰可以讀」會改成要有密碼或分享碼。",
         tunnelStarting: "正在開通道…（最多 30 秒）", saveFirst: "先按儲存，再開公開網址。",
         connect: "🔌 連接 AI",
+        login: "🔑 輸入管理密碼", logout: "在這台裝置登出", loginTitle: "管理密碼", loginOk: "解鎖",
+        loginWrong: "管理密碼不對。",
+        loginHelp: "忘記了？在執行 driftnet 的那台電腦上打開 http://localhost:8787，⚙ 設定可以直接設新密碼，不用舊密碼。如果 driftnet 跑在伺服器上，先執行 ssh -L 8787:127.0.0.1:8787 你的伺服器，再開 http://localhost:8787。",
         labels: {
           DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要。選「不使用」也會分類，只是沒有摘要。"],
           DRIFTNET_LLM_MODEL: ["模型", "例如 claude-haiku-5-5、gpt-5-mini、gemini-3.8-flash、qwen3"],
@@ -500,7 +548,8 @@
       <p>${esc(viewing ? T().tokenToEdit : T().tokenPrompt)}</p>
       <input id="token" class="search" style="max-width:none;width:100%" type="password" autocomplete="current-password">
       <p><button class="lang" type="submit">${esc(T().tokenSave)}</button>
-      ${viewing ? `<button class="lang" type="button" id="token-back">${esc(T().back)}</button>` : ""}</p></form>`;
+      ${viewing ? `<button class="lang" type="button" id="token-back">${esc(T().back)}</button>` : ""}</p>
+      <p class="hint">${esc(T().st.loginHelp)}</p></form>`;
     if (viewing) $("token-back").onclick = () => load();
     $("token-form").onsubmit = (e) => {
       e.preventDefault();
@@ -538,7 +587,7 @@
   function updateCrumb() {
     const t = T();
     const parts = [state.view === "favorites" ? `★ ${t.favorites}` : state.view === "trash" ? `🗑 ${t.trash}`
-      : state.view === "notes" ? `📝 ${t.notes}` : t.all];
+      : state.view === "notes" ? `📝 ${t.notes}` : state.view === "map" ? `🗺 ${t.map}` : t.all];
     if (state.category) parts.push(catLabel(state.category));
     if (state.kind) parts.push(t.kinds[state.kind] ?? state.kind);
     $("crumb").innerHTML = `${esc(t.showing)} <b>${esc(parts.join(" · "))}</b>`;
@@ -571,11 +620,15 @@
       btn("view", "all", T().all, stats.items) + btn("view", "favorites", `★ ${T().favorites}`, stats.favorites) +
       btn("view", "trash", `🗑 ${T().trash}`, stats.trash || "") +
       btn("view", "notes", `📝 ${T().notes}`, stats.notes || "") +
+      btn("view", "map", `🗺 ${T().map}`, "") +
       `</div><div class="folders-head" data-drop-root><h2>${esc(T().folders)}</h2>` +
       `<button type="button" class="icon" data-new="" title="${esc(T().newFolder)}" aria-label="${esc(T().newFolder)}">＋</button></div>` +
       `<div class="tree" role="list">${folderRows(null, 0)}</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
       Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>` +
-      `<div class="foot"><button type="button" data-connect>${esc(T().st.connect)}</button>` +
+      `<div class="foot">` +
+      (ui.role !== "admin" ? `<button type="button" data-login>${esc(T().st.login)}</button>` : "") +
+      (ui.role === "admin" && !ui.local && store.get("driftnet-token") ? `<button type="button" data-logout>${esc(T().st.logout)}</button>` : "") +
+      `<button type="button" data-connect>${esc(T().st.connect)}</button>` +
       `<button type="button" data-settings>${esc(T().settings)}</button>` +
       `<button type="button" data-export="markdown">${esc(T().exportMd)}</button>` +
       `<button type="button" data-export="vault">${esc(T().exportVault)}</button></div>`;
@@ -593,6 +646,8 @@
       if (b.dataset.export) return download(b.dataset.export);
       if (b.dataset.settings !== undefined) { if (isDrawer()) setMenu(false); return openSettings(); }
       if (b.dataset.connect !== undefined) { if (isDrawer()) setMenu(false); return openConnect(); }
+      if (b.dataset.login !== undefined) { if (isDrawer()) setMenu(false); return openLogin(); }
+      if (b.dataset.logout !== undefined) { store.set("driftnet-token", ""); return load(); }
       if (b.dataset.new !== undefined) return openFolderDialog(null, b.dataset.new || null);
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
@@ -807,7 +862,7 @@
       <label class="set-row check"><input type="checkbox" data-pref="compact" ${prefs.compact ? "checked" : ""}><span>${esc(st.compact)}</span></label>
       <label class="set-row check"><input type="checkbox" data-pref="tags" ${prefs.tags ? "checked" : ""}><span>${esc(st.tags)}</span></label>
       <label class="set-row check"><input type="checkbox" data-pref="said" ${prefs.said ? "checked" : ""}><span>${esc(st.said)}</span></label></fieldset>`;
-    let server = `<p class="set-status">${esc(st.forbidden)}</p>`;
+    let server = `<p class="set-status">${esc(st.forbidden)}</p><p><button class="btn primary" type="button" id="st-login">${esc(st.login)}</button></p>`;
     if (serverSettings) {
       const field = (s) => {
         const [label, help] = st.labels[s.key] ?? [s.key, ""];
@@ -898,6 +953,9 @@
       const el = $("st-body").querySelector(b.dataset.copy) ?? $("cx-body").querySelector(b.dataset.copy);
       await navigator.clipboard?.writeText(el.value ?? el.textContent).catch(() => {});
       b.textContent = st.copied; setTimeout(() => (b.textContent = st.copy), 1200);
+    } else if (b.id === "st-login") {
+      $("settings-dlg").close();
+      openLogin();
     } else if (b.id === "ac-show") {
       const i = $("ac-pw"); i.type = i.type === "password" ? "text" : "password"; b.textContent = i.type === "password" ? st.show : st.hide;
     } else if (b.id === "ac-gen") {
@@ -938,6 +996,273 @@
     }
     $("settings-dlg").close();
     toast(serverSaved ? T().st.savedServer : T().saved);
+    load();
+  };
+
+  // ── Mind map ─────────────────────────────────────────────────────────────
+  const MAP_COLORS = ["#2459e0", "#0f9f8f", "#d9480f", "#7048e8", "#c2255c", "#2b8a3e", "#e8590c", "#1971c2", "#9c36b5", "#5c940d", "#0c8599", "#e67700", "#495057"];
+  const mapOpen = new Set((() => { try { return JSON.parse(store.get("driftnet-map-open") ?? "[]"); } catch { return []; } })());
+  const saveMapOpen = () => store.set("driftnet-map-open", JSON.stringify([...mapOpen]));
+  let mapZoom = Number(store.get("driftnet-map-zoom")) || 1;
+  let mapItems = [];
+
+  async function renderMap() {
+    const t = T();
+    try {
+      mapItems = await api("/api/items?limit=500&minWorth=skip");
+    } catch (err) {
+      if (err.unauthorized) return askToken();
+      throw err;
+    }
+    $("list").innerHTML = `<div class="map-bar">
+        <button class="btn" type="button" data-map="expand">${esc(t.expandAll)}</button>
+        <button class="btn" type="button" data-map="collapse">${esc(t.collapseAll)}</button>
+        <button class="btn" type="button" data-map="new">${esc(t.newFolder)}</button>
+        <span class="spacer"></span>
+        <button class="btn" type="button" data-map="out" aria-label="${esc(t.zoomOut)}">－</button>
+        <button class="btn" type="button" data-map="fit">${esc(t.fit)}</button>
+        <button class="btn" type="button" data-map="in" aria-label="${esc(t.zoomIn)}">＋</button></div>
+      <p class="hint">${esc(t.mapHint)}</p>
+      <div class="map-wrap" id="map-wrap"><div class="map-canvas" id="map-canvas"></div></div>`;
+    drawMap();
+  }
+
+  /** Root → folders → sub-folders and cards, laid out left to right like a mind map. */
+  function drawMap() {
+    const canvas = $("map-canvas");
+    if (!canvas) return;
+    const byFolder = new Map();
+    for (const i of mapItems) byFolder.set(i.category, [...(byFolder.get(i.category) ?? []), i]);
+    const total = (f) => (byFolder.get(f.id)?.length ?? 0) + kids(f.id).reduce((n, c) => n + total(c), 0);
+    const build = (f, depth, color) => {
+      const open = mapOpen.has(f.id);
+      const node = { key: `f:${f.id}`, type: "folder", id: f.id, label: catLabel(f.id), count: total(f), depth, color, open, children: [] };
+      if (open) {
+        node.children.push(...kids(f.id).map((c) => build(c, depth + 1, color)));
+        node.children.push(...(byFolder.get(f.id) ?? []).map((i) => ({ key: `i:${i.id}`, type: "item", id: i.id, depth: depth + 1, color,
+          label: (i.summary?.name ?? i.title).slice(0, 32), worth: i.worth, children: [] })));
+      }
+      node.hasKids = kids(f.id).length > 0 || (byFolder.get(f.id)?.length ?? 0) > 0;
+      return node;
+    };
+    const root = { key: "root", type: "root", label: "driftnet", count: mapItems.length, depth: 0, color: "#2459e0",
+      children: kids(null).map((f, n) => build(f, 1, MAP_COLORS[n % MAP_COLORS.length])) };
+
+    // Pass 1: create the nodes and measure them.
+    const flat = [];
+    const walk = (n) => { flat.push(n); n.children.forEach(walk); };
+    walk(root);
+    canvas.innerHTML = `<svg id="map-svg"></svg>` + flat.map((n) => {
+      const tw = n.type === "folder" && n.hasKids ? `<span class="tw ${n.open ? "open" : ""}">▶</span>` : "";
+      const cnt = n.type !== "item" && n.count ? `<span class="cnt">${n.count}</span>` : "";
+      const w = n.type === "item" && n.worth === "must-see" ? `<span class="w">★</span>` : "";
+      return `<div class="mnode ${n.type}" role="button" tabindex="0" data-key="${esc(n.key)}" style="--c:${n.color}">${tw}${w}<span>${esc(n.label)}</span>${cnt}</div>`;
+    }).join("");
+    const el = new Map([...canvas.querySelectorAll(".mnode")].map((d) => [d.dataset.key, d]));
+    const colW = [];
+    for (const n of flat) { n.w = el.get(n.key).offsetWidth; n.h = el.get(n.key).offsetHeight; colW[n.depth] = Math.max(colW[n.depth] ?? 0, n.w); }
+    const colX = [32];
+    for (let d = 1; d < colW.length; d++) colX[d] = colX[d - 1] + colW[d - 1] + 64;
+
+    // Pass 2: leaves take a row each; a parent sits in the middle of its children.
+    let row = 0;
+    const ROW = 44;
+    const place = (n) => {
+      if (!n.children.length) { n.cy = 32 + row++ * ROW + ROW / 2; return; }
+      n.children.forEach(place);
+      n.cy = (n.children[0].cy + n.children[n.children.length - 1].cy) / 2;
+    };
+    place(root);
+    for (const n of flat) {
+      n.x = colX[n.depth];
+      const d = el.get(n.key);
+      d.style.left = `${n.x}px`;
+      d.style.top = `${n.cy - n.h / 2}px`;
+    }
+    const width = Math.max(...flat.map((n) => n.x + n.w)) + 48;
+    const height = 32 + row * ROW + 32;
+    const paths = [];
+    const link = (p) => p.children.forEach((c) => {
+      const x1 = p.x + p.w, y1 = p.cy, x2 = c.x, y2 = c.cy, k = (x2 - x1) / 2;
+      paths.push(`<path d="M${x1} ${y1} C${x1 + k} ${y1}, ${x2 - k} ${y2}, ${x2} ${y2}" stroke="${c.color}"/>`);
+      link(c);
+    });
+    link(root);
+    const svg = $("map-svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.innerHTML = paths.join("");
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    canvas.style.transform = `scale(${mapZoom})`;
+    // The scroll area follows the zoomed size.
+    canvas.style.marginRight = `${width * mapZoom - width}px`;
+    canvas.style.marginBottom = `${height * mapZoom - height}px`;
+  }
+
+  function mapZoomTo(z) {
+    mapZoom = Math.min(2, Math.max(0.4, Math.round(z * 10) / 10));
+    store.set("driftnet-map-zoom", String(mapZoom));
+    drawMap();
+  }
+
+  $("list").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-map]");
+    if (!b) return;
+    const a = b.dataset.map;
+    if (a === "expand") { folders.forEach((f) => mapOpen.add(f.id)); saveMapOpen(); drawMap(); }
+    else if (a === "collapse") { mapOpen.clear(); saveMapOpen(); drawMap(); }
+    else if (a === "new") openFolderDialog(null, null);
+    else if (a === "in") mapZoomTo(mapZoom + 0.1);
+    else if (a === "out") mapZoomTo(mapZoom - 0.1);
+    else if (a === "fit") {
+      const wrap = $("map-wrap"), c = $("map-canvas");
+      mapZoomTo(Math.min(1.4, (wrap.clientWidth - 8) / c.offsetWidth, (wrap.clientHeight - 8) / c.offsetHeight));
+    }
+  });
+
+  /** Tap: open or close a folder, or open a card. Drag: file a card or nest a folder. Long-press a folder: edit it. */
+  (() => {
+    let press = null;
+    const nodeAt = (x, y) => document.elementFromPoint(x, y)?.closest?.(".mnode");
+    const clearDrop = () => document.querySelectorAll(".mnode.drop").forEach((d) => d.classList.remove("drop"));
+    const endPress = () => {
+      if (!press) return;
+      clearTimeout(press.timer);
+      press.ghost?.remove();
+      press.el.classList.remove("dragging");
+      clearDrop();
+      press = null;
+    };
+    $("list").addEventListener("pointerdown", (e) => {
+      const node = e.target.closest(".mnode");
+      if (!node || e.button > 0) return;
+      const key = node.dataset.key;
+      press = { key, el: node, x: e.clientX, y: e.clientY, drag: false, long: false, id: e.pointerId };
+      node.setPointerCapture(e.pointerId);
+      if (key.startsWith("f:")) press.timer = setTimeout(() => { if (press && !press.drag) { press.long = true; openFolderDialog(key.slice(2)); } }, 550);
+    });
+    $("list").addEventListener("pointermove", (e) => {
+      if (!press || e.pointerId !== press.id) return;
+      const moved = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+      if (!press.drag && moved > 6 && press.key !== "root") {
+        clearTimeout(press.timer);
+        press.drag = true;
+        press.el.classList.add("dragging");
+        press.ghost = press.el.cloneNode(true);
+        press.ghost.classList.remove("dragging");
+        press.ghost.classList.add("mghost");
+        press.ghost.style.left = press.ghost.style.top = "";
+        document.body.append(press.ghost);
+      }
+      if (!press.drag) return;
+      press.ghost.style.left = `${e.clientX}px`;
+      press.ghost.style.top = `${e.clientY}px`;
+      clearDrop();
+      const over = nodeAt(e.clientX, e.clientY);
+      if (over && over !== press.el && (over.classList.contains("folder") || (over.classList.contains("root") && press.key.startsWith("f:")))) over.classList.add("drop");
+      // Near an edge: scroll the map along.
+      const wrap = $("map-wrap"), r = wrap.getBoundingClientRect();
+      if (e.clientX > r.right - 40) wrap.scrollLeft += 14; else if (e.clientX < r.left + 40) wrap.scrollLeft -= 14;
+      if (e.clientY > r.bottom - 40) wrap.scrollTop += 14; else if (e.clientY < r.top + 40) wrap.scrollTop -= 14;
+    });
+    const finish = async (e) => {
+      if (!press || e.pointerId !== press.id) return;
+      const p = press;
+      const target = p.drag ? document.querySelector(".mnode.drop") : null;
+      endPress();
+      if (p.long) return;
+      if (!p.drag) {
+        if (p.key.startsWith("f:")) { const id = p.key.slice(2); mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); saveMapOpen(); drawMap(); }
+        else if (p.key.startsWith("i:")) { Object.assign(state, { view: "all", category: "", kind: "" }); history.replaceState(null, "", `#item-${p.key.slice(2)}`); load(); }
+        return;
+      }
+      if (!target) return;
+      const to = target.dataset.key === "root" ? null : target.dataset.key.slice(2);
+      if (p.key.startsWith("i:")) await mapMoveItem(Number(p.key.slice(2)), to);
+      else await mapMoveFolder(p.key.slice(2), to);
+    };
+    $("list").addEventListener("pointerup", finish);
+    $("list").addEventListener("pointercancel", (e) => { if (press && e.pointerId === press.id) endPress(); });
+    $("list").addEventListener("keydown", (e) => {
+      const node = e.target.closest?.(".mnode");
+      if (!node || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      const key = node.dataset.key;
+      if (key.startsWith("f:")) { const id = key.slice(2); mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); saveMapOpen(); drawMap(); }
+      else if (key.startsWith("i:")) { Object.assign(state, { view: "all", category: "" }); history.replaceState(null, "", `#item-${key.slice(2)}`); load(); }
+    });
+  })();
+
+  // A long press on a phone must not open the system menu over the map.
+  $("list").addEventListener("contextmenu", (e) => { if (e.target.closest(".mnode")) e.preventDefault(); });
+
+  async function mapWrite(path, method, body) {
+    const token = store.get("driftnet-token");
+    const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}) }).catch(() => null);
+    if (res?.status === 401) { toast(T().needPassword); openLogin(); return null; }
+    const data = await res?.json().catch(() => ({}));
+    if (!res?.ok) { toast(data?.error ?? T().failed); return null; }
+    return data;
+  }
+  async function mapMoveItem(id, to) {
+    const item = mapItems.find((i) => i.id === id);
+    if (!item || !to || item.category === to) return;
+    const from = item.category;
+    if (!(await mapWrite(`/api/items/${id}/move`, "POST", { folder: to }))) return;
+    item.category = to;
+    mapOpen.add(to); saveMapOpen();
+    drawMap();
+    toast(T().moved(nameOf(item), folderPath(to)), async () => {
+      if (await mapWrite(`/api/items/${id}/move`, "POST", { folder: from })) { item.category = from; drawMap(); }
+    });
+    refreshFolders();
+  }
+  async function mapMoveFolder(id, to) {
+    if (id === to || (to && subtreeOf(id).has(to))) return;
+    const f = folderById(id);
+    if (!f || f.parent === to) return;
+    const from = f.parent;
+    if (!(await mapWrite(`/api/folders/${encodeURIComponent(id)}`, "PATCH", { parent: to }))) return;
+    f.parent = to;
+    if (to) { mapOpen.add(to); saveMapOpen(); }
+    drawMap();
+    toast(T().folderMoved(catLabel(id), to ? folderPath(to) : T().topLevelShort), async () => {
+      if (await mapWrite(`/api/folders/${encodeURIComponent(id)}`, "PATCH", { parent: from })) { f.parent = from; drawMap(); }
+    });
+    refreshFolders();
+  }
+  /** Keep the sidebar tree and counts in step after a change made on the map. */
+  async function refreshFolders() {
+    folders = await api("/api/folders").catch(() => folders);
+    refreshTree();
+  }
+
+  // ── Unlock editing with the admin password ────────────────────────────────
+  function openLogin() {
+    const st = T().st;
+    $("lg-title").textContent = st.loginTitle;
+    $("lg-label").textContent = st.password;
+    $("lg-help").textContent = st.loginHelp;
+    $("lg-ok").textContent = st.loginOk;
+    $("lg-cancel").textContent = T().cancel;
+    $("lg-error").textContent = "";
+    $("lg-pw").value = "";
+    $("login-dlg").showModal();
+    $("lg-pw").focus();
+  }
+  $("lg-cancel").onclick = () => $("login-dlg").close();
+  $("login-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const pw = $("lg-pw").value.trim();
+    if (!pw) return;
+    // Only the admin password opens the settings, so that is the check.
+    const res = await fetch("/api/settings", { headers: { authorization: `Bearer ${pw}` } }).catch(() => null);
+    if (!res?.ok) { $("lg-error").textContent = T().st.loginWrong; return; }
+    store.set("driftnet-token", pw);
+    $("login-dlg").close();
+    toast(T().saved);
     load();
   };
 
@@ -1127,6 +1452,7 @@
   async function render() {
     updateCrumb();
     if (state.view === "notes") return renderNotes();
+    if (state.view === "map") return renderMap();
     const p = new URLSearchParams({ limit: "300" });
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
     if (state.view !== "all") p.set("view", state.view);

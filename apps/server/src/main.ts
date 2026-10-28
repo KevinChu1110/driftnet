@@ -11,7 +11,7 @@ import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
-import { canRead, isAdmin, isLocal, isPrivate, newKey, readKey, token, Tunnel } from "./access.ts";
+import { canRead, isAdmin, isLocal, isPrivate, isTrustedLocal, newKey, readKey, role, token, Tunnel } from "./access.ts";
 import { llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
@@ -43,7 +43,7 @@ const STATIC: Record<string, [Buffer, string]> = {
 };
 
 /** Writes (ingest, feedback, MCP tools that change things) need the admin password when one is set. */
-const authorized = (req: IncomingMessage) => isAdmin(req, env);
+const authorized = (req: IncomingMessage) => isAdmin(req, env) || isTrustedLocal(req);
 const tunnel = new Tunnel(PORT);
 process.on("exit", () => tunnel.stop());
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { tunnel.stop(); process.exit(0); });
@@ -119,7 +119,7 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "content-type": asset[1], "cache-control": "public, max-age=86400" });
       return res.end(asset[0]);
     }
-    if (req.method === "GET" && !canRead(req, env)) return send(res, 401, { error: "unauthorized" });
+    if (req.method === "GET" && !canRead(req, env) && !isTrustedLocal(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL || `${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
@@ -130,7 +130,7 @@ const server = createServer(async (req, res) => {
       );
       // First run: nothing configured yet, so the page opens the settings to get started.
       const setup = !envFile && dn.engines.summarizer === "off" && dn.engines.judge === "heuristic" && !dn.store.stats().items;
-      return send(res, 200, { locale: resolveLocale(), categories, setup });
+      return send(res, 200, { locale: resolveLocale(), categories, setup, role: role(req, env), local: isLocal(req), passwordSet: !!token(env) });
     }
 
     // ── The reader's folder tree ──────────────────────────────────────────

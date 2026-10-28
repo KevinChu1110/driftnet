@@ -68,7 +68,9 @@ for (let i = 0; i < 50; i++) {
 
 // ── Chrome ──────────────────────────────────────────────────────────────────
 const profile = mkdtempSync(join(tmpdir(), "driftnet-web-chrome-"));
-const chrome = spawn(CHROME, ["--headless=new", `--user-data-dir=${profile}`, "--remote-debugging-port=0", "--no-first-run", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const chrome = spawn(CHROME, ["--headless=new", `--user-data-dir=${profile}`, "--remote-debugging-port=0", "--no-first-run",
+  // remote.test reaches the same server but is not "this machine": how a phone or a tunnel looks to driftnet.
+  "--host-resolver-rules=MAP remote.test 127.0.0.1", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const wsUrl = await new Promise((resolve, reject) => {
   let err = "";
   chrome.stderr.on("data", (d) => { err += d; const m = /DevTools listening on (ws:\/\/\S+)/.exec(err); if (m) resolve(m[1]); });
@@ -357,6 +359,44 @@ try {
   assert.equal((await api("/api/stats")).trash, before, "scrolling must not trash a card");
   console.log("✓ a vertical drag is a scroll, not a swipe");
   void box;
+  // The mind map: open a folder, drag a card onto another folder, nest a folder.
+  {
+    await viewport(1280, 820, false);
+    await open();
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="map"]').click()`);
+    await waitFor(s, `!!document.querySelector('.mnode[data-key="root"]')`, "map");
+    await evaluate(s, `document.querySelector('[data-map="expand"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".mnode.item").length > 2`, "expanded map");
+    const pick = await evaluate(s, `(() => { const n = document.querySelector(".mnode.item"); return Number(n.dataset.key.slice(2)); })()`);
+    const before = (await api(`/api/items/${pick}`)).category;
+    const target = await evaluate(s, `(() => { const f = [...document.querySelectorAll(".mnode.folder")].find((n) => n.dataset.key !== "f:${before}"); return f.dataset.key.slice(2); })()`);
+    const center = (sel) => evaluate(s, `(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await evaluate(s, `document.querySelector('.mnode[data-key="f:${target}"]').scrollIntoView({ block: "center", inline: "center" })`);
+    await evaluate(s, `document.querySelector('.mnode[data-key="i:${pick}"]').scrollIntoView({ block: "center", inline: "nearest" })`);
+    const a = await center(`.mnode[data-key="i:${pick}"]`);
+    const b = await center(`.mnode[data-key="f:${target}"]`);
+    const mouse = (type, p) => cdp("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 }, s);
+    await mouse("mousePressed", a);
+    for (let k = 1; k <= 12; k++) { await mouse("mouseMoved", { x: a.x + ((b.x - a.x) * k) / 12, y: a.y + ((b.y - a.y) * k) / 12 }); await sleep(16); }
+    await mouse("mouseReleased", b);
+    await waitFor(s, `document.getElementById("toast").classList.contains("show")`, "moved on the map");
+    assert.equal((await api(`/api/items/${pick}`)).category, target, "dragging a card onto a folder files it");
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    await evaluate(s, `document.querySelector('[data-map="fit"]').click()`);
+    await sleep(300);
+    await shoot(`web-map-${LANG}.png`);
+    // Phone: the same map, panned with a finger.
+    await viewport(390, 844, true);
+    await open();
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="map"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".mnode.item").length > 2`, "map on a phone");
+    await evaluate(s, `document.querySelector('[data-map="fit"]').click()`);
+    await sleep(300);
+    await shoot(`web-phone-map-${LANG}.png`);
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
+    console.log("✓ mind map: expand, drag a card onto a folder (mouse), phone layout");
+  }
+
   // Access: a password from the page, private reading, a share key, the public URL, the connect cards.
   {
     await viewport(1280, 820, false);
@@ -371,8 +411,10 @@ try {
     await evaluate(s, `(() => { document.querySelector('[data-key="DRIFTNET_ACCESS"]').value = "private"; document.getElementById("st-save").click(); return 1; })()`);
     await waitFor(s, `!document.getElementById("settings-dlg").open`, "saved password");
     assert.equal(await evaluate(s, `localStorage.getItem("driftnet-token")`), pw, "the page keeps the password it set");
-    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`)).status, 401, "private now");
-    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`, { headers: { authorization: `Bearer ${pw}` } })).status, 200);
+    const remote = { "x-forwarded-for": "203.0.113.9" };
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`, { headers: remote })).status, 401, "private now (from elsewhere)");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`, { headers: { ...remote, authorization: `Bearer ${pw}` } })).status, 200);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items`)).status, 200, "this machine itself needs no password");
     await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "page still works with the saved password");
 
     await evaluate(s, `document.querySelector("#nav [data-settings]").click()`);
@@ -380,9 +422,9 @@ try {
     await evaluate(s, `document.getElementById("ac-newkey").click()`);
     await waitFor(s, `!!document.getElementById("ac-key")?.value`, "share key");
     const key = await evaluate(s, `document.getElementById("ac-key").value`);
-    assert.equal((await fetch(`http://127.0.0.1:${port}/llms.txt?key=${key}`)).status, 200, "the share key reads by URL");
-    assert.equal((await fetch(`http://127.0.0.1:${port}/llms.txt?key=${pw}`)).status, 401, "the admin password never works in a URL");
-    assert.equal((await fetch(`http://127.0.0.1:${port}/api/ingest`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/json" }, body: "{}" })).status, 401, "the share key can't write");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/llms.txt?key=${key}`, { headers: remote })).status, 200, "the share key reads by URL");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/llms.txt?key=${pw}`, { headers: remote })).status, 401, "the admin password never works in a URL");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/ingest`, { method: "POST", headers: { ...remote, authorization: `Bearer ${key}`, "content-type": "application/json" }, body: "{}" })).status, 401, "the share key can't write");
     await evaluate(s, `document.getElementById("ac-tunnel").click()`);
     await waitFor(s, `document.getElementById("ac-url")?.value === "https://demo-tunnel.trycloudflare.com"`, "public URL shown");
     await evaluate(s, `document.getElementById("ac").scrollIntoView({ block: "start" })`);
@@ -403,7 +445,7 @@ try {
 
     // A phone that got a link from a bot: no password stored, only ?key= in the link.
     await evaluate(s, `(() => { localStorage.removeItem("driftnet-token"); localStorage.removeItem("driftnet-key"); return 1; })()`);
-    await cdp("Page.navigate", { url: `http://127.0.0.1:${port}/?key=${key}#item-1` }, s);
+    await cdp("Page.navigate", { url: `http://remote.test:${port}/?key=${key}#item-1` }, s);
     await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "cards through a share-key link");
     assert.equal(await evaluate(s, `location.search`), "", "the key is taken out of the address bar");
     assert.equal(await evaluate(s, `location.hash`), "#item-1");
@@ -414,6 +456,14 @@ try {
     await evaluate(s, `document.getElementById("token-back").click()`);
     await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "back to browsing");
     console.log("✓ a share-key link opens on a phone without a password; editing asks for it");
+    // The 🔑 entry: unlock with the admin password from the same phone.
+    await evaluate(s, `document.querySelector("#nav [data-login]").click()`);
+    await waitFor(s, `document.getElementById("login-dlg").open`, "login dialog");
+    await evaluate(s, `(() => { document.getElementById("lg-pw").value = "wrong-password"; document.getElementById("lg-ok").click(); return 1; })()`);
+    await waitFor(s, `document.getElementById("lg-error").textContent.length > 0`, "wrong password refused");
+    await evaluate(s, `(() => { document.getElementById("lg-pw").value = ${JSON.stringify(pw)}; document.getElementById("lg-ok").click(); return 1; })()`);
+    await waitFor(s, `!document.getElementById("login-dlg").open && !document.querySelector("#nav [data-login]")`, "unlocked");
+    console.log("✓ 🔑 entry: a wrong password is refused, the right one unlocks editing");
   }
 
   console.log("\nall web checks passed");

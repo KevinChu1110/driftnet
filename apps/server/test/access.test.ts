@@ -70,3 +70,16 @@ test("card links carry the share key only when reading is private", async () => 
   assert.equal(cardLink("https://dn.example", 6), "https://dn.example/#item-6");
   assert.equal(cardLink("https://dn.example/?key=abc", 6), "https://dn.example/?key=abc#item-6");
 });
+
+test("this machine on purpose is trusted; another site's page or a forwarded request is not", async () => {
+  const { isTrustedLocal, role } = await import("../src/access.ts");
+  assert.ok(isTrustedLocal(req()));
+  assert.ok(isTrustedLocal(req({ headers: { origin: "http://localhost:8787" } })));
+  assert.ok(!isTrustedLocal(req({ headers: { origin: "https://evil.test" } })), "CSRF from a web page");
+  assert.ok(!isTrustedLocal(req({ headers: { "x-forwarded-for": "1.2.3.4" } })));
+  const remote = { headers: { "x-forwarded-for": "1.2.3.4" } };
+  assert.equal(role(req(), env), "admin");
+  assert.equal(role(req({ ...remote, auth: env.DRIFTNET_TOKEN }), env), "admin");
+  assert.equal(role(req({ ...remote, auth: env.DRIFTNET_READ_KEY }), env), "reader");
+  assert.equal(role(req(remote), env), "none");
+});

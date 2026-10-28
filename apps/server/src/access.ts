@@ -64,6 +64,25 @@ export function isLocal(req: IncomingMessage): boolean {
 }
 
 /**
+ * This machine acting on purpose: local (see isLocal) and not a request another
+ * website's page made the browser send (a foreign Origin). Whoever can use this
+ * machine can already read ~/.driftnet/.env, so it may set or reset the admin
+ * password without knowing the old one — the way out when it is forgotten.
+ */
+export function isTrustedLocal(req: IncomingMessage): boolean {
+  if (!isLocal(req)) return false;
+  const origin = req.headers.origin;
+  const host = req.headers.host ?? "";
+  return !origin || origin === `http://${host}` || origin === `https://${host}`;
+}
+
+/** What the page may offer: admin (change things), reader (look only), none (asks for a key). */
+export function role(req: IncomingMessage, env: NodeJS.ProcessEnv): "admin" | "reader" | "none" {
+  if (isTrustedLocal(req) || (token(env) ? isAdmin(req, env) : true)) return "admin";
+  return canRead(req, env) ? "reader" : "none";
+}
+
+/**
  * Where links to cards point: the public address, plus the read-only share key
  * when reading is private, so a link sent to a phone opens without a password.
  * The page stores the key and removes it from the address bar.
