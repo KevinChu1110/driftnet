@@ -57,20 +57,28 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 ## ✨ Core features
 
+### Catch the link
+
 - 🎯 **Finds the actual tool.** A post linking a repo becomes the repo; a post that only *names* projects gets them looked up on GitHub by exact name. Links a model makes up are thrown away.
 - 💬 **Reads "link in the comments".** The [Chrome extension](#chrome-extension) opens the comments; a weekly roundup becomes one item per project.
 - 📥 **Many ways in.** A Chrome button, Discord, Telegram, Slack or LINE bots, your agent, or one HTTP call ([Ways in](#ways-in)).
+
+### Understand and sort it
+
 - 🖼️ **Cards you can read at a glance.** Pictures, a one-line answer, what you'll see, why it's here.
 - 🗂️ **Your folders are the categories.** The AI files new links by each folder's path and description; its suggestions wait in the Inbox.
 - 🧠 **Mind map and split view.** Drag cards onto folders; ✨ AI tidy-up proposes a plan that changes nothing until you apply it ([the web page](#the-web-page)).
 - 📱 **A page you can search, on a phone too.** Notes, undo and trash, keyboard shortcuts, read-only share links.
+- 🚫 **Not a read-later app.** Pocket and Raindrop keep the link you gave them. driftnet follows the post to the tool it is about, keeps a short outline instead of the whole page, and lets your agents read and write the same catalogue over MCP.
+
+### Cheap, safe and yours
+
 - 💸 **Spends almost nothing.** Repeat links are free and pages are cut to an outline of about 350 tokens before any model sees them. Five real Facebook reels were judged for $0.00029 in total.
 - ⚖️ **Optional judge.** [Jev](https://console.typesafe.ai) (needs a TypeSafe key) decides in ~100 ms what is worth summarising. Without it, your model sorts each link.
 - 🗳️ **Learns what to ignore.** 👎 a result and its publisher loses reputation; sources that keep getting voted down stop costing anything.
 - 🛡️ **Safe by default.** Private and local addresses are refused, and prompt injection is never passed on to agents.
 - 🤖 **Agents use it too.** MCP, `/openapi.json`, `/llms.txt`, `/feed.xml` and an outgoing webhook; or let them do the reading ([Agents](#agents)).
 - 🧩 **Any model or none, and it stays yours.** An API, your Claude or Google subscription, Ollama, or no model (links are then listed unsorted under "other"). Local SQLite; English and Traditional Chinese throughout.
-- 🚫 **Not a read-later app.** Pocket and Raindrop keep the link you gave them. driftnet follows the post to the tool it is about, keeps a short outline instead of the whole page, and lets your agents read and write the same catalogue over MCP.
 
 ## 🚀 Quick start
 

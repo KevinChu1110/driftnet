@@ -99,23 +99,32 @@ async function fetchImage(url: string): Promise<MediaFile> {
   return { bytes, type: real };
 }
 
-/** Write atomically, then drop the oldest files until the folder fits the cap. */
+/** Bytes in each cache folder: counted once from disk, then kept up to date, so a new picture doesn't rescan the folder. */
+const cacheTotals = new Map<string, number>();
+
+/** Write atomically, then (only once over the cap) drop the oldest files until the folder fits. */
 function store(dir: string, file: string, bytes: Buffer, cap: number): void {
   try {
     mkdirSync(dir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
     writeFileSync(tmp, bytes);
     renameSync(tmp, file);
-    const files = readdirSync(dir).filter((f) => !f.endsWith(".tmp")).map((f) => ({ f, ...pick(statSync(join(dir, f))) }));
-    let total = files.reduce((n, x) => n + x.size, 0);
-    for (const x of files.sort((a, b) => a.mtime - b.mtime)) {
-      if (total <= cap) break;
-      if (join(dir, x.f) === file) continue;
-      try { unlinkSync(join(dir, x.f)); total -= x.size; } catch { /* already gone */ }
+    const known = cacheTotals.get(dir);
+    let total = known === undefined ? scan(dir).reduce((n, x) => n + x.size, 0) : known + bytes.length;
+    if (total > cap) {
+      const files = scan(dir);
+      total = files.reduce((n, x) => n + x.size, 0);
+      for (const x of files.sort((a, b) => a.mtime - b.mtime)) {
+        if (total <= cap) break;
+        if (join(dir, x.f) === file) continue;
+        try { unlinkSync(join(dir, x.f)); total -= x.size; } catch { /* already gone */ }
+      }
     }
+    cacheTotals.set(dir, total);
   } catch (err) {
     console.warn(`[driftnet] media cache: ${(err as Error).message}`); // serving still works without the cache
   }
 }
 
 const pick = (s: { size: number; mtimeMs: number }) => ({ size: s.size, mtime: s.mtimeMs });
+const scan = (dir: string) => readdirSync(dir).filter((f) => !f.endsWith(".tmp")).map((f) => ({ f, ...pick(statSync(join(dir, f))) }));

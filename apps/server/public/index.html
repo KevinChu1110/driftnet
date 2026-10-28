@@ -172,7 +172,8 @@
   .map-crumb [aria-current] { font-weight: 600; padding: 6px 4px; }
   .map-crumb .sep { color: var(--muted); }
   .mnode:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
-  .map-tip { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .map-tip { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+  .map-tip > button { flex: none; }
   .map-wrap { position: relative; overflow: auto; height: 70vh; min-height: 320px; border: 1px solid var(--line);
               border-radius: 16px; background: var(--panel); box-shadow: var(--shadow); touch-action: pan-x pan-y pinch-zoom; overscroll-behavior: contain;
               background-image: radial-gradient(color-mix(in srgb, var(--muted) 18%, transparent) 1px, transparent 1px); background-size: 22px 22px; }
@@ -478,6 +479,7 @@
   .crow { display: flex; gap: 14px; align-items: flex-start; }
   .cbody { flex: 1; min-width: 0; }
   .thumb { position: relative; flex: 0 0 132px; height: 88px; border-radius: 10px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); }
+  .thumb .more-pics { position: absolute; right: 6px; bottom: 6px; padding: 1px 7px; border-radius: 999px; background: rgb(0 0 0 / .62); color: #fff; font-size: 12px; font-weight: 600; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb .play, .g-slide .play { position: absolute; inset: 0; margin: auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
     background: rgba(0,0,0,.6); color: #fff; font-size: 14px; pointer-events: none; }
@@ -510,6 +512,7 @@
   .md-tags { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); }
   .md-fine { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 12px; }
   .md-actions { flex: none; margin: 0; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  .md-actions .spacer { flex: 1; }
   .md-actions .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
   .md-actions .btn.on { border-color: var(--star); color: var(--star); }
   .gallery { margin: 4px 0 0; }
@@ -1856,7 +1859,7 @@
           : `<button type="button" data-map="focus" data-id="${esc(id)}">${esc(catLabel(id))}</button>`)).join("") + `</nav>`;
     })() : "";
     const allOpen = mapOpen.size > 0 || !!state.q;
-    const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip">${esc(t.mapHint)} ${esc(t.mapHintFocus)} <button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
+    const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip"><span>${esc(t.mapHint)} ${esc(t.mapHintFocus)}</span><button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
     $("list").innerHTML = `<div class="map-bar">
         <button class="btn" type="button" data-map="${allOpen ? "collapse" : "expand"}">${ic(allOpen ? "collapse" : "expand")} ${esc(allOpen ? t.collapseAll : t.expandAll)}</button>
         <button class="btn" type="button" data-map="new">${ic("plus")} ${esc(t.newFolder)}</button>
@@ -2368,7 +2371,7 @@
       (admin ? (inTrash ? btn("restore", "undo", t.restore)
         : btn("favorite", "star", i.favorite ? t.unfavorite : t.favorite, i.favorite ? "on" : "") + btn("move", "move", t.moveTo) +
           `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refresh)}</button>` +
-          btn("note", "note", i.note ? t.editNote : t.addNote) + btn("trash", "trash", t.remove)) : "") +
+          btn("note", "note", i.note ? t.editNote : t.addNote) + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
       (modalFrom === "map" ? btn("list", "list", t.showInList) : "");
   }
   function openModal(id, from = "list") {
@@ -2977,12 +2980,12 @@
   }
   /** The list thumbnail: the first picture, cropped; a card with none (or a broken one) simply has no box. */
   function thumbHtml(i) {
-    const m = mediaOf(i)[0];
+    const all = mediaOf(i), m = all[0];
     if (!m) return "";
     const gif = m.kind === "gif";
     return `<div class="thumb">
       <img src="${esc(m.src)}" alt="${esc(m.alt || i.summary?.name || i.title)}" referrerpolicy="no-referrer" loading="lazy" decoding="async" draggable="false" data-media ${gif ? "data-gif" : ""}>
-      ${m.kind === "video" ? `<span class="play" aria-hidden="true">▶</span>` : ""}</div>`;
+      ${m.kind === "video" ? `<span class="play" aria-hidden="true">▶</span>` : ""}${all.length > 1 ? `<span class="more-pics">+${all.length - 1}</span>` : ""}</div>`;
   }
 
   /** Inbox: one-tap chips for the card's suggested folders (keys 1–3), and "other folder…" (m). */
