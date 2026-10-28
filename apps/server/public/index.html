@@ -45,6 +45,15 @@
   nav .count { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 400; }
   nav h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 10px 6px; }
 
+  .menu { display: none; width: 44px; height: 44px; margin: -4px 0 -4px -8px; border: 0; border-radius: 10px; background: none; cursor: pointer;
+          place-items: center; color: var(--text); }
+  .menu:hover, .menu:focus-visible { background: var(--bg); }
+  .scrim, .drawer-head, .crumb { display: none; }
+  .drawer-head { align-items: center; justify-content: space-between; padding: 2px 4px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .drawer-head .brand { font-size: 17px; }
+  .crumb { align-items: center; gap: 8px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--muted);
+           font-size: 13px; padding: 9px 16px; text-align: left; cursor: pointer; }
+  .crumb b { color: var(--accent); font-weight: 600; }
   main { padding: 16px 20px 48px; display: grid; gap: 12px; align-content: start; }
   .hint { color: var(--muted); font-size: 13px; margin: -4px 2px 0; }
 
@@ -95,30 +104,40 @@
     .lang { margin-left: auto; }
     .search { order: 3; flex-basis: 100%; max-width: none; margin: 0; font-size: 16px; /* 16px: iOS doesn't zoom in */ }
     .layout { grid-template-columns: 1fr; }
-    nav { position: static; background: var(--bg); border: 0; border-bottom: 1px solid var(--line);
-          max-height: none; padding: 8px 0; display: grid; gap: 6px; }
-    nav h2 { display: none; }
-    nav .row { display: flex; overflow-x: auto; gap: 6px; padding: 0 16px; scrollbar-width: none; }
-    nav .row::-webkit-scrollbar { display: none; }
-    nav button { width: auto; white-space: nowrap; padding: 7px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); min-height: 36px; }
-    nav button[aria-pressed="true"] { border-color: var(--accent); }
-    nav .kinds button { font-size: 13px; min-height: 32px; padding: 4px 10px; }
+    /* The sidebar becomes a drawer behind the ☰ button. */
+    .menu { display: grid; }
+    nav { position: fixed; top: 0; bottom: 0; left: 0; z-index: 10; width: min(300px, 84vw); max-height: none; border-right: 1px solid var(--line);
+          background: var(--panel); padding: max(12px, env(safe-area-inset-top)) 10px calc(20px + env(safe-area-inset-bottom));
+          transform: translateX(-102%); visibility: hidden; box-shadow: 8px 0 30px rgba(0,0,0,.18);
+          transition: transform .25s ease, visibility 0s linear .25s; /* hide only after sliding out */ }
+    body.menu-open nav { transform: none; visibility: visible; transition: transform .25s ease; }
+    body.menu-open { overflow: hidden; }
+    .scrim { display: block; position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+    body.menu-open .scrim { opacity: 1; pointer-events: auto; }
+    .drawer-head { display: flex; }
+    nav button { min-height: 44px; }
+    .crumb { display: flex; }
     main { padding: 12px 12px calc(40px + env(safe-area-inset-bottom)); gap: 10px; }
     .card { padding: 13px 14px; }
     .top { padding-right: 0; }
     .tools { position: static; justify-content: flex-end; margin: 4px -6px -8px 0; }
     .card ul { padding-left: 18px; }
   }
-  @media (prefers-reduced-motion: reduce) { .card, .swipe, .toast { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .card, .swipe, .toast, nav, .scrim { transition: none; } }
 </style>
 </head>
 <body>
 <header>
+  <button id="menu" class="menu" type="button" aria-controls="nav" aria-expanded="false">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
   <h1 class="brand"><img src="/favicon.svg" alt="" width="26" height="26">driftnet</h1>
   <span class="stats" id="stats"></span>
   <input id="q" class="search" type="search" enterkeyhint="search">
   <button id="lang" class="lang" type="button"></button>
 </header>
+<button id="crumb" class="crumb" type="button" aria-controls="nav"></button>
+<div class="scrim" id="scrim"></div>
 <div class="layout">
   <nav id="nav"></nav>
   <main id="list" aria-live="polite"></main>
@@ -140,7 +159,7 @@
       swipeFav: "☆ Favorite", swipeUnfav: "★ Unfavorite", swipeTrash: "Remove 🗑", swipeRestore: "↩ Restore",
       removed: (n) => `“${n}” moved to the trash`, restored: (n) => `“${n}” restored`, faved: (n) => `★ “${n}” added to favorites`,
       undo: "Undo", tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
-      failed: "Couldn't save — check your connection.",
+      failed: "Couldn't save — check your connection.", menu: "Menu", close: "Close menu", showing: "Showing:",
     },
     "zh-TW": {
       search: "搜尋工具、標籤、連結…", all: "全部", favorites: "最愛", trash: "垃圾桶", any: "不限",
@@ -156,7 +175,7 @@
       swipeFav: "☆ 加入最愛", swipeUnfav: "★ 移出最愛", swipeTrash: "移到垃圾桶 🗑", swipeRestore: "↩ 還原",
       removed: (n) => `已將「${n}」移到垃圾桶`, restored: (n) => `已還原「${n}」`, faved: (n) => `★ 已將「${n}」加入最愛`,
       undo: "復原", tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
-      failed: "沒有存成功，請檢查網路。",
+      failed: "沒有存成功，請檢查網路。", menu: "選單", close: "關閉選單", showing: "目前顯示：",
     },
   };
   const state = { view: "all", category: "", kind: "", q: "" };
@@ -200,6 +219,32 @@
     $("q").setAttribute("aria-label", T().search);
     $("lang").textContent = T().switchTo;
     $("nav").setAttribute("aria-label", T().nav);
+    $("menu").setAttribute("aria-label", T().menu);
+  }
+
+  // ── Drawer (phones) ──────────────────────────────────────────────────────
+  const isDrawer = () => matchMedia("(max-width: 720px)").matches;
+  /** keyboard: move focus into the drawer and back (a tap doesn't need the focus ring). */
+  function setMenu(open, keyboard = false) {
+    document.body.classList.toggle("menu-open", open);
+    $("menu").setAttribute("aria-expanded", String(open));
+    if (!keyboard) return;
+    if (open) $("nav").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
+    else if (isDrawer()) $("menu").focus({ preventScroll: true });
+  }
+  // event.detail is 0 for a click made with the keyboard (Enter / Space).
+  $("menu").onclick = (e) => setMenu(!document.body.classList.contains("menu-open"), e.detail === 0);
+  $("crumb").onclick = (e) => setMenu(true, e.detail === 0);
+  $("scrim").onclick = () => setMenu(false);
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("menu-open")) setMenu(false, true); });
+
+  /** One line under the header saying what is shown, so a closed drawer hides nothing. */
+  function updateCrumb() {
+    const t = T();
+    const parts = [state.view === "favorites" ? `★ ${t.favorites}` : state.view === "trash" ? `🗑 ${t.trash}` : t.all];
+    if (state.category) parts.push(catLabel(state.category));
+    if (state.kind) parts.push(t.kinds[state.kind] ?? state.kind);
+    $("crumb").innerHTML = `${esc(t.showing)} <b>${esc(parts.join(" · "))}</b>`;
   }
 
   async function load() {
@@ -221,6 +266,8 @@
       `<button type="button" data-field="${field}" data-value="${esc(key)}" aria-pressed="${state[field] === key}">
          <span>${esc(label)}</span><span class="count">${n ?? ""}</span></button>`;
     $("nav").innerHTML =
+      `<div class="drawer-head"><span class="brand"><img src="/favicon.svg" alt="" width="24" height="24">driftnet</span>` +
+      `<button type="button" class="menu" id="menu-close" aria-label="${esc(T().close)}">✕</button></div>` +
       `<div class="row">` +
       btn("view", "all", T().all, stats.items) + btn("view", "favorites", `★ ${T().favorites}`, stats.favorites) +
       btn("view", "trash", `🗑 ${T().trash}`, stats.trash || "") +
@@ -231,17 +278,20 @@
     $("nav").onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
+      if (b.id === "menu-close") return setMenu(false);
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
       if (field === "view") state.category = "";
       state[field] = field !== "view" && state[field] === value ? "" : value;
-      $("nav").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", state[x.dataset.field] === x.dataset.value));
+      $("nav").querySelectorAll("button[data-field]").forEach((x) => x.setAttribute("aria-pressed", state[x.dataset.field] === x.dataset.value));
+      if (isDrawer()) setMenu(false);
       render();
     };
     render();
   }
 
   async function render() {
+    updateCrumb();
     const p = new URLSearchParams({ limit: "300" });
     if (state.view !== "all") p.set("view", state.view);
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);

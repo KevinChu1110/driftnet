@@ -108,6 +108,13 @@ const swipe = async (id, dx) => {
   await touch("touchEnd", box.x + dx);
   await sleep(450);
 };
+/** A finger tap on an element (a script click() looks like a keyboard press). */
+const tap = async (selector) => {
+  const p = await evaluate(s, `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  await cdp("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [p] }, s);
+  await cdp("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }, s);
+  await sleep(350);
+};
 const ids = () => evaluate(s, `[...document.querySelectorAll(".swipe")].map((e) => Number(e.dataset.id))`);
 const api = (path) => fetch(`http://127.0.0.1:${port}${path}`).then((r) => r.json());
 
@@ -123,6 +130,43 @@ try {
   await open();
   await shoot(`web-phone-${LANG}.png`);
   const first = (await ids())[0];
+
+  // The ☰ drawer: opens, picking a shelf closes it and the crumb says what is shown.
+  {
+    const open = () => evaluate(s, `document.body.classList.contains("menu-open")`);
+    assert.equal(await open(), false);
+    await tap("#menu");
+    assert.equal(await open(), true);
+    assert.equal(await evaluate(s, `document.activeElement?.closest?.("#nav") ? "nav" : "elsewhere"`), "elsewhere", "a tap doesn't pull focus into the drawer");
+    assert.equal(await evaluate(s, `document.getElementById("menu").getAttribute("aria-expanded")`), "true");
+    const inView = await evaluate(s, `(() => { const r = document.getElementById("nav").getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })()`);
+    assert.ok(inView, "drawer slid in");
+    await shoot(`web-phone-menu-${LANG}.png`);
+    const shelf = await evaluate(s, `(() => { const b = document.querySelector('#nav [data-field="category"]'); b.click(); return b.querySelector("span").textContent; })()`);
+    await sleep(350);
+    assert.equal(await open(), false, "picking a shelf closes the drawer");
+    const crumb = await evaluate(s, `document.getElementById("crumb").textContent`);
+    assert.ok(crumb.includes(shelf), `crumb shows the shelf: ${JSON.stringify(crumb)} vs ${JSON.stringify(shelf)}`);
+    // Back to everything; the scrim and Escape close it too.
+    await evaluate(s, `document.getElementById("crumb").click()`);
+    await sleep(300);
+    await evaluate(s, `document.querySelector('#nav [data-field="category"][aria-pressed="true"]').click()`);
+    await sleep(300);
+    await evaluate(s, `document.getElementById("menu").click()`);
+    await sleep(300);
+    await evaluate(s, `document.getElementById("scrim").click()`);
+    await sleep(300);
+    assert.equal(await open(), false, "scrim closes");
+    await evaluate(s, `document.getElementById("menu").click()`);
+    await sleep(300);
+    await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }, s);
+    await sleep(300);
+    assert.equal(await open(), false, "Escape closes");
+    assert.equal(await evaluate(s, `document.activeElement.id`), "menu", "after Escape, focus returns to ☰");
+    await evaluate(s, `document.activeElement.blur()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 3`, "all items again");
+    console.log("✓ ☰ drawer: opens, closes on pick / scrim / Escape, crumb shows the filter");
+  }
 
   // A picture mid-swipe, then let go short of the threshold: nothing happens.
   {

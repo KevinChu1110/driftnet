@@ -95,9 +95,10 @@ where to read it on the web page. Want the summary in the chat instead, or no re
 
 ### The web page
 
-<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the catalogue, a card being swiped left to the trash, and the trash with an undo prompt" width="100%"></p>
+<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the catalogue, the ☰ drawer with views and shelves, and a card being swiped left to the trash" width="100%"></p>
 
-Every link lands on a page you can search, filter by shelf and kind, and open from a phone.
+Every link lands on a page you can search, filter by shelf and kind, and open from a phone. On a
+phone the sidebar folds into a ☰ drawer, and a line under the search box says what you're looking at.
 
 - **Swipe right** to add a favorite, **swipe left** to move to the trash; a short swipe does nothing,
   and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.

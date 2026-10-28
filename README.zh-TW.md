@@ -87,9 +87,10 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ### 網頁
 
-<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：清單、一張卡片往左滑向垃圾桶、垃圾桶和復原提示" width="100%"></p>
+<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：清單、☰ 側邊欄（檢視與分類）、一張卡片往左滑向垃圾桶" width="100%"></p>
 
-每個連結都會整理到一個網頁上，可以搜尋、依分類和類型篩選，手機也能開。
+每個連結都會整理到一個網頁上，可以搜尋、依分類和類型篩選，手機也能開。在手機上，側邊欄會收進左上角的 ☰，
+搜尋框下方有一行字告訴你現在看的是哪個分類。
 
 - **往右滑**加入最愛，**往左滑**移到垃圾桶；滑太短不會觸發，上下捲動也不會被當成滑動。電腦上可以按 ☆ 和 🗑，或用滑鼠拖曳。
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
