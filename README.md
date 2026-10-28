@@ -98,6 +98,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 **In a chat**, messages without a link are ignored. Replies end with the item number: vote with
 `👍12` or `👎12 reason`.
 
+<p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet replying in a Discord channel to a GitHub link and to a Facebook reel, which it traced to the Paperclip repo" width="70%"></p>
+<sub>A real run in Discord, with <code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>. The reel had no link; driftnet found Paperclip by name, and since the repo had just been shared too, it shows "already saved · shared 2×". Server address replaced.</sub>
+
 ### Chrome extension
 
 <p align="center"><img src="assets/extension-en.jpg" alt="The driftnet popup over a social post: saved, with category, worth and a three-point summary" width="100%"></p>

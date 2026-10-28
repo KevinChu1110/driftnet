@@ -90,6 +90,9 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 **在聊天室裡**，沒有連結的訊息一律忽略。回覆最後有項目編號，用 `👍12` 或 `👎12 原因` 投票。
 
+<p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 在 Discord 頻道回覆一個 GitHub 連結和一則 FB reel，並從 reel 追到 Paperclip repo" width="70%"></p>
+<sub>Discord 實測畫面。reel 沒有附連結，driftnet 用名稱找到 Paperclip；因為這個 repo 剛好也被貼了，所以顯示「已收錄過 · 分享 2 次」。伺服器網址已替換。</sub>
+
 ### Chrome 擴充
 
 <p align="center"><img src="assets/extension-zh-TW.jpg" alt="driftnet 彈出視窗疊在一則社群貼文上：已收錄，附分類、評價和三點摘要" width="100%"></p>
