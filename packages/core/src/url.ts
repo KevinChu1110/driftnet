@@ -8,8 +8,9 @@ const TRACKING_PARAMS = new Set([
 
 /** Share-tracking params that only the Chinese-market apps add (Xiaohongshu, Douyin, TikTok). Matched on those hosts only: "_t" or "did" mean something elsewhere. */
 const ASIAN_SHARE_HOSTS = ["xiaohongshu.com", "xhslink.com", "douyin.com", "iesdouyin.com", "tiktok.com"];
+// Xiaohongshu's xsec_token/xsec_source stay: without them a note is served only behind the login wall.
 const ASIAN_SHARE_PARAMS = new Set([
-  "xsec_token", "xsec_source", "share_from_user_hidden", "apptime", "share_id", "exsource", "app_platform", "app_version",
+  "share_from_user_hidden", "apptime", "share_id", "exsource", "app_platform", "app_version",
   "author_share", "shareredirect", "type_share", "_r", "_t", "u_code", "did", "iid", "is_from_webapp", "sender_device",
   "web_id", "region", "timestamp", "tt_from", "enter_from", "enter_method", "sec_uid", "sec_user_id", "social_share_type",
 ]);

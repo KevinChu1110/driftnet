@@ -17,7 +17,7 @@ test("share short links are followed to the final page, which then canonicalises
   try {
     const xhs = await fetchText(`http://127.0.0.1:${port}/xhs`);
     assert.equal(new URL(xhs.url).pathname, "/explore/66aa", "redirect followed to the final URL");
-    assert.equal(canonicalize(xhs.url.replace("127.0.0.1", "www.xiaohongshu.com")), `https://xiaohongshu.com:${port}/explore/66aa`);
+    assert.equal(canonicalize(xhs.url.replace("127.0.0.1", "www.xiaohongshu.com")), `https://xiaohongshu.com:${port}/explore/66aa?xsec_source=pc_share&xsec_token=ABC`);
     const dy = await fetchText(`http://127.0.0.1:${port}/dy`);
     assert.equal(new URL(dy.url).pathname, "/video/7300");
   } finally {

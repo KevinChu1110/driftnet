@@ -16,7 +16,7 @@ test("canonicalize strips tracking and unifies hosts", () => {
 test("canonicalize drops Xiaohongshu, Douyin and TikTok share tracking but keeps the content", () => {
   assert.equal(
     canonicalize("https://www.xiaohongshu.com/explore/66aa1b?xsec_token=AB&xsec_source=pc_share&share_from_user_hidden=true&apptime=1700&share_id=x&exSource=a"),
-    "https://xiaohongshu.com/explore/66aa1b",
+    "https://xiaohongshu.com/explore/66aa1b?xsec_source=pc_share&xsec_token=AB",
   );
   assert.equal(canonicalize("https://www.douyin.com/video/7300?_r=1&_t=abc&u_code=1&did=2&iid=3&share_item_id=4&is_from_webapp=1&sender_device=pc&web_id=5&region=TW&utm_medium=x"), "https://douyin.com/video/7300");
   assert.equal(canonicalize("https://www.tiktok.com/@u/video/123?_r=1&_t=z&is_from_webapp=1&sender_device=pc&share_app_id=1"), "https://tiktok.com/@u/video/123");
