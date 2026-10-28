@@ -38,7 +38,7 @@ test("store: reputation learns from votes", () => {
   const store = new Store(":memory:");
   const j = { isAiTool: 1, category: "other", kind: "repo" as const, worth: "normal" as const, engine: "heuristic" as const, confidence: 0 };
   for (let i = 0; i < 3; i++) {
-    const item = store.upsert({ url: `https://spam.example/${i}`, aliases: [], title: "t", judgement: j, summary: null, costUsd: 0, flags: [], source: "spam.example" });
+    const item = store.upsert({ url: `https://spam.example/${i}`, aliases: [], title: "t", judgement: j, summary: null, flags: [], source: "spam.example" });
     store.vote(item.id, -1, "alice");
   }
   const rep = store.reputation("spam.example");

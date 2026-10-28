@@ -41,14 +41,6 @@ export interface Summary {
   mentions?: { name: string; openSource: boolean }[];
 }
 
-export interface Usage {
-  judgeInputTokens: number;
-  llmInputTokens: number;
-  llmCachedTokens: number;
-  llmOutputTokens: number;
-  costUsd: number;
-}
-
 export interface Item {
   id: number;
   url: string;
@@ -59,7 +51,6 @@ export interface Item {
   isAiTool: number;
   summary: Summary | null;
   judgeEngine: Judgement["engine"];
-  costUsd: number;
   /** Set by the pollution guard, e.g. "injection", "hidden-chars", "low-reputation". */
   flags: string[];
   /** Who published it (GitHub owner, YouTube channel, domain) — the unit reputation is kept for. */
@@ -80,9 +71,8 @@ export interface ShareContext {
 
 export interface IngestResult {
   item: Item;
-  /** true when the item came from the cache and cost nothing. */
+  /** true when the item came from the cache: nothing was fetched or sent to a model. */
   cached: boolean;
-  usage: Usage;
   /** Repos found from tools the content mentioned by name. */
   related?: IngestResult[];
 }

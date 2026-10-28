@@ -15,7 +15,7 @@ driftnet 是一個 LINE／Slack／Discord／Telegram 機器人：讀你丟進來
 | 3. 防污染 | 去除隱藏字元、標記提示詞注入 | $0 |
 | 4. 信譽 | 常被倒讚的來源只存不摘要 | $0 |
 | 5. 判斷 | [Jev](https://console.typesafe.ai) 用選擇題回答分類／類型／價值／是否注入，約 100ms | **約 $0.00006** |
-| 6. 摘要 | 唯一一次 LLM 呼叫（Claude Haiku），只有值得看的才跑 | 約 $0.0003（估） |
+| 6. 摘要 | 唯一一次 LLM 呼叫，用**你自己選**的模型，只有值得看的才跑 | 小模型就夠 |
 
 實測 5 個真實 FB reels：判斷全部只花 **$0.00029**；其中只有一句標語、沒內容的那篇被判為不值得看，不會進入摘要。
 
@@ -49,30 +49,33 @@ skill 規定 agent 只能**向人提議**升級，不能自己安裝任何東西
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-cp .env.example .env   # 填 DRIFTNET_ANTHROPIC_API_KEY 和要用的聊天平台；DRIFTNET_LANGUAGE="Traditional Chinese (Taiwan)"
+cp .env.example .env   # 選模型供應商（可不選）和要用的聊天平台；DRIFTNET_LANGUAGE="Traditional Chinese (Taiwan)"
 pnpm dev               # http://localhost:8787
 ```
 
 需要 Node.js 22.13 以上（使用內建的 `node:sqlite`）。各平台設定見英文版 README。
 
-> [!NOTE]
-> 金鑰變數是 `DRIFTNET_ANTHROPIC_API_KEY`，**刻意不用** `ANTHROPIC_API_KEY`：後者一旦 export，
-> Claude Code 也會讀到，從訂閱額度改走 API 計費。
+### 模型隨你選
 
-啟動時會印出實際生效的模型（`judge=jev  summarizer=claude-haiku-5-5 / low`）。可用
-`DRIFTNET_SUMMARY_MODEL`、`DRIFTNET_SUMMARY_EFFORT` 覆寫；effort 打錯字會退回 `low` 並提醒，
-不會讓每次摘要都默默失敗。
+driftnet 不綁任何一家。摘要只透過一個很小的介面（`LlmProvider`：把 JSON schema 填好），內建兩種：
 
-## 花多少錢、資料去哪裡
+| `DRIFTNET_LLM_PROVIDER` | 涵蓋 |
+|---|---|
+| `anthropic` | Claude（官方 SDK） |
+| `openai` | 所有相容 OpenAI 格式的服務：OpenAI、Gemini、Grok、DeepSeek、OpenRouter、LiteLLM、**Ollama／LM Studio（完全本機）** |
+| *（不填）* | 不用模型：照樣擷取、用 Jev 判斷（有設的話）、去重、列出 |
 
-每次付費呼叫（判斷或摘要，失敗的也算）都會記帳。網頁的 **Cost** 分頁按月、步驟、模型列出花費，
-每則平均成本，以及快取幫你省下多少次重複分享。數字是依牌價估算，實際以供應商帳單為準。
+所有供應商共用 `DRIFTNET_LLM_MODEL`、`DRIFTNET_LLM_API_KEY`、`DRIFTNET_LLM_BASE_URL` 三個變數。
+driftnet **刻意不讀** `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`：這些變數一旦 export，會改變機器上其他工具的計費方式
+（例如 Claude Code 會從訂閱改走 API 計費）。不論哪家，回覆都會照 schema 驗證，不守格式的模型也存不進壞資料。
+
+## 資料去哪裡
 
 > [!IMPORTANT]
-> 「自架」指的是儲存，不是模型。資料庫在你自己的伺服器上；但判斷和摘要時，driftnet 會把連結的
-> **摘錄**（標題、截短的內文、分享時附的聊天文字）送到 **TypeSafe**（有設 `TYPESAFE_API_KEY` 時，Jev）
-> 和 **Anthropic**（有設 `DRIFTNET_ANTHROPIC_API_KEY` 時），適用各家 API 條款。沒有連結的聊天訊息
-> 不會被處理或儲存。設 `DRIFTNET_JUDGE=off`／`DRIFTNET_SUMMARIZER=off` 就不會送任何內容給模型供應商，只做擷取和列表。
+> 「自架」指的是儲存。資料庫在你自己的伺服器上；但判斷和摘要時，driftnet 會把連結的**摘錄**
+> （標題、截短的內文、分享時附的聊天文字）送到 **TypeSafe**（有設 `TYPESAFE_API_KEY` 時，Jev）和
+> **你選的模型供應商**，適用各家 API 條款。沒有連結的聊天訊息不會被處理或儲存。
+> `openai` 供應商指向 Ollama、並關掉 Jev（`DRIFTNET_JUDGE=off`），就能全部留在自己的機器上。
 
 ## 待辦（歡迎貢獻）
 

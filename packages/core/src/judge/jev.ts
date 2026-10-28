@@ -2,8 +2,6 @@ import { WORTH, type Digest, type Kind } from "../types.ts";
 import { judgeState, WORTH_CRITERIA, type Judge, type JudgeResult } from "./index.ts";
 
 const ENDPOINT = process.env.TYPESAFE_ENDPOINT ?? "https://api.typesafe.ai/v1/systemone";
-/** Jev input price, USD per token ($0.042 / 1M). */
-const INPUT_PRICE = 0.042 / 1_000_000;
 
 const KINDS: Record<Kind, string> = {
   repo: "A source code repository",
@@ -51,16 +49,12 @@ export class JevJudge implements Judge {
         console.warn(`[driftnet] jev HTTP ${res.status}, falling back`);
         return null;
       }
-      const data = (await res.json()) as {
-        answers: Record<string, JevAnswer>;
-        usage?: { input_tokens?: number };
-      };
+      const data = (await res.json()) as { answers: Record<string, JevAnswer> };
       const a = data.answers;
       if (a.ai_tool?.type !== "noul" || a.category?.type !== "choice" || a.kind?.type !== "choice" || a.worth?.type !== "score") {
         return null;
       }
       const worthIdx = Math.max(0, Math.min(WORTH.length - 1, Math.round(a.worth.score)));
-      const inputTokens = data.usage?.input_tokens ?? 0;
       return {
         judgement: {
           isAiTool: a.ai_tool.noul,
@@ -70,9 +64,6 @@ export class JevJudge implements Judge {
           engine: "jev",
           confidence: a.category.confidence,
         },
-        model: "jev-latest",
-        inputTokens,
-        costUsd: inputTokens * INPUT_PRICE,
         ...(a.aimed_at_ai?.type === "noul" && a.aimed_at_ai.noul >= 0.7 ? { flags: ["injection"] } : {}),
       };
     } catch (err) {

@@ -35,7 +35,7 @@ each step, and most links never reach the expensive one:
 | 3. Guard | Strip hidden Unicode, flag prompt injection | $0 |
 | 4. Reputation | Publishers the community keeps voting down are stored but not summarised | $0 |
 | 5. Judge | [Jev](https://console.typesafe.ai) answers category / kind / worth / injection as typed choices, ~100 ms | **~$0.00006** |
-| 6. Summarise | One small structured call (Claude Haiku), only for items worth reading | ~$0.0003 (est.) |
+| 6. Summarise | One structured call to the model **you** choose, only for items worth reading | a small model is plenty |
 
 Measured on five real Facebook reels: judging all five cost **$0.00029**. One that was nothing but
 a one-line caption was judged `skip` and would never have been summarised.
@@ -82,48 +82,43 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
 pnpm install
-cp .env.example .env   # add DRIFTNET_ANTHROPIC_API_KEY, and the chat platforms you use
+cp .env.example .env   # pick a model provider (optional) and the chat platforms you use
 pnpm dev               # http://localhost:8787
 ```
 
 Requires Node.js 22.13+ (uses the built-in `node:sqlite`).
 
-> [!NOTE]
-> The key variable is `DRIFTNET_ANTHROPIC_API_KEY`, not `ANTHROPIC_API_KEY`. If you export the
-> latter, Claude Code picks it up and switches from your subscription to API billing.
+### Bring any model
 
-The startup line shows which models are actually in effect
-(`judge=jev  summarizer=claude-haiku-5-5 / low`). Override with `DRIFTNET_SUMMARY_MODEL` and
-`DRIFTNET_SUMMARY_EFFORT`; a mistyped effort falls back to `low` with a warning instead of
-silently breaking every summary.
+driftnet is not tied to a vendor. Summaries go through one small interface (`LlmProvider`: fill
+in a JSON schema), with two adapters built in:
 
-## What it costs, and where your data goes
+| `DRIFTNET_LLM_PROVIDER` | Covers |
+|---|---|
+| `anthropic` | Claude, via the official SDK |
+| `openai` | Anything OpenAI-compatible: OpenAI, Gemini, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio (fully local)** |
+| *(empty)* | No model: links are still extracted, judged by Jev if configured, deduplicated and listed |
 
-Every paid call (judge or summary, failed ones included) is logged. The **Cost** tab on the web
-page shows spend per month, step and model, the average per item, and how many repeat shares
-the cache served for free. Figures are estimates from list prices; your provider's bill is
-authoritative.
+Every provider uses the same three variables: `DRIFTNET_LLM_MODEL`, `DRIFTNET_LLM_API_KEY`,
+`DRIFTNET_LLM_BASE_URL`. driftnet never reads `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`: exporting
+those changes how other tools on your machine bill you (Claude Code, for example, switches from
+your subscription to API billing). Replies are validated against the schema whatever the
+provider, so a model that ignores structured output cannot store malformed data.
+
+## Where your data goes
 
 > [!IMPORTANT]
-> "Self-hosted" describes storage, not the models. The database lives on your server. But to
-> judge and summarise a link, driftnet sends a **digest** of it (title, a clipped excerpt, the
-> chat note it was shared with) to **TypeSafe** (Jev, if `TYPESAFE_API_KEY` is set) and to
-> **Anthropic** (if `DRIFTNET_ANTHROPIC_API_KEY` is set), under their API terms. Chat messages
-> without a link are never processed or stored. Set `DRIFTNET_JUDGE=off` /
-> `DRIFTNET_SUMMARIZER=off` and nothing goes to a model provider; items are then only extracted and listed.
-
-| Platform | Needs | Public URL? |
-|---|---|---|
-| Telegram | `TELEGRAM_BOT_TOKEN`; disable privacy mode for groups | No (long polling) |
-| Discord | `DISCORD_BOT_TOKEN`; enable the Message Content intent | No (gateway) |
-| LINE | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`; webhook `/webhooks/line` | Yes |
-| Slack | `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`; events URL `/webhooks/slack` | Yes |
-| Anything else | `POST /api/chat {"text": "…"}` returns the reply text | — |
+> "Self-hosted" describes storage. The database lives on your server, but to judge and summarise
+> a link driftnet sends a **digest** of it (title, a clipped excerpt, the chat note it was shared
+> with) to **TypeSafe** (Jev, if `TYPESAFE_API_KEY` is set) and to **your chosen model provider**,
+> under their API terms. Chat messages without a link are never processed or stored. Point the
+> `openai` provider at Ollama and turn Jev off (`DRIFTNET_JUDGE=off`) to keep everything on your
+> own machine.
 
 ## Layout
 
 ```
-packages/core     pipeline, extractors, judge (Jev), summariser (Claude), guard, store (SQLite)
+packages/core     pipeline, extractors, judge (Jev), summariser + model adapters, guard, store (SQLite)
 apps/server       HTTP API, web page, MCP, chat adapters
 skills/driftnet   Agent Skill for any skills-capable agent
 ```
@@ -141,8 +136,8 @@ Found by running driftnet on real shared links:
 - [ ] **Links in comments.** "Link in the first comment" is everywhere.
 - [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, reaction-based voting.
 - [ ] **Weekly digest** posted back to the chat.
-- [ ] **More judges and models.** The `Judge` interface takes any typed classifier; the
-      summariser is one class.
+- [ ] **More judges and model adapters.** `Judge` takes any typed classifier; `LlmProvider`
+      takes any model that can fill a JSON schema (Gemini native, Bedrock, Vertex…).
 
 ## License
 

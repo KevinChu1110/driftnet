@@ -4,7 +4,7 @@ import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
 import type { Summarizer } from "./summarize.ts";
-import type { Digest, IngestResult, Judgement, ShareContext, Usage } from "./types.ts";
+import type { Digest, IngestResult, Judgement, ShareContext } from "./types.ts";
 import { extractUrls, hostOf } from "./url.ts";
 
 export interface PipelineOptions {
@@ -41,12 +41,11 @@ export class Pipeline {
 
   async ingest(url: string, ctx: ShareContext, depth = 0): Promise<IngestResult> {
     const { store } = this.opts;
-    const usage: Usage = { judgeInputTokens: 0, llmInputTokens: 0, llmCachedTokens: 0, llmOutputTokens: 0, costUsd: 0 };
 
     const hit = store.findByUrl(url);
     if (hit) {
       store.recordShare(hit.id, ctx);
-      return { item: store.get(hit.id)!, cached: true, usage };
+      return { item: store.get(hit.id)!, cached: true };
     }
 
     let digest = await extract(url);
@@ -58,10 +57,10 @@ export class Pipeline {
       const item = store.upsert({
         url: known.url, aliases: [url], title: known.title,
         judgement: { ...known, engine: known.judgeEngine, confidence: 1 },
-        summary: known.summary, costUsd: 0, flags: known.flags, source: known.source,
+        summary: known.summary, flags: known.flags, source: known.source,
       });
       store.recordShare(item.id, ctx);
-      return { item: store.get(item.id)!, cached: true, usage };
+      return { item: store.get(item.id)!, cached: true };
     }
 
     const cleaned = guard(digest.text);
@@ -79,11 +78,6 @@ export class Pipeline {
     if (judged?.flags) flags.push(...judged.flags.filter((f) => !flags.includes(f)));
     // Low confidence → let the LLM classify instead, unless there is no LLM to ask.
     const trusted = judged && (judged.judgement.confidence >= (this.opts.minConfidence ?? 0.4) || !this.opts.summarizer);
-    if (judged) {
-      usage.judgeInputTokens += judged.inputTokens;
-      usage.costUsd += judged.costUsd;
-      store.logUsage({ step: "judge", model: judged.model, url: digest.url, inputTokens: judged.inputTokens, costUsd: judged.costUsd });
-    }
     if (judged && trusted) {
       judgement = judged.judgement;
     }
@@ -94,27 +88,19 @@ export class Pipeline {
       const r = await this.opts.summarizer.summarize(
         digest, cleanedNote.text, judgement ? undefined : this.opts.categories,
       );
-      store.logUsage({
-        step: "summary", model: r.model, url: digest.url, inputTokens: r.inputTokens, cachedTokens: r.cachedTokens,
-        outputTokens: r.outputTokens, costUsd: r.costUsd, ok: !r.error,
-      });
       summary = r.summary;
       judgement ??= r.judgement ?? null;
-      usage.llmInputTokens += r.inputTokens;
-      usage.llmCachedTokens += r.cachedTokens;
-      usage.llmOutputTokens += r.outputTokens;
-      usage.costUsd += r.costUsd;
     }
 
     judgement ??= heuristicJudgement(digest, distrusted || flags.includes("injection"));
 
     const item = store.upsert({
       url: digest.url, aliases: [url], title: summary?.name ?? digest.title, judgement, summary,
-      costUsd: usage.costUsd, flags, source,
+      flags, source,
     });
     store.recordShare(item.id, ctx);
     const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
-    return { item: store.get(item.id)!, cached: false, usage, ...(related.length ? { related } : {}) };
+    return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
   }
 
   /** Named open-source projects without a link → look them up on GitHub and catalogue them too. */

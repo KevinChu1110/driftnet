@@ -50,7 +50,6 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
     if (req.method === "GET" && path === "/api/stats") return send(res, 200, { ...dn.store.stats(), engines: dn.engines });
-    if (req.method === "GET" && path === "/api/usage") return send(res, 200, { ...dn.store.usageReport(), engines: dn.engines });
 
     if (req.method === "GET" && path === "/api/items") {
       const p = url.searchParams;
