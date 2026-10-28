@@ -9,6 +9,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
+[![CI](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml)
 [![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
 ![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
 ![Runs locally](https://img.shields.io/badge/runs-locally-0f9f8f.svg)
