@@ -152,10 +152,10 @@
   .bar .spacer { flex: 1; }
   dialog.wide { width: min(720px, calc(100vw - 32px)); }
   #nd-body { min-height: 40vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
-  body.compact .card ul, body.compact .said, body.compact .card .found { display: none; }
+  body.compact .card .demo, body.compact .card .thumb { display: none; }
   body.compact .card { padding-top: 10px; padding-bottom: 10px; }
   body.compact .card p { margin: 2px 0; }
-  body.hide-tags .meta .tags, body.hide-said .said { display: none; }
+  body.hide-tags .tags, body.hide-said .said { display: none; }
   .set-group { border: 0; padding: 0; margin: 0 0 16px; }
   .set-group legend { font-weight: 650; font-size: 14px; margin-bottom: 8px; padding: 0; }
   .set-row { display: grid; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
@@ -283,10 +283,6 @@
   @media (max-width: 720px) { #palette-btn { display: none; } }
   .map-wrap { user-select: none; -webkit-user-select: none; }
   .mghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -130%) rotate(-2deg); opacity: .95; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
-  .peek h3 { margin: 0 0 8px; font-size: 18px; }
-  .peek ul { color: var(--muted); padding-left: 20px; }
-  .peek-actions { flex-wrap: wrap; }
-  .peek-actions .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
   .tabs { display: flex; gap: 4px; padding: 3px; background: var(--bg); border-radius: 12px; margin-bottom: 14px; position: sticky; top: 0; z-index: 1; }
   .tabs button { flex: 1; border: 0; background: none; border-radius: 9px; padding: 8px 6px; min-height: 40px; cursor: pointer; color: var(--muted); font-weight: 600; }
   .tabs button[aria-selected="true"] { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
@@ -300,7 +296,6 @@
   .meta .link-btn { min-height: 32px; }
   .tags { white-space: normal; } .tags .tag { white-space: nowrap; }
   .btn:disabled, .btn[disabled] { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
-  @media (max-width: 720px) { .peek-actions { display: grid; grid-template-columns: 1fr 1fr; } .peek-actions .spacer { display: none; } }
   .set-row .envname { font-family: ui-monospace, Menlo, monospace; font-size: 11px; opacity: .6; }
   dialog::backdrop { backdrop-filter: blur(3px); }
   .act span { display: inline-flex; align-items: center; gap: 6px; }
@@ -478,6 +473,67 @@
     .tools { position: static; justify-content: flex-end; margin: 4px -6px -8px 0; }
     .card ul { padding-left: 18px; }
   }
+  /* Card list: a thumbnail, the name, the one-liner and what you would see. Everything else lives in the modal. */
+  .card { cursor: pointer; }
+  .crow { display: flex; gap: 14px; align-items: flex-start; }
+  .cbody { flex: 1; min-width: 0; }
+  .thumb { position: relative; flex: 0 0 132px; height: 88px; border-radius: 10px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .play, .g-slide .play { position: absolute; inset: 0; margin: auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(0,0,0,.6); color: #fff; font-size: 14px; pointer-events: none; }
+  .card p.demo { color: var(--muted); font-size: 14px; margin: 2px 0 4px; }
+  .meta .has-note { display: inline-flex; color: var(--accent); }
+  .meta .has-note .ico { width: 14px; height: 14px; }
+  /* The detail modal: gallery, the story, the actions. A full-screen sheet on a phone. */
+  dialog.mdl { padding: 0; width: min(760px, calc(100vw - 32px)); max-height: min(92vh, 900px); overflow: hidden; }
+  dialog.mdl[open] { display: flex; flex-direction: column; }
+  .md-top { display: flex; align-items: center; gap: 4px; padding: 8px 10px 4px 16px; touch-action: none; flex: none; }
+  .md-handle { display: none; }
+  .md-top .md-pos { color: var(--muted); font-size: 13px; margin-right: auto; }
+  .md-top .tool { width: 40px; height: 40px; font-size: 22px; }
+  .md-top .tool .ico { width: 20px; height: 20px; }
+  .md-top .prev .ico { transform: rotate(180deg); }
+  .md-scroll { overflow: auto; padding: 0 18px 12px; flex: 1; min-height: 0; overscroll-behavior: contain; }
+  .md-scroll h3 { margin: 12px 0 6px; font-size: 21px; letter-spacing: -.01em; }
+  .md-scroll h3 a { color: var(--text); text-decoration: none; }
+  .md-scroll h3 a:hover { color: var(--accent); }
+  .md-sub { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .md-one { margin: 0 0 6px; font-size: 16px; }
+  .md-sec { margin: 14px 0; }
+  .md-sec h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .md-sec p { margin: 4px 0; font-size: 15px; }
+  .md-sec ul { margin: 4px 0; padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+  .md-sec.demo p { font-size: 16px; }
+  .md-try { position: relative; }
+  .md-try pre { margin: 0; padding: 10px 70px 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: auto; font-size: 13px; user-select: text; -webkit-user-select: text; }
+  .md-try button { position: absolute; top: 6px; right: 6px; }
+  .md-tags { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); }
+  .md-fine { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 12px; }
+  .md-actions { flex: none; margin: 0; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  .md-actions .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  .md-actions .btn.on { border-color: var(--star); color: var(--star); }
+  .gallery { margin: 4px 0 0; }
+  .g-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); overscroll-behavior-x: contain; }
+  .g-track::-webkit-scrollbar { display: none; }
+  .g-slide { position: relative; flex: 0 0 100%; scroll-snap-align: center; aspect-ratio: 16 / 9; max-height: 46vh; display: grid; place-items: center; }
+  .g-slide a { display: block; width: 100%; height: 100%; }
+  .g-slide img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .g-slide .play { width: 56px; height: 56px; font-size: 22px; }
+  .g-thumbs { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .g-th { flex: 0 0 72px; height: 48px; padding: 0; border-radius: 8px; overflow: hidden; border: 2px solid transparent; background: var(--bg); cursor: pointer; opacity: .7; }
+  .g-th.on { border-color: var(--accent); opacity: 1; }
+  .g-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  @media (max-width: 720px) {
+    .thumb { flex-basis: 96px; height: 72px; }
+    .crow { gap: 10px; }
+    dialog.mdl { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; transition: transform .2s ease; }
+    .md-handle { display: block; position: absolute; left: 50%; top: 6px; width: 40px; height: 4px; margin-left: -20px; border-radius: 4px; background: var(--line); }
+    .md-top { padding-top: 14px; }
+    .md-actions { display: grid; grid-template-columns: 1fr 1fr; }
+    .md-actions .spacer { display: none; }
+    .g-slide { max-height: 36vh; }
+  }
+  @media (prefers-reduced-motion: reduce) { dialog.mdl { transition: none; } }
   @media (prefers-reduced-motion: reduce) { .card, .swipe, .toast, nav, .scrim, nav .twist, .mnode, .mnode .tw, .tool { transition: none !important; } }
 </style>
 </head>
@@ -563,15 +619,14 @@
       <button class="btn" id="st-cancel" type="button"></button><button class="btn primary" id="st-save" type="submit"></button></div>
   </form>
 </dialog>
-<dialog id="peek-dlg" class="peek">
-  <div id="pk-body"></div>
-  <div class="dlg-actions peek-actions">
-    <a class="btn primary" id="pk-open" target="_blank" rel="noopener noreferrer"></a>
-    <button class="btn" type="button" id="pk-move"></button>
-    <button class="btn" type="button" id="pk-refresh"></button>
-    <button class="btn" type="button" id="pk-list"></button>
-    <span class="spacer"></span><button class="btn" type="button" id="pk-close"></button>
-  </div>
+<dialog id="item-dlg" class="mdl" aria-labelledby="md-title">
+  <div class="md-top" id="md-grab"><span class="md-handle" aria-hidden="true"></span>
+    <span class="md-pos" id="md-pos" aria-live="polite"></span>
+    <button class="tool prev" type="button" data-md="prev" id="md-prev"></button>
+    <button class="tool next" type="button" data-md="next" id="md-next"></button>
+    <button class="tool" type="button" data-md="close" id="md-close">×</button></div>
+  <div class="md-scroll" id="md-scroll"></div>
+  <div class="dlg-actions md-actions" id="md-actions"></div>
 </dialog>
 <dialog id="login-dlg" aria-labelledby="lg-title">
   <form id="login-form" method="dialog">
@@ -660,7 +715,7 @@
       a11yFolder: (n, c) => `Folder ${n}, ${c} cards`, a11yCard: (n) => `Card ${n}`,
       expandAll: "Expand all", collapseAll: "Collapse all", zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", openCard: "Open card",
       layoutBoth: "Both sides", layoutRight: "Right side", layoutHelp: "Switch between branches on both sides (XMind) and all to the right",
-      zoom: "Zoom", gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", showInList: "Show in the list", close: "Close",
+      zoom: "Zoom", gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", mdDemo: "What you'll see", mdWhy: "Why it's here", mdHighlights: "Highlights", mdUse: "Good for", mdTry: "Try it", mdCopy: "Copy", mdCopied: "Copied", mdPrev: "Previous card", mdNext: "Next card", mdPos: (n, m) => `${n} of ${m}`, mdSlide: (n, m) => `Picture ${n} of ${m}`, mdPlay: "Play the video", mdPictures: "Pictures", mdTags: "Tags", mdHasNote: "Has your note", showInList: "Show in the list", close: "Close",
       needPassword: "Changing things needs the admin password.",
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
@@ -794,7 +849,7 @@
       a11yFolder: (n, c) => `資料夾 ${n}，${c} 張卡片`, a11yCard: (n) => `卡片 ${n}`,
       expandAll: "全部展開", collapseAll: "全部收合", zoomIn: "放大", zoomOut: "縮小", fit: "符合畫面", openCard: "開啟卡片",
       layoutBoth: "兩側展開", layoutRight: "往右展開", layoutHelp: "切換：分支分佈在兩側（XMind 預設）或全部往右",
-      zoom: "縮放", gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", showInList: "在清單中查看", close: "關閉",
+      zoom: "縮放", gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", mdDemo: "你會看到什麼", mdWhy: "為什麼收進來", mdHighlights: "重點", mdUse: "適合用在", mdTry: "試試看", mdCopy: "複製", mdCopied: "已複製", mdPrev: "上一張卡片", mdNext: "下一張卡片", mdPos: (n, m) => `第 ${n} / ${m} 張`, mdSlide: (n, m) => `第 ${n} 張圖，共 ${m} 張`, mdPlay: "播放影片", mdPictures: "圖片", mdTags: "標籤", mdHasNote: "有你的筆記", showInList: "在清單中查看", close: "關閉",
       needPassword: "要修改需要管理密碼。",
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
@@ -2256,47 +2311,186 @@
   // A long press on a phone must not open the system menu over the map.
   $("list").addEventListener("contextmenu", (e) => { if (e.target.closest(".mnode")) e.preventDefault(); });
 
-  /** A card from the map, without leaving the map. */
-  let peeking = null;
-  function openPeek(id) {
-    const i = mapItems.find((x) => x.id === id) ?? find(id);
-    if (!i) return;
-    peeking = id;
-    const t = T(), s = i.summary;
-    $("pk-body").innerHTML = `<h3>${esc(s?.name ?? i.title)}</h3>
-      <p><span class="badge folder" style="--c:${folderColor(i.category)}">${esc(folderPath(i.category))}</span>
-        <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span></p>
-      ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
-      ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-      ${i.note ? `<div class="mynote">${ic("note")}<span>${esc(i.note)}</span></div>` : ""}`;
-    $("pk-open").href = safeUrl(s?.primaryUrl || i.url);
-    $("pk-open").innerHTML = `${ic("link")} ${esc(t.openLink)}`;
-    $("pk-move").innerHTML = `${ic("move")} ${esc(t.moveTo)}`;
-    $("pk-move").hidden = role !== "admin";
-    paintPeekRefresh();
-    $("pk-list").innerHTML = `${ic("list")} ${esc(t.showInList)}`;
-    $("pk-close").textContent = t.close;
-    $("pk-close").hidden = matchMedia("(max-width: 720px)").matches;   // tap outside closes it on a phone
-    $("peek-dlg").showModal();
-  }
-  $("pk-close").onclick = () => $("peek-dlg").close();
+  /** A card from the map, without leaving the map: the same modal the list uses. */
+  const openPeek = (id) => openModal(id, "map");
   $("pick-cancel").onclick = () => dropPicked();
-  $("peek-dlg").addEventListener("click", (e) => { if (e.target === $("peek-dlg")) $("peek-dlg").close(); });
-  const paintPeekRefresh = () => {
-    const b = $("pk-refresh"), busy = refreshing.has(peeking);
-    b.innerHTML = `${ic("refresh")} ${esc(T().refresh)}`;
-    b.hidden = role !== "admin" || state.view === "trash";
-    b.classList.toggle("spin", busy);
-    b.disabled = busy;
-  };
-  $("pk-refresh").onclick = () => refreshItem(peeking);
-  $("pk-move").onclick = () => { $("peek-dlg").close(); openMovePicker(peeking); };
-  $("pk-list").onclick = () => {
-    $("peek-dlg").close();
-    Object.assign(state, { view: "all", category: "", kind: "" });
-    history.replaceState(null, "", `#item-${peeking}`);
-    load();
-  };
+
+  // ── The detail modal (one implementation for the list and the map) ───────
+  const mdlDlg = $("item-dlg");
+  let modalId = null, modalFrom = "list", keepHash = false;
+  /** Cards ←/→ step through: what the list shows now (nothing when opened from the map). */
+  const mdIds = () => modalFrom === "list" ? [...$("list").querySelectorAll(".swipe")].map((e) => Number(e.dataset.id)) : [];
+  const mediaOf = (i) => (Array.isArray(i.media) ? i.media : []).filter((m) => m && typeof m.src === "string" && m.src.startsWith("/"));
+  function galleryHtml(i) {
+    const m = mediaOf(i), t = T(), name = i.summary?.name ?? i.title;
+    if (!m.length) return "";
+    const url = safeUrl(i.summary?.primaryUrl || i.url);
+    const img = (x, extra = "") => `<img src="${esc(x.src)}" alt="${esc(extra === "t" ? "" : x.alt || name)}" referrerpolicy="no-referrer" loading="lazy" decoding="async" draggable="false" data-media>`;
+    const slide = (x, n) => `<div class="g-slide" role="group" aria-roledescription="slide" aria-label="${esc(t.mdSlide(n + 1, m.length))}">${
+      x.kind === "video" ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(t.mdPlay)}">${img(x)}<span class="play" aria-hidden="true">▶</span></a>` : img(x)}</div>`;
+    return `<div class="gallery"><div class="g-track" id="g-track" tabindex="0" role="region" aria-label="${esc(t.mdPictures)}">${m.map(slide).join("")}</div>${
+      m.length > 1 ? `<div class="g-thumbs">${m.map((x, n) => `<button type="button" class="g-th ${n ? "" : "on"}" data-g="${n}" aria-label="${esc(t.mdSlide(n + 1, m.length))}">${img(x, "t")}</button>`).join("")}</div>` : ""}</div>`;
+  }
+  function paintModal() {
+    const i = find(modalId);
+    if (!i) return void (mdlDlg.open && mdlDlg.close());
+    const t = T(), s = i.summary, admin = role === "admin", inTrash = state.view === "trash";
+    const url = safeUrl(s?.primaryUrl || i.url), name = s?.name ?? i.title;
+    const ids = mdIds(), at = ids.indexOf(i.id);
+    $("md-pos").textContent = at >= 0 ? t.mdPos(at + 1, ids.length) : "";
+    for (const [id, label, off] of [["md-prev", t.mdPrev, at <= 0], ["md-next", t.mdNext, at < 0 || at >= ids.length - 1]]) {
+      const b = $(id); b.innerHTML = ic("chev"); b.setAttribute("aria-label", label); b.title = label; b.hidden = at < 0; b.disabled = off;
+    }
+    $("md-close").setAttribute("aria-label", t.close); $("md-close").title = t.close;
+    const list = (arr) => `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+    const sec = (cls, title, body) => body ? `<section class="md-sec ${cls}"><h4>${esc(title)}</h4>${body}</section>` : "";
+    const why = [s?.why ? `<p>${esc(s.why)}</p>` : "",
+      ...(i.said ?? []).map((x) => `<div class="said">${ic("chat")}<span>${esc(x)}</span></div>`),
+      i.note ? `<div class="mynote">${ic("note")}<span>${esc(i.note)}</span></div>` : ""].join("");
+    $("md-scroll").innerHTML = `${galleryHtml(i)}
+      <h3 id="md-title"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(name)}</a></h3>
+      <p class="md-sub"><span class="badge folder" style="--c:${folderColor(i.category)}">${esc(folderPath(i.category))}</span>
+        <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span>
+        <span>#${i.id} · ${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span></p>
+      ${s?.oneLiner ? `<p class="md-one">${esc(s.oneLiner)}</p>` : ""}
+      ${sec("demo", t.mdDemo, s?.demo ? `<p>${esc(s.demo)}</p>` : "")}
+      ${sec("why", t.mdWhy, why)}
+      ${sec("hl", t.mdHighlights, s?.highlights?.length ? list(s.highlights) : "")}
+      ${sec("uc", t.mdUse, s?.useCases?.length ? list(s.useCases) : "")}
+      ${sec("try", t.mdTry, s?.tryIt ? `<div class="md-try"><pre><code>${esc(s.tryIt)}</code></pre><button class="btn" type="button" data-md="copy">${esc(t.mdCopy)}</button></div>` : "")}
+      ${sec("tags", t.mdTags, s?.tags?.length ? `<div class="md-tags tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</div>` : "")}
+      ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}" data-open="${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
+      ${i.flags?.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
+      <div class="md-fine">${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}<span>${esc(i.createdAt.slice(0, 10))}</span>${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}</div>`;
+    const busy = refreshing.has(i.id);
+    const btn = (act, icon, label, extra = "") => `<button class="btn ${extra}" type="button" data-md="${act}">${ic(icon)} ${esc(label)}</button>`;
+    $("md-actions").innerHTML = `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ic("link")} ${esc(t.openLink)}</a>` +
+      (admin ? (inTrash ? btn("restore", "undo", t.restore)
+        : btn("favorite", "star", i.favorite ? t.unfavorite : t.favorite, i.favorite ? "on" : "") + btn("move", "move", t.moveTo) +
+          `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refresh)}</button>` +
+          btn("note", "note", i.note ? t.editNote : t.addNote) + btn("trash", "trash", t.remove)) : "") +
+      (modalFrom === "map" ? btn("list", "list", t.showInList) : "");
+  }
+  function openModal(id, from = "list") {
+    if (!find(id)) return;
+    const wasOpen = mdlDlg.open;
+    modalId = id; modalFrom = from;
+    paintModal();
+    if (!wasOpen) mdlDlg.showModal();
+    $("md-scroll").scrollTop = 0;
+    mdlDlg.style.transform = "";
+    history.replaceState(null, "", `${location.pathname}${location.search}#item-${id}`);
+  }
+  /** Step to the previous / next card in the list the modal came from. */
+  function stepModal(d) {
+    const ids = mdIds(), at = ids.indexOf(modalId), to = ids[at + d];
+    if (at < 0 || to == null) return;
+    openModal(to, modalFrom);
+  }
+  mdlDlg.addEventListener("close", () => {
+    const id = modalId, from = modalFrom;
+    if (!keepHash && /^#item-\d+$/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
+    keepHash = false;
+    mdlDlg.style.transform = "";
+    // Focus goes back to the card you ended on (the one you opened, or the last one you stepped to).
+    setTimeout(() => {
+      const c = from === "list" && !document.querySelector("dialog[open]") ? document.querySelector(`#item-${id} .card`) : null;
+      if (c) { c.focus({ preventScroll: true }); c.scrollIntoView({ block: "nearest" }); }
+    }, 0);
+  });
+  mdlDlg.addEventListener("click", async (e) => {
+    if (e.target === mdlDlg) return mdlDlg.close();   // the backdrop
+    const open = e.target.closest("a[data-open]");
+    if (open) { e.preventDefault(); const to = Number(open.dataset.open); if (find(to)) openModal(to, modalFrom); else { mdlDlg.close(); jumpTo(to); } return; }
+    const g = e.target.closest("[data-g]");
+    if (g) { const tr = $("g-track"); tr.scrollTo({ left: Number(g.dataset.g) * tr.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); return; }
+    const b = e.target.closest("[data-md]");
+    if (!b || b.disabled) return;
+    const id = modalId, item = find(id), el = document.getElementById(`item-${id}`), act1 = b.dataset.md;
+    if (act1 === "close") return mdlDlg.close();
+    if (act1 === "prev") return stepModal(-1);
+    if (act1 === "next") return stepModal(1);
+    if (act1 === "copy") {
+      await navigator.clipboard?.writeText(item?.summary?.tryIt ?? "").catch(() => {});
+      b.textContent = T().mdCopied; setTimeout(() => { if (b.isConnected) b.textContent = T().mdCopy; }, 1500);
+      return;
+    }
+    if (!item) return;
+    if (act1 === "list") {
+      keepHash = true; mdlDlg.close();
+      Object.assign(state, { view: "all", category: "", kind: "" });
+      history.replaceState(null, "", `#item-${id}`);
+      return load();
+    }
+    if (act1 === "move") { mdlDlg.close(); return openMovePicker(id); }
+    if (act1 === "refresh") return refreshItem(id);
+    if (act1 === "note") return openItemNote(id);
+    if (act1 === "favorite") {
+      if (el) await run(el, "favorite");
+      else { const on = !item.favorite; if (await act(id, on ? "favorite" : "unfavorite")) { item.favorite = on; refreshCounts(); if (mapShown()) drawMap(); } }
+      return paintModal();
+    }
+    if (act1 === "trash" || act1 === "restore") {
+      mdlDlg.close();
+      if (el) return run(el, act1);
+      if (!(await act(id, act1))) return;
+      toast(act1 === "trash" ? T().removed(nameOf(item)) : T().restored(nameOf(item)), async () => { await act(id, act1 === "trash" ? "restore" : "trash"); load(); });
+      return load();
+    }
+  });
+  // ←/→ step through the list; the gallery follows its scroll position.
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !mdlDlg.open || !["ArrowLeft", "ArrowRight", "Escape"].includes(e.key)) return;
+    if (document.querySelectorAll("dialog[open]").length > 1) return;   // a picker or note on top keeps its own keys
+    e.preventDefault();
+    if (e.key === "Escape") mdlDlg.close(); else stepModal(e.key === "ArrowLeft" ? -1 : 1);
+  });
+  mdlDlg.addEventListener("scroll", (e) => {
+    const tr = e.target;
+    if (tr?.id !== "g-track") return;
+    const n = Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+    for (const b of mdlDlg.querySelectorAll(".g-th")) b.classList.toggle("on", Number(b.dataset.g) === n);
+  }, true);
+  // A phone: pull the sheet down from its top bar to close it.
+  {
+    let y0 = null, dy = 0;
+    const grab = $("md-grab");
+    grab.addEventListener("touchstart", (e) => { if (e.target.closest("button")) return; y0 = e.touches[0].clientY; dy = 0; mdlDlg.style.transition = "none"; }, { passive: true });
+    grab.addEventListener("touchmove", (e) => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); mdlDlg.style.transform = `translateY(${dy}px)`; }, { passive: true });
+    const end = () => { if (y0 == null) return; y0 = null; mdlDlg.style.transition = ""; if (dy > 90) mdlDlg.close(); else mdlDlg.style.transform = ""; };
+    grab.addEventListener("touchend", end); grab.addEventListener("touchcancel", end);
+  }
+  // A picture that fails to load (a dead link, a missing proxy file) is dropped rather than shown broken.
+  document.addEventListener("error", (e) => {
+    const img = e.target;
+    if (img?.tagName !== "IMG" || !img.hasAttribute("data-media")) return;
+    const th = img.closest(".thumb");
+    if (th) return th.remove();
+    const gal = img.closest(".gallery");
+    if (!gal) return;
+    const slides = [...gal.querySelectorAll(".g-slide")], btns = [...gal.querySelectorAll(".g-th")];
+    const n = img.closest(".g-th") ? btns.indexOf(img.closest(".g-th")) : slides.indexOf(img.closest(".g-slide"));
+    slides[n]?.remove(); btns[n]?.remove();
+    if (!gal.querySelector(".g-slide")) return gal.remove();
+    gal.querySelectorAll(".g-th").forEach((b, k) => { b.dataset.g = k; b.classList.toggle("on", k === 0); });
+    if (gal.querySelectorAll(".g-th").length < 2) gal.querySelector(".g-thumbs")?.remove();
+  }, true);
+  // A GIF in the list shows one still frame until you point at the card (or open it): a list full of moving pictures is noise.
+  document.addEventListener("load", (e) => {
+    const img = e.target;
+    if (img?.tagName !== "IMG" || !img.hasAttribute("data-gif") || img.dataset.anim) return;
+    try {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      const still = c.toDataURL("image/png");
+      img.dataset.anim = img.src; img.src = still;
+    } catch { /* leave it moving rather than blank */ }
+  }, true);
+  let hot = null;
+  const playGif = (card, on) => { const im = card?.querySelector("img[data-gif]"); if (im?.dataset.anim) { if (on) { im.dataset.still ??= im.src; im.src = im.dataset.anim; } else if (im.dataset.still) im.src = im.dataset.still; } };
+  $("list").addEventListener("mouseover", (e) => { const c = e.target.closest?.(".card"); if (c === hot) return; playGif(hot, false); hot = c; playGif(hot, true); });
+  $("list").addEventListener("mouseleave", () => { playGif(hot, false); hot = null; });
 
   async function mapWrite(path, method, body) {
     const token = store.get("driftnet-token");
@@ -2490,6 +2684,7 @@
     item.note = saved.note;
     const el = document.getElementById(`item-${noting}`);
     if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${noting}`)); }
+    if (modalId === noting && mdlDlg.open) paintModal();
     setTimeout(restoreFocus, 0);
     toast(T().saved);
   };
@@ -2731,8 +2926,10 @@
         const top = target.getBoundingClientRect().top + scrollY - document.querySelector("header").offsetHeight - ($("crumb").offsetHeight || 0) - 12;
         if (splitOn()) target.scrollIntoView({ block: "center" }); else scrollTo({ top });
         target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
+        if (hashOpen) { hashOpen = false; openModal(Number(location.hash.slice(6)), "list"); }
       }
     }
+    if (mdlDlg.open) paintModal();
   }
 
   function card(i) {
@@ -2752,29 +2949,38 @@
       <div class="act right ${inTrash ? "restore" : ""}"><span>${ic(inTrash ? "undo" : "star", inTrash || i.favorite ? "" : "filled")} ${esc(inTrash ? t.swipeRestore : i.favorite ? t.swipeUnfav : t.swipeFav)}</span></div>
       <div class="act left"><span>${inTrash ? "" : `${esc(t.swipeTrash)} ${ic("trash")}`}</span></div>
       <article class="card" tabindex="0" aria-labelledby="name-${i.id}">
-        <div class="top">
-          <a class="name" id="name-${i.id}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
-          <span class="badge folder" style="--c:${folderColor(i.category)}">${esc(catLabel(i.category))}</span>
-          <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span>
-          ${i.pending ? `<span class="rating">${esc(summaries ? t.pending : t.noModel)}</span>` : ""}
-        </div>
-        ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
-        ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
-        ${(i.said ?? []).slice(0, 2).map((x) => `<div class="said">${ic("chat")}<span>${esc(x)}</span></div>`).join("")}
-        ${i.note ? `<div class="mynote">${ic("note")}<span>${esc(i.note)}</span></div>` : ""}
-        ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
-        ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
-        ${state.view === "inbox" ? inboxChips(i) : ""}
-        <div class="meta">
-          <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
-          <span>${esc(i.createdAt.slice(0, 10))}</span>
-          ${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}
-          ${s?.tags?.length ? `<span class="tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</span>` : ""}
-          ${inTrash ? "" : `<button class="link-btn" type="button" data-act="note">${ic("note")} ${esc(i.note ? t.editNote : t.addNote)}</button>`}
+        <div class="crow">
+          ${thumbHtml(i)}
+          <div class="cbody">
+            <div class="top">
+              <a class="name" id="name-${i.id}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s?.name ?? i.title)}</a>
+              <span class="badge folder" style="--c:${folderColor(i.category)}">${esc(catLabel(i.category))}</span>
+              <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span>
+              ${i.pending ? `<span class="rating">${esc(summaries ? t.pending : t.noModel)}</span>` : ""}
+            </div>
+            ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
+            ${s?.demo ? `<p class="demo">${esc(s.demo)}</p>` : ""}
+            ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
+            ${state.view === "inbox" ? inboxChips(i) : ""}
+            <div class="meta">
+              <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
+              <span>${esc(i.createdAt.slice(0, 10))}</span>
+              ${i.note ? `<span class="has-note" title="${esc(t.mdHasNote)}" role="img" aria-label="${esc(t.mdHasNote)}">${ic("note")}</span>` : ""}
+            </div>
+          </div>
         </div>
         <div class="tools">${tools}</div>
       </article>
     </div>`;
+  }
+  /** The list thumbnail: the first picture, cropped; a card with none (or a broken one) simply has no box. */
+  function thumbHtml(i) {
+    const m = mediaOf(i)[0];
+    if (!m) return "";
+    const gif = m.kind === "gif";
+    return `<div class="thumb">
+      <img src="${esc(m.src)}" alt="${esc(m.alt || i.summary?.name || i.title)}" referrerpolicy="no-referrer" loading="lazy" decoding="async" draggable="false" data-media ${gif ? "data-gif" : ""}>
+      ${m.kind === "video" ? `<span class="play" aria-hidden="true">▶</span>` : ""}</div>`;
   }
 
   /** Inbox: one-tap chips for the card's suggested folders (keys 1–3), and "other folder…" (m). */
@@ -2857,7 +3063,7 @@
     const el = document.getElementById(`item-${id}`), item = find(id);
     if (el && item) { const focus = el.contains(document.activeElement); el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); if (focus) document.querySelector(`#item-${id} [data-act="refresh"]`)?.focus(); }
     if (mapShown()) drawMap();
-    if (peeking === id && $("peek-dlg").open) paintPeekRefresh();
+    if (modalId === id && mdlDlg.open) paintModal();
   }
   async function refreshItem(id) {
     const item = find(id);
@@ -2876,7 +3082,7 @@
     } finally {
       refreshing.delete(id);
       repaintItem(id);
-      if (peeking === id && $("peek-dlg").open) openPeek(id);
+      if (modalId === id && mdlDlg.open) paintModal();
       refreshCounts();
     }
   }
@@ -2981,10 +3187,14 @@
       if (e.shiftKey) selectRange(Number(sw.dataset.id)); else toggleSelect(Number(sw.dataset.id));
       return;
     }
-    const n = e.target.closest('.link-btn[data-act="note"]');
-    if (n) return openItemNote(Number(n.closest(".swipe").dataset.id));
     const b = e.target.closest(".tool");
-    if (!b || b.dataset.grip) return;
+    if (!b) {
+      // The card body (not its name link, chips or buttons) opens the detail modal.
+      const body = e.target.closest(".swipe .card");
+      if (body && !e.target.closest("a, button, .chip, input, summary")) openModal(Number(body.closest(".swipe").dataset.id), "list");
+      return;
+    }
+    if (b.dataset.grip) return;
     if (b.dataset.act === "move") return openMovePicker(Number(b.closest(".swipe").dataset.id));
     if (b.dataset.act === "refresh") return refreshItem(Number(b.closest(".swipe").dataset.id));
     run(b.closest(".swipe"), b.dataset.act);
@@ -2997,6 +3207,8 @@
     const cardEl = grip.closest(".card");
     e.dataTransfer.setDragImage(cardEl, 24, 24);
   });
+  // A shared link (#item-<id>) opens that card's modal once the list is drawn.
+  let hashOpen = /^#item-\d+$/.test(location.hash);
   // A "found in" link to a card outside the current filter: show everything, then jump.
   addEventListener("hashchange", () => {
     if (location.hash.startsWith("#focus=")) {
@@ -3005,7 +3217,9 @@
       else setMapFocus(id);
       return;
     }
-    if (/^#item-\d+$/.test(location.hash) && !document.getElementById(location.hash.slice(1))) {
+    if (/^#item-\d+$/.test(location.hash)) {
+      if (document.getElementById(location.hash.slice(1))) return openModal(Number(location.hash.slice(6)), "list");
+      hashOpen = true;
       Object.assign(state, { view: "all", category: "", kind: "", q: "" });
       $("q").value = "";
       load();
@@ -3372,6 +3586,8 @@
       next.focus(); next.scrollIntoView({ block: "nearest" });
       return;
     }
+    // Enter or o on a focused card opens its detail modal.
+    if ((k === "Enter" || k === "o") && cur && document.activeElement === cur) { e.preventDefault(); openModal(Number(cur.closest(".swipe").dataset.id), "list"); return; }
     if (!cur || role !== "admin") return;
     const swipe = cur.closest(".swipe");
     if (!["f", "#", "Delete", "m", "n"].includes(k)) return;
