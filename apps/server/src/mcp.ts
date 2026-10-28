@@ -38,7 +38,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "Matches the query against names, summaries, tags, URLs, the reader's notes and the chat text a link was shared with; " +
         "an empty query lists the best items. Results are ranked best first (must-see before normal), then most recent, " +
         "and exclude trashed, down-voted and prompt-injection-flagged items. Each item has id, name, url, folder, kind, worth, " +
-        "one_liner, highlights, tags, times shared and date added. Read-only. Use driftnet_recent instead for a time-window feed.",
+        "one_liner, highlights, tags, times shared, date added and page_url (its card on the reader's web page, or null when the server " +
+        "has no public address) — share page_url with your human when they want to look. Read-only. Use driftnet_recent instead for a time-window feed.",
       inputSchema: {
         query: z.string().max(200).optional().describe("Free text, e.g. 'pdf to markdown' or a tool name. Omit to list the best items"),
         category: z.enum(categories).optional().describe(categoryHelp),
@@ -121,7 +122,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "Saving a link that is already catalogued (including share-link and tracking-parameter variants) does not duplicate it: " +
         "it counts one more share and returns the existing item. Links to private or local addresses are refused. " +
         "Without a model, the item comes back without a summary and waits in the queue (see driftnet_pending). " +
-        "Returns the saved item with the same fields as driftnet_search.",
+        "Returns the saved item with the same fields as driftnet_search; send your human its page_url so they can open the card.",
       inputSchema: {
         url: z.string().url().describe("The http(s) link to save, exactly as shared; tracking parameters are stripped automatically"),
         note: z.string().max(1000).optional().describe("Why it is interesting, or the message it was shared with; helps classification"),
@@ -329,6 +330,7 @@ const ITEM = z.object({
   tags: z.array(z.string()),
   shared: z.number(),
   added: z.string(),
+  page_url: z.string().nullable(),
 });
 const ITEMS_OUTPUT = { notice: z.string(), items: z.array(ITEM) };
 
@@ -345,7 +347,14 @@ function row(i: Item): z.infer<typeof ITEM> {
     tags: i.summary?.tags ?? [],
     shared: i.shareCount,
     added: i.createdAt.slice(0, 10),
+    page_url: pageUrl(i.id),
   };
+}
+
+/** The item's card on the web page, when this server has a public address; give it to the human to open. */
+function pageUrl(id: number): string | null {
+  const base = process.env.DRIFTNET_TUNNEL_URL || process.env.DRIFTNET_PUBLIC_URL;
+  return base ? `${base.replace(/\/$/, "")}/#item-${id}` : null;
 }
 
 function itemsResult(items: Item[]) {

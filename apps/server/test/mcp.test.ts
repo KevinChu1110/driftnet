@@ -66,3 +66,17 @@ test("with only the share key, an agent gets the reading tools", async () => {
   for (const t of (await client.listTools()).tools) assert.equal(t.annotations?.readOnlyHint, true);
   await client.close();
 });
+
+test("items carry a link to their card when the server has a public address", async () => {
+  process.env.DRIFTNET_PUBLIC_URL = "https://dn.example/";
+  try {
+    const client = await connect();
+    const r = await client.callTool({ name: "driftnet_search", arguments: { min_worth: "skip" } });
+    const items = (r.structuredContent as { items: { id: number; page_url: string | null }[] }).items;
+    assert.ok(items.length);
+    for (const i of items) assert.equal(i.page_url, `https://dn.example/#item-${i.id}`);
+    await client.close();
+  } finally {
+    delete process.env.DRIFTNET_PUBLIC_URL;
+  }
+});
