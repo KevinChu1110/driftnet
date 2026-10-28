@@ -81,7 +81,10 @@
      "github",
      "前端元件"
     ],
-    "primaryUrl": "https://github.com/stackedlol/ascii-sharks"
+    "primaryUrl": "https://github.com/stackedlol/ascii-sharks",
+    "demo": "在瀏覽器的畫布上畫出一群用 ASCII 字元組成的鯊魚與小魚游來游去，可以當成動態背景嵌進網頁。",
+    "why": "有人在聊天室分享，說拿來讓首頁更有趣很適合。",
+    "tryIt": "npm i ascii-sharks"
    }
   },
   {
@@ -265,7 +268,10 @@
      "zero-dependencies",
      "mit"
     ],
-    "primaryUrl": "https://github.com/stackedlol/ascii-sharks"
+    "primaryUrl": "https://github.com/stackedlol/ascii-sharks",
+    "demo": "Draws a school of ASCII-art sharks and fish swimming across a browser canvas; you can embed it as an animated background.",
+    "why": "Someone shared it in the chat as a fun way to liven up a landing page.",
+    "tryIt": "npm i ascii-sharks"
    }
   },
   {

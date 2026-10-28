@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
+import { deflateSync } from "node:zlib";
 
 const CHROME = process.env.CHROME;
 if (!CHROME) {
@@ -97,8 +98,60 @@ const waitFor = async (s, expression, what, ms = 8000) => {
   const end = Date.now() + ms;
   for (;;) { const v = await evaluate(s, expression).catch(() => null); if (v) return v; if (Date.now() > end) throw new Error(`timed out: ${what}`); await sleep(100); }
 };
+
+// ── Pictures without the network ─────────────────────────────────────────────
+// This catalogue is offline, so the page's pictures are faked in the browser: GET /api/media/<id>/<n> answers with a
+// generated PNG (n = 9 answers 404, to prove a dead picture is hidden), and the item JSON is topped up with `media`
+// (and demo/why when the seed lacks them). Once the server has the real proxy and the seed stores media, delete this
+// block (the Fetch.enable call below) and seed media the normal way; the steps keep working unchanged.
+const crcTable = Int32Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c; });
+const crc32 = (b) => { let c = -1; for (const x of b) c = crcTable[(c ^ x) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+const pngChunk = (type, data) => { const t = Buffer.from(type), n = Buffer.alloc(4), c = Buffer.alloc(4); n.writeUInt32BE(data.length); c.writeUInt32BE(crc32(Buffer.concat([t, data]))); return Buffer.concat([n, t, data, c]); };
+const makePng = (w, h, px) => {
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = y * (w * 3 + 1) + 1 + x * 3, [r, g, b] = px(x, y); raw[o] = r; raw[o + 1] = g; raw[o + 2] = b; }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk("IHDR", ihdr), pngChunk("IDAT", deflateSync(raw)), pngChunk("IEND", Buffer.alloc(0))]);
+};
+const picture = (n) => makePng(640, 360, (x, y) => [40 + ((x * 180) / 640 + n * 50) % 200, 90 + (y * 120) / 360, 200 - ((x + y) % 120) - n * 20]);
+const sharkId = demo.findIndex((i) => /ascii-sharks/.test(i.url)) + 1, deadId = 2;
+const extra = {
+  [sharkId]: { media: [0, 1, 2].map((n) => ({ src: `/api/media/${sharkId}/${n}`, kind: n === 0 ? "gif" : "image", alt: `ascii-sharks picture ${n + 1}`, width: 640, height: 360 })),
+    demo: "Draws a school of ASCII-art sharks swimming across a canvas.", why: "Shared as a fun way to liven up a page." },
+  [deadId]: { media: [{ src: `/api/media/${deadId}/9`, kind: "image", alt: "gone" }] },   // 404: must not show as a broken image
+};
+const topUp = (it) => {
+  const x = extra[it?.id];
+  if (!x || !it.summary) return it;
+  if (!it.media?.length) it.media = x.media;
+  it.summary.demo ??= x.demo; it.summary.why ??= x.why;
+  return it;
+};
+ws.addEventListener("message", async (e) => {
+  const m = JSON.parse(e.data);
+  if (m.method !== "Fetch.requestPaused") return;
+  const { requestId, request, responseStatusCode, responseHeaders } = m.params, sid = m.sessionId;
+  try {
+    const path = new URL(request.url).pathname;
+    if (path.startsWith("/api/media/")) {
+      const n = Number(path.split("/").pop());
+      if (n === 9) return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 404, body: "" }, sid);
+      return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "image/png" }], body: picture(n).toString("base64") }, sid);
+    }
+    if (request.method === "GET" && responseStatusCode === 200) {
+      const r = await cdp("Fetch.getResponseBody", { requestId }, sid);
+      const json = JSON.parse(r.base64Encoded ? Buffer.from(r.body, "base64").toString() : r.body);
+      const out = Array.isArray(json) ? json.map(topUp) : topUp(json);
+      return void await cdp("Fetch.fulfillRequest", { requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "application/json" }], body: Buffer.from(JSON.stringify(out)).toString("base64") }, sid);
+    }
+    await cdp("Fetch.continueResponse", { requestId }, sid);
+  } catch {
+    await cdp("Fetch.continueRequest", { requestId }, sid).catch(() => cdp("Fetch.continueResponse", { requestId }, sid).catch(() => {}));
+  }
+});
 const { targetId } = await cdp("Target.createTarget", { url: "about:blank" });
 const { sessionId: s } = await cdp("Target.attachToTarget", { targetId, flatten: true });
+await cdp("Fetch.enable", { patterns: [{ urlPattern: "*/api/media/*", requestStage: "Request" }, { urlPattern: "*/api/items*", requestStage: "Response" }] }, s);
 const viewport = async (width, height, mobile) => {
   await cdp("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 2, mobile }, s);
   await cdp("Emulation.setTouchEmulationEnabled", { enabled: mobile, maxTouchPoints: mobile ? 5 : 1 }, s);
@@ -232,17 +285,98 @@ try {
   }
   await shoot(`web-desktop-${LANG}.png`);
 
+  // The tidier card list and the detail modal.
+  {
+    const old = 5;   // a card with no media, demo or why
+    const key = async (k, code) => {
+      await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: k, windowsVirtualKeyCode: code }, s);
+      await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: k, windowsVirtualKeyCode: code }, s);
+      await sleep(150);
+    };
+    const KEYS = { Enter: 13, Escape: 27, ArrowLeft: 37, ArrowRight: 39 };
+    const press = (k) => key(k, KEYS[k]);
+    const modalOpen = `document.getElementById("item-dlg").open`;
+    const title = `document.getElementById("md-title")?.textContent`;
+    await waitFor(s, `!!document.querySelector('#item-${sharkId} .thumb img')`, "a thumbnail on the card with media");
+    await waitFor(s, `document.querySelector('#item-${sharkId} .thumb img').naturalWidth > 0`, "the thumbnail loaded");
+    assert.equal(await evaluate(s, `document.querySelector('#item-${sharkId} .thumb img').getAttribute("referrerpolicy") + document.querySelector('#item-${sharkId} .thumb img').loading`), "no-referrerlazy");
+    assert.ok(await evaluate(s, `document.querySelector('#item-${sharkId} .thumb img').alt.length > 0`), "thumbnail has alt text");
+    assert.ok(await evaluate(s, `document.querySelector('#item-${sharkId} .card .demo')?.textContent.length > 10`), "the demo line is the second line of the card");
+    assert.ok(await evaluate(s, `!document.querySelector('#item-${sharkId} .card ul, #item-${sharkId} .card .said, #item-${sharkId} .card .tags, #item-${sharkId} .card .link-btn')`), "highlights, chat, tags and the note link are off the card");
+    await waitFor(s, `!document.querySelector('#item-${deadId} .thumb')`, "a thumbnail that 404s is dropped");
+    assert.ok(await evaluate(s, `!document.querySelector('#item-${old} .thumb') && !document.querySelector('#item-${old} .card .demo')`), "an old card has no thumbnail box and no demo line");
+    await shoot(`web-cards-${LANG}.png`);
+
+    // Click on the card body opens the modal: gallery, demo, why, the actions.
+    await evaluate(s, `document.querySelector('#item-${sharkId} .card').click()`);
+    await waitFor(s, modalOpen, "modal opens on a card click");
+    assert.equal(await evaluate(s, `location.hash`), `#item-${sharkId}`, "the address bar names the card");
+    assert.equal(await evaluate(s, `document.getElementById("item-dlg").getAttribute("aria-labelledby")`), "md-title");
+    assert.match(await evaluate(s, title), /ascii-sharks/);
+    await waitFor(s, `document.querySelectorAll("#item-dlg .g-slide img").length === 3 && document.querySelector("#item-dlg .g-slide img").naturalWidth > 0`, "the gallery shows the seeded pictures");
+    assert.equal(await evaluate(s, `document.querySelectorAll("#item-dlg .g-th").length`), 3, "a thumbnail strip");
+    await evaluate(s, `document.querySelectorAll("#item-dlg .g-th")[1].click()`);
+    await waitFor(s, `document.querySelectorAll("#item-dlg .g-th")[1].classList.contains("on")`, "the strip follows the gallery");
+    assert.ok(await evaluate(s, `document.querySelector("#item-dlg .md-sec.demo")?.textContent.length > 20 && document.querySelector("#item-dlg .md-sec.why")?.textContent.length > 20`), "demo and why sections");
+    assert.ok(await evaluate(s, `!!document.querySelector("#item-dlg .md-sec.try button[data-md=copy]") && !!document.querySelector("#item-dlg .md-sec.hl li") && !!document.querySelector("#item-dlg .md-sec.tags")`), "tryIt with a copy button, highlights, tags");
+    assert.ok(await evaluate(s, `["favorite", "move", "refresh", "note", "trash"].every((a) => document.querySelector('#item-dlg [data-md="' + a + '"]'))`), "the actions are in the modal");
+    await evaluate(s, `document.getElementById("item-dlg").querySelector(".md-scroll").scrollTop = 0`);
+    await shoot(`web-card-modal-${LANG}.png`);
+
+    // ←/→ step through the list.
+    const order = await ids();
+    const at = order.indexOf(sharkId);
+    assert.ok(at >= 0 && at < order.length - 1, "the shark card has a next card");
+    const nameOf = async (id) => evaluate(s, `document.querySelector('#item-${id} .name').textContent`);
+    await press("ArrowRight");
+    assert.equal(await evaluate(s, title), await nameOf(order[at + 1]), "→ shows the next card");
+    assert.equal(await evaluate(s, `location.hash`), `#item-${order[at + 1]}`);
+    await press("ArrowLeft");
+    assert.equal(await evaluate(s, title), await nameOf(sharkId), "← comes back");
+    // Esc closes it and focus returns to the card.
+    await press("Escape");
+    await waitFor(s, `!${modalOpen} && document.activeElement?.closest?.(".swipe")?.dataset.id === "${sharkId}" && location.hash === ""`, "Esc closes the modal, focus returns to the card, the hash clears");
+    // Enter on a focused card opens it too; stepping and closing leaves focus on the card you ended on.
+    await press("Enter");
+    await waitFor(s, modalOpen, "Enter opens the modal");
+    await press("ArrowRight");
+    await press("Escape");
+    await waitFor(s, `!${modalOpen} && document.activeElement?.closest?.(".swipe")?.dataset.id === "${order[at + 1]}"`, "focus lands on the card you stepped to");
+    // A card with nothing but a one-liner: no gallery, no empty sections, no broken pictures.
+    await evaluate(s, `document.querySelector('#item-${old} .card').click()`);
+    await waitFor(s, modalOpen, "old card opens");
+    assert.ok(await evaluate(s, `!document.querySelector("#item-dlg .gallery") && !document.querySelector("#item-dlg .md-sec.demo") && ![...document.querySelectorAll("#item-dlg .md-sec")].some((e) => !e.textContent.trim())`), "an old card has no empty boxes");
+    await evaluate(s, `document.getElementById("item-dlg").close()`);
+    // A card whose picture is gone: the dead image is dropped, not shown broken.
+    await evaluate(s, `document.querySelector('#item-${deadId} .card').click()`);
+    await waitFor(s, `${modalOpen} && !document.querySelector("#item-dlg .gallery")`, "a 404 picture disappears from the modal");
+    await evaluate(s, `document.getElementById("item-dlg").close()`);
+    // A shared link: #item-<id> opens the modal, on a fresh load and on a hash change.
+    await cdp("Page.navigate", { url: "about:blank" }, s);
+    await cdp("Page.navigate", { url: `http://127.0.0.1:${port}/#item-${sharkId}` }, s);
+    await waitFor(s, `document.getElementById("item-dlg")?.open && document.getElementById("md-title")?.textContent.includes("ascii-sharks")`, "a #item link opens the modal on load");
+    await evaluate(s, `document.getElementById("item-dlg").close()`);
+    await evaluate(s, `location.hash = "#item-${old}"`);
+    await waitFor(s, `${modalOpen} && location.hash === "#item-${old}"`, "a hash change opens the modal");
+    await evaluate(s, `document.getElementById("item-dlg").close()`);
+    await open();
+    console.log("✓ cards: thumbnail + demo line, dead pictures hidden; modal opens by click and Enter, ←/→ step, Esc returns focus, #item-<id> deep link, old cards stay clean");
+  }
+
   // Notes on a card, the notes page, settings and export.
   {
     const id = (await ids())[0];
-    await evaluate(s, `document.querySelector('#item-${id} .link-btn[data-act="note"]').click()`);
+    await evaluate(s, `document.querySelector('#item-${id} .card').click()`);
+    await waitFor(s, `document.getElementById("item-dlg").open`, "detail modal");
+    await evaluate(s, `document.querySelector('#item-dlg [data-md="note"]').click()`);
     await waitFor(s, `document.getElementById("note-dlg").open`, "note dialog");
     await evaluate(s, `(() => { document.getElementById("in-text").value = "remember: check the license"; document.getElementById("in-save").click(); return 1; })()`);
-    await waitFor(s, `document.querySelector('#item-${id} .mynote')?.textContent.includes("check the license")`, "note on the card");
+    await waitFor(s, `document.querySelector('#item-dlg .mynote')?.textContent.includes("check the license") && !!document.querySelector('#item-${id} .has-note')`, "note in the modal, marked on the card");
+    await evaluate(s, `document.getElementById("item-dlg").close()`);
     assert.equal((await api(`/api/items/${id}`)).note, "remember: check the license");
     assert.ok((await api("/api/items?q=license")).some((i) => i.id === id), "notes are searchable");
     assert.ok((await api("/api/items")).find((i) => i.id === 1).said.length, "chat text comes with the item");
-    console.log("✓ a note on a card is saved, shown and searchable");
+    console.log("✓ a note on a card is saved, shown in the modal and searchable");
 
     await evaluate(s, `document.querySelector('[data-field="view"][data-value="notes"]').click()`);
     await waitFor(s, `document.querySelector(".note-card a[data-card]")`, "notes page with card links");
@@ -820,6 +954,10 @@ try {
     await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "cards through a share-key link");
     assert.equal(await evaluate(s, `location.search`), "", "the key is taken out of the address bar");
     assert.equal(await evaluate(s, `location.hash`), "#item-1");
+    await waitFor(s, `document.getElementById("item-dlg")?.open`, "the shared card opens as a sheet");
+    assert.equal(await evaluate(s, `document.querySelectorAll("#md-actions [data-md]").length`), 0, "a reader gets no edit actions in the modal");
+    await shoot(`web-phone-modal-${LANG}.png`);
+    await evaluate(s, `document.getElementById("item-dlg").close()`);
     assert.equal(await evaluate(s, `localStorage.getItem("driftnet-key")`), key);
     // A reader sees no edit controls, and a chip that unlocks editing.
     assert.equal(await evaluate(s, `getComputedStyle(document.querySelector('#item-1 .tools')).display`), "none", "no edit buttons for a reader");
