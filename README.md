@@ -22,10 +22,11 @@
 You see a great AI tool on Threads, Facebook, X or YouTube and paste it somewhere "to look at
 later". Two hundred links later, nobody looks.
 
-**driftnet catches those links.** Drop them in a chat (LINE, Slack, Discord, Telegram), send them
-with a Chrome button, or hand them to your agent. driftnet follows each one to the actual tool,
-sorts it, writes a short explanation in your language, and puts it on a searchable page. It runs
-on your own computer, works with any model or none at all, and your agents read the same catalogue
+**driftnet catches those links.** Your feed is a current: good finds drift past once and are gone.
+driftnet is the net you leave in it. Drop links in a chat (LINE, Slack, Discord, Telegram), send
+them with a Chrome button, or hand them to your agent. driftnet follows each one to the actual
+tool, sorts it, writes a short explanation in your language, and puts it on a searchable page.
+Repos, articles and videos get the same treatment. It runs on your own computer, works with any model or none at all, and your agents read the same catalogue
 over MCP.
 
 ```text
@@ -39,7 +40,7 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 <p align="center"><img src="assets/screenshot-en.jpg" alt="The driftnet web page: your folder tree on the left, summarised tools on the right" width="100%"></p>
 
-**Contents** · [Why](#why-driftnet) · [Quick start](#quick-start) · [Ways in](#ways-in) ·
+**Contents** · [Why](#why-driftnet) · [Quick start](#quick-start) · [Your setup](#which-setup-is-yours) · [Ways in](#ways-in) ·
 [Models](#models) · [Agents](#agents) · [How it works](#how-it-works) ·
 [Settings](#settings) · [Online](#putting-it-online-optional) · [Your data](#where-your-data-goes) ·
 [Contributing](#contributing)
@@ -51,12 +52,17 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
   extension opens the comments. A weekly roundup becomes one item per project. Links a model
   makes up are thrown away.
 - **Spends almost nothing.** Repeat links are free, pages are cut down to an outline of about
-  350 tokens before any model sees them, and a ~100 ms judge decides what is worth summarising.
-  Five real Facebook reels were judged for $0.00029 in total.
+  350 tokens before any model sees them, and an optional judge, [Jev](https://console.typesafe.ai) (needs a TypeSafe key),
+  decides in ~100 ms what is worth summarising. Five real Facebook reels were judged for $0.00029
+  in total. Without Jev, the model you picked sorts each link; with no model either, links are
+  listed unsorted under "other".
 - **Learns what to ignore.** 👎 a result and its publisher loses reputation; sources that keep
   getting voted down stop costing anything. Prompt injection is never passed on to agents.
 - **Stays yours.** Local SQLite, your choice of model (an API, your Claude or Google
   subscription, Ollama, or none), and English or Traditional Chinese throughout.
+- **Not a read-later app.** Pocket and Raindrop keep the link you gave them. driftnet follows the post
+  to the tool it is about, keeps a short outline instead of the whole page, and lets your agents read
+  and write the same catalogue over MCP.
 
 ## Quick start
 
@@ -91,6 +97,14 @@ Needs Node.js 22.13+. Settings live in `~/.driftnet/.env` and the catalogue in
 curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   -d '{"text": "look at this https://github.com/paperclipai/paperclip"}'
 ```
+
+## Which setup is yours?
+
+| You are | Start with | Model |
+|---|---|---|
+| Just me, on my computer | The [Chrome extension](#chrome-extension) and [the web page](#the-web-page) | A local one through Ollama (see [Models](#models)), or none |
+| A group chat | A Discord, Telegram, Slack or LINE bot, see [Ways in](#ways-in) | Any |
+| My agents | [MCP, the Claude Code plugin or the agent queue](#agents) | None needed: the agent does the reading |
 
 ## Ways in
 
@@ -334,7 +348,7 @@ Most links never reach a model; the ones that do arrive as a short outline.
 | 3. Outline | Headings and the opening of each section; menus, breadcrumbs, cookie banners and footers dropped; capped at ~350 **tokens**, counting CJK at a token per character | no |
 | 4. Guard | Links to private or local addresses refused (every redirect checked); hidden Unicode stripped; prompt injection flagged | no |
 | 5. Reputation | Publishers voted below 25% (3+ votes) are stored, not summarised | no |
-| 6. Judge | [Jev](https://console.typesafe.ai) answers folder, kind, worth and injection as typed choices, ~100 ms | tiny classifier |
+| 6. Judge (optional) | [Jev](https://console.typesafe.ai), with a TypeSafe key, answers folder, kind, worth and injection as typed choices, ~100 ms. Without it, your model classifies in step 7 | tiny classifier |
 | 7. Summarise | One structured call, only for items worth reading, or the agent queue | one call |
 | 8. Follow | Repos linked or named in the content are looked up and catalogued too | no |
 
