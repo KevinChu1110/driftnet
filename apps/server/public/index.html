@@ -357,6 +357,21 @@
   a.name { color: var(--text); font-weight: 700; font-size: 17px; text-decoration: none; letter-spacing: -.01em; }
   a.name:hover { color: var(--accent); }
   .badge { font-size: 12px; padding: 1px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+  .chip { font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); color: var(--text); }
+  .chip:hover, .chip:focus-visible { border-color: var(--accent); }
+  .chip.more { background: transparent; border-style: dashed; color: var(--muted); border-color: var(--line); }
+  .chip kbd { font: 600 11px/1 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; color: var(--muted); background: var(--panel); }
+  body.readonly .chips { display: none; }
+  .plan-op { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .plan-op:first-child { border-top: 0; }
+  .plan-op input { margin-top: 3px; }
+  .plan-op .why { grid-column: 2; color: var(--muted); font-size: 13px; }
+  .plan-op details { grid-column: 2; font-size: 13px; color: var(--muted); }
+  .plan-op details ul { margin: 4px 0 0; padding-left: 18px; }
+  .plan-op.off { opacity: .5; }
+  #plan-body { max-height: 55vh; overflow: auto; }
   .badge.folder { background: color-mix(in srgb, var(--c) 14%, var(--panel)); color: var(--c); font-weight: 600; }
   .rating { font-size: 12px; color: var(--muted); white-space: nowrap; }
   .rating.must { color: var(--star); font-weight: 600; }
@@ -462,6 +477,8 @@
     <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
     <symbol id="i-link" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8M3.5 13.5V18a1.5 1.5 0 0 0 1.5 1.5h14a1.5 1.5 0 0 0 1.5-1.5v-4.5M3.5 13.5H8a4 4 0 0 0 8 0h4.5"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M10 4l1.8 5.2L17 11l-5.2 1.8L10 18l-1.8-5.2L3 11l5.2-1.8zM18 3v4M16 5h4M18 16v4M16 18h4"/></symbol>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   </defs>
 </svg>
@@ -561,6 +578,12 @@
   <dl class="keys" id="ky-body"></dl>
   <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="ky-close" type="button"></button></div>
 </dialog>
+<dialog id="plan-dlg" class="wide" aria-labelledby="pl-title">
+  <h3 id="pl-title"></h3>
+  <p class="hint" id="pl-intro"></p>
+  <div id="plan-body"></div>
+  <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="pl-cancel" type="button"></button><button class="btn primary" id="pl-apply" type="button" disabled></button></div>
+</dialog>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
   const STRINGS = {
@@ -605,6 +628,14 @@
       kNext: "Next / previous card", kFav: "Favorite", kMove: "Move to…", kNote: "Note", kTrash: "Trash (restore in the trash)", kSearch: "Search", kMap: "Mind map", kAll: "All cards",
       kSelect: "Select or unselect the card", kRange: "Select a range", kHold: "Hold", kLong: "Start selecting on a phone", keysClose: "Close", kClear: "Clear the selection", kUndo: "Undo the last action", kHelp: "This list",
       kQuickNone: "Move a card into a folder first; the nine you use most get a number here.", kQuickN: (f) => `Move into ${f}`,
+      inbox: "Inbox", emptyInbox: "Inbox zero — every card has a folder you chose.", hintInbox: "Tap a folder to file the card. Not filed yet: the cards below.",
+      chipOther: "Other folder…", chipTitle: (p) => `Confidence ${p}%`,
+      keysInbox: "In the Inbox", kChip: "File into the card's suggested folder 1–3", kSkip: "Skip: focus the next card", kQuickInbox: "In the Inbox, 1–3 pick the focused card's suggested folders instead; 4–9 still file into your most-used folders.",
+      planBtn: "Suggest folders", planNoModel: "Needs an AI model (Settings → AI)", planTitle: "Suggested folder changes",
+      planIntro: "The AI only proposes. Tick what you want, then apply; nothing changes until then, and Undo reverts the whole plan. Cards you filed by hand are never moved.",
+      planThinking: "Asking the model…", planNone: "The model found nothing worth changing.", planApply: (n) => `Apply ${n} selected`,
+      planCreate: (p) => `Create “${p}”`, planRename: (a, b) => `Rename “${a}” to “${b}”`, planMove: (n, d) => `Move ${n} ${n === 1 ? "card" : "cards"} to “${d}”`,
+      planMerge: (a, b) => `Merge “${a}” into “${b}”`, planApplied: (n) => `Applied ${n} ${n === 1 ? "change" : "changes"} to your folders`, planNeeds: "Needs the folder it creates",
       nSelected: (n) => `${n} selected`, selectAll: "Select all", clearSel: "Clear", trashShort: "Trash",
       moveTitleMany: (n) => `Move ${n} cards to`, pickedMany: (n) => `Picked up ${n} cards — tap the folder they go into`,
       bulkMoved: (n, f) => `Moved ${n} cards to ${f}`, bulkRemoved: (n) => `${n} cards moved to the trash`, bulkRestored: (n) => `${n} cards restored`,
@@ -712,6 +743,14 @@
       kNext: "下一張／上一張", kFav: "最愛", kMove: "移動到…", kNote: "筆記", kTrash: "垃圾桶（在垃圾桶裡是還原）", kSearch: "搜尋", kMap: "樹狀圖", kAll: "全部卡片",
       kSelect: "選取／取消選取這張", kRange: "選取一段範圍", kHold: "長按", kLong: "在手機上開始選取卡片", keysClose: "關閉", kClear: "取消全部選取", kUndo: "復原上一個動作", kHelp: "顯示這份清單",
       kQuickNone: "先把卡片移進某個資料夾；最常用的九個資料夾會在這裡得到數字鍵。", kQuickN: (f) => `移到 ${f}`,
+      inbox: "收件匣", emptyInbox: "收件匣清空了——每張卡片都有你選的資料夾。", hintInbox: "點一下資料夾就能歸檔。下面是還沒歸檔的卡片。",
+      chipOther: "其他資料夾…", chipTitle: (p) => `信心 ${p}%`,
+      keysInbox: "在收件匣", kChip: "歸到這張卡片建議的第 1–3 個資料夾", kSkip: "略過：移到下一張卡片", kQuickInbox: "在收件匣裡，1–3 改成選擇目前卡片的建議資料夾；4–9 仍然是放進最常用的資料夾。",
+      planBtn: "建議整理資料夾", planNoModel: "需要先設定 AI 模型（設定 → AI）", planTitle: "建議的資料夾調整",
+      planIntro: "AI 只負責提議。勾選想要的項目再套用，套用前什麼都不會改；復原可以一次還原整份方案。你親手歸檔的卡片不會被移動。",
+      planThinking: "正在請模型想想…", planNone: "模型認為目前沒有值得調整的地方。", planApply: (n) => `套用選取的 ${n} 項`,
+      planCreate: (p) => `新增「${p}」`, planRename: (a, b) => `把「${a}」改名為「${b}」`, planMove: (n, d) => `把 ${n} 張卡片移到「${d}」`,
+      planMerge: (a, b) => `把「${a}」合併到「${b}」`, planApplied: (n) => `已套用 ${n} 項資料夾調整`, planNeeds: "需要它新增的資料夾",
       nSelected: (n) => `已選 ${n} 張`, selectAll: "全選", clearSel: "清除", trashShort: "垃圾桶",
       moveTitleMany: (n) => `把 ${n} 張卡片移動到`, pickedMany: (n) => `已拿起 ${n} 張卡片，點要放進去的資料夾`,
       bulkMoved: (n, f) => `已將 ${n} 張卡片移到 ${f}`, bulkRemoved: (n) => `已將 ${n} 張卡片移到垃圾桶`, bulkRestored: (n) => `已還原 ${n} 張卡片`,
@@ -902,7 +941,7 @@
   /** One line under the header saying what is shown, so a closed drawer hides nothing. */
   function updateCrumb() {
     const t = T();
-    const parts = [state.view === "favorites" ? t.favorites : state.view === "trash" ? t.trash
+    const parts = [state.view === "favorites" ? t.favorites : state.view === "trash" ? t.trash : state.view === "inbox" ? t.inbox
       : state.view === "notes" ? t.notes : state.view === "map" ? t.map : t.all];
     if (state.category) parts.push(catLabel(state.category));
     if (state.kind) parts.push(t.kinds[state.kind] ?? state.kind);
@@ -940,11 +979,13 @@
       `<div class="drawer-head"><span class="brand"><img src="/favicon.svg" alt="" width="24" height="24">driftnet</span>` +
       `<button type="button" class="menu" id="menu-close" aria-label="${esc(T().close)}">✕</button></div>` +
       `<div class="row">` +
+      (role === "admin" || stats.inbox ? btn("view", "inbox", T().inbox, stats.inbox || "", "inbox") : "") +
       btn("view", "all", T().all, stats.items, "all") + btn("view", "favorites", T().favorites, stats.favorites, "star") +
       btn("view", "map", T().map, "", "map") +
       btn("view", "notes", T().notes, stats.notes || "", "note") +
       btn("view", "trash", T().trash, stats.trash || "", "trash") +
       `</div><div class="folders-head" data-drop-root><h2>${esc(T().folders)}</h2>` +
+      (role === "admin" ? `<button type="button" class="icon" data-suggest title="${esc(summaries ? T().planBtn : T().planNoModel)}" aria-label="${esc(T().planBtn)}" ${summaries ? "" : "aria-disabled=\"true\""} ${summaries ? "" : 'style="opacity:.45"'}>${ic("sparkle")}</button>` : "") +
       `<button type="button" class="icon" data-new="" title="${esc(T().newFolder)}" aria-label="${esc(T().newFolder)}">${ic("plus")}</button></div>` +
       `<div class="tree" role="list">${folderRows(null, 0)}</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
       Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>` +
@@ -972,6 +1013,7 @@
       if (b.dataset.login !== undefined) { if (isDrawer()) setMenu(false); return openLogin(); }
       if (b.dataset.logout !== undefined) { store.set("driftnet-token", ""); return load(); }
       if (b.dataset.new !== undefined) return openFolderDialog(null, b.dataset.new || null);
+      if (b.dataset.suggest !== undefined) { if (isDrawer()) setMenu(false); return openPlan(); }
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
       if (field === "view") state.category = "";
@@ -1143,6 +1185,7 @@
     if (!b) return;
     $("move-dlg").close();
     if (movingMany) bulkApply("move", movingMany, b.dataset.to);
+    else if (state.view === "inbox") inboxFile(moving, b.dataset.to);
     else moveItem(moving, b.dataset.to);
   };
 
@@ -1160,7 +1203,7 @@
     const old = folderById(from); if (old) old.count--;
     const el = document.getElementById(`item-${id}`);
     // Still inside the folder being viewed? Update the badge; otherwise it leaves the list.
-    const visible = !state.category || subtreeOf(state.category).has(to);
+    const visible = state.view !== "inbox" && (!state.category || subtreeOf(state.category).has(to));
     if (el && !visible) {
       if (el.contains(document.activeElement)) (el.nextElementSibling ?? el.previousElementSibling)?.querySelector?.(".card")?.focus();
       dismiss(el);
@@ -2263,9 +2306,9 @@
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
     items = await api(`/api/items?${p}`);
     const t = T();
-    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : t.empty;
+    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : t.empty;
     $("list").innerHTML = items.length
-      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : t.hint)}</p>` + items.map(card).join("")
+      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : t.hint)}</p>` + items.map(card).join("")
       : `<div class="empty first"><span>${esc(empty)}</span>${state.view === "all" && !state.q && !state.category && role === "admin"
           ? `<form class="add" id="add-form"><input id="add-url" type="url" inputmode="url" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
              <button class="btn primary" type="submit">${ic("plus")} ${esc(t.addLink)}</button></form>
@@ -2315,6 +2358,7 @@
         ${i.note ? `<div class="mynote">${ic("note")}<span>${esc(i.note)}</span></div>` : ""}
         ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
         ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
+        ${state.view === "inbox" ? inboxChips(i) : ""}
         <div class="meta">
           <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
           <span>${esc(i.createdAt.slice(0, 10))}</span>
@@ -2326,6 +2370,29 @@
       </article>
     </div>`;
   }
+
+  /** Inbox: one-tap chips for the card's suggested folders (keys 1–3), and "other folder…" (m). */
+  function inboxChips(i) {
+    const t = T();
+    const picks = (i.suggestions ?? []).filter((x) => folderById(x.folder)).slice(0, 3);
+    return `<div class="chips" role="group" aria-label="${esc(t.moveTo)}">` +
+      picks.map((x, n) => `<button type="button" class="chip" data-chip="${esc(x.folder)}" title="${esc(t.chipTitle(Math.round(x.score * 100)))}"><kbd>${n + 1}</kbd>${esc(folderPath(x.folder))}</button>`).join("") +
+      `<button type="button" class="chip more" data-chip-more><kbd>m</kbd>${esc(t.chipOther)}</button></div>`;
+  }
+  /** File an Inbox card; the next one takes focus so a run of keys or taps keeps going. Undo puts it back in the Inbox. */
+  function inboxFile(id, folder) {
+    const sw = document.getElementById(`item-${id}`);
+    const nextId = Number((sw?.nextElementSibling ?? sw?.previousElementSibling)?.dataset?.id) || null;
+    return bulkApply("move", [id], folder).then(() => { if (nextId) document.querySelector(`#item-${nextId} .card`)?.focus({ preventScroll: true }); });
+  }
+  $("list").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-chip], [data-chip-more]");
+    const sw = chip?.closest(".swipe");
+    if (!chip || !sw || role !== "admin" || selected.size) return;
+    e.preventDefault();
+    if (chip.dataset.chip) inboxFile(Number(sw.dataset.id), chip.dataset.chip);
+    else openMovePicker(Number(sw.dataset.id));
+  });
 
   // ── Actions ──────────────────────────────────────────────────────────────
   const find = (id) => items.find((x) => x.id === id) ?? mapItems.find((x) => x.id === id);
@@ -2381,7 +2448,7 @@
     if (!stats) return;
     $("stats").textContent = T().stats(stats.items, stats.shares);
     const set = (v, n) => { const c = $("nav").querySelector(`[data-field="view"][data-value="${v}"] .count`); if (c) c.textContent = n || (v === "all" ? "0" : ""); };
-    set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash);
+    set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash); set("inbox", stats.inbox);
   }
 
   // ── Select several cards: x, Shift-click or a long press; then act on all of them ──
@@ -2471,7 +2538,7 @@
   $("list").addEventListener("click", (e) => {
     // With cards selected a click picks or drops the card; Shift-click selects a range. Links and buttons don't fire meanwhile.
     const sw = e.target.closest(".swipe");
-    if (sw && role === "admin" && (e.shiftKey || selected.size) && !e.target.closest(".tool, .link-btn")) {
+    if (sw && role === "admin" && (e.shiftKey || selected.size) && !e.target.closest(".tool, .link-btn, .chip")) {
       e.preventDefault();
       if (e.shiftKey) selectRange(Number(sw.dataset.id)); else toggleSelect(Number(sw.dataset.id));
       return;
@@ -2605,13 +2672,90 @@
     $("ky-close").textContent = t.keysClose;
     $("ky-body").innerHTML =
       `<h4>${esc(t.keysMove)}</h4>` + row(["j", "k"], t.kNext) + row(["f"], t.kFav) + row(["m"], t.kMove) + row(["n"], t.kNote) + row(["#"], t.kTrash) +
+      `<h4>${esc(t.keysInbox)}</h4>` + row(["1", "2", "3"], t.kChip) + row(["s"], t.kSkip) + row(["m"], t.kMove) +
       `<h4>${esc(t.keysSelect)}</h4>` + row(["x"], t.kSelect) + row(["Shift", "click"], t.kRange) + row([t.kHold], t.kLong) + row(["Esc"], t.kClear) +
       `<h4>${esc(t.keysQuick)}</h4>` + (quick.length ? quick.map((id, i) => row([String(i + 1)], t.kQuickN(catLabel(id)))).join("") : `<dd style="grid-column:1/-1">${esc(t.kQuickNone)}</dd>`) +
+      `<dd style="grid-column:1/-1">${esc(t.kQuickInbox)}</dd>` +
       `<h4>${esc(t.keysGo)}</h4>` + row(["/"], t.kSearch) + row(["g", "m"], t.kMap) + row(["g", "a"], t.kAll) + row(["z"], t.kUndo) + row(["?"], t.kHelp);
     $("keys-dlg").showModal();
   }
   $("ky-close").onclick = () => $("keys-dlg").close();
   $("keys-dlg").addEventListener("click", (e) => { if (e.target === $("keys-dlg")) $("keys-dlg").close(); });
+  // ── AI folder plan: proposed, reviewed line by line, applied in one go ────
+  let plan = null;
+  const planOps = () => plan?.operations ?? [];
+  /** A folder named in a plan: a real one by path, or one the plan itself creates (new:<ref>). */
+  function planFolder(id) {
+    if (!id.startsWith("new:")) return folderPath(id);
+    const c = planOps().find((o) => o.op === "create" && o.ref === id.slice(4));
+    return c ? (c.parent ? `${planFolder(c.parent)} › ${c.name}` : c.name) : id;
+  }
+  const planNeeds = (o) => o.op === "move" ? o.folder : o.op === "create" && o.parent ? o.parent : "";
+  function planLine(o) {
+    const t = T();
+    return o.op === "create" ? t.planCreate(planFolder("new:" + o.ref))
+      : o.op === "rename" ? t.planRename(folderPath(o.folder), o.name)
+      : o.op === "move" ? t.planMove(o.cards.length, planFolder(o.folder))
+      : t.planMerge(folderPath(o.from), folderPath(o.into));
+  }
+  function drawPlan() {
+    const t = T();
+    $("plan-body").innerHTML = planOps().length ? planOps().map((o) => `<div class="plan-op" data-op="${esc(o.id)}">
+        <input type="checkbox" id="po-${esc(o.id)}" checked aria-labelledby="pol-${esc(o.id)}">
+        <label id="pol-${esc(o.id)}" for="po-${esc(o.id)}"><b>${esc(planLine(o))}</b></label>
+        ${o.reason ? `<span class="why">${esc(o.reason)}</span>` : ""}
+        ${o.op === "move" ? `<details><summary>${esc(t.planMove(o.cards.length, planFolder(o.folder)))}</summary><ul>${o.cards.map((c) => `<li>${esc(c.name)}</li>`).join("")}</ul></details>` : ""}
+      </div>`).join("") : `<p class="hint">${esc(t.planNone)}</p>`;
+    syncPlan();
+  }
+  /** An operation that points at a folder the plan creates goes with it: untick the create and those untick (and stay locked). */
+  function syncPlan() {
+    const on = (id) => $(`po-${id}`)?.checked;
+    const refOn = (ref) => { const c = planOps().find((o) => o.op === "create" && o.ref === ref); return c ? on(c.id) && refOn(planNeeds(c).replace(/^new:/, "")) : true; };
+    for (const o of planOps()) {
+      const need = planNeeds(o), ok = !need.startsWith("new:") || refOn(need.slice(4));
+      const box = $(`po-${o.id}`);
+      if (!ok) box.checked = false;
+      box.disabled = !ok;
+      box.closest(".plan-op").classList.toggle("off", !box.checked);
+      box.title = ok ? "" : T().planNeeds;
+    }
+    const n = planOps().filter((o) => on(o.id)).length;
+    $("pl-apply").textContent = T().planApply(n);
+    $("pl-apply").disabled = !n;
+  }
+  $("plan-body").addEventListener("change", syncPlan);
+  async function openPlan() {
+    const t = T();
+    if (!summaries) return toast(t.planNoModel);
+    plan = null;
+    $("pl-title").textContent = t.planTitle;
+    $("pl-intro").textContent = t.planIntro;
+    $("pl-cancel").textContent = t.cancel;
+    $("pl-apply").textContent = t.planApply(0);
+    $("pl-apply").disabled = true;
+    $("plan-body").innerHTML = `<p class="hint" role="status">${esc(t.planThinking)}</p>`;
+    $("plan-dlg").showModal();
+    const r = await mapWrite("/api/folders/suggest", "POST");
+    if (!r) return $("plan-dlg").close();
+    plan = r;
+    drawPlan();
+  }
+  $("pl-cancel").onclick = () => $("plan-dlg").close();
+  $("plan-dlg").addEventListener("click", (e) => { if (e.target === $("plan-dlg")) $("plan-dlg").close(); });
+  $("pl-apply").onclick = async () => {
+    const accept = planOps().filter((o) => $(`po-${o.id}`)?.checked).map((o) => o.id);
+    if (!accept.length) return;
+    $("pl-apply").disabled = true;
+    const r = await mapWrite("/api/folders/suggest/apply", "POST", { plan: plan.plan, accept });
+    if (!r) { $("pl-apply").disabled = false; return; }
+    $("plan-dlg").close();
+    await load();
+    toast(T().planApplied(r.count), async () => {
+      if (await mapWrite("/api/items/bulk/undo", "POST", { undo: r.undo })) await load();
+    });
+  };
+
   /** The newest undoable action, so z (or ⌘/Ctrl+Z) can undo it from the keyboard. */
   let lastUndo = null;
   function toast(text, undo) {
@@ -2648,6 +2792,11 @@
     if (k === "/") { e.preventDefault(); $("q").focus(); return; }
     if ((k === "z" || k === "u") && lastUndo) { e.preventDefault(); $("toast-undo").click(); return; }
     if (k === "?") { openKeys(); return; }
+    // Inbox: 1–3 pick the focused card's suggestion chips (before the global "file into top-9 folders").
+    if (state.view === "inbox" && /^[1-3]$/.test(k) && role === "admin" && focusedId() && !selected.size) {
+      const chip = document.querySelectorAll(`#item-${focusedId()} [data-chip]`)[Number(k) - 1];
+      if (chip) { e.preventDefault(); inboxFile(focusedId(), chip.dataset.chip); return; }
+    }
     if (/^[1-9]$/.test(k) && role === "admin" && !document.activeElement?.isContentEditable && quickMove(Number(k))) { e.preventDefault(); return; }
     if (k === "x" && role === "admin" && !document.activeElement?.isContentEditable && focusedId() && state.view !== "map") { e.preventDefault(); toggleSelect(focusedId()); return; }
     if (prev === "g" && k === "m") { Object.assign(state, { view: "map", category: "" }); load(); return; }
@@ -2656,9 +2805,9 @@
     if (!cards.length) return;
     const cur = document.activeElement?.closest?.(".card");
     const at = cards.indexOf(cur);
-    if (k === "j" || k === "k") {
+    if (k === "j" || k === "k" || (k === "s" && state.view === "inbox")) {
       e.preventDefault();
-      const next = cards[Math.min(cards.length - 1, Math.max(0, at + (k === "j" ? 1 : -1)))] ?? cards[0];
+      const next = cards[Math.min(cards.length - 1, Math.max(0, at + (k === "k" ? -1 : 1)))] ?? cards[0];
       next.focus(); next.scrollIntoView({ block: "nearest" });
       return;
     }

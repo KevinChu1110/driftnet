@@ -57,7 +57,7 @@ test("agents can read the folder tree, add a folder and file an item into it", a
 test("every tool explains itself: descriptions, a description on every parameter, annotations", async () => {
   const client = await connect();
   const { tools } = await client.listTools();
-  assert.equal(tools.length, 17);
+  assert.equal(tools.length, 18);
   for (const t of tools) {
     assert.ok((t.description ?? "").length > 150, `${t.name}: description too thin`);
     assert.ok(t.annotations && t.annotations.readOnlyHint !== undefined && t.annotations.destructiveHint !== undefined, `${t.name}: annotations`);
@@ -121,5 +121,22 @@ test("agents can trash and restore, star, note, rename and delete folders", asyn
   assert.equal((await call("driftnet_delete_folder", { id: "other" })).isError, true);
   const tools = (await client.listTools()).tools;
   assert.equal(tools.find((t) => t.name === "driftnet_delete_folder")!.annotations!.destructiveHint, true, "the one destructive tool says so");
+  await client.close();
+});
+
+test("the inbox filter and suggested folders show up for agents; suggest_folders is read-only and needs a model", async () => {
+  const client = await connect();
+  const a = dn.store.upsert({ url: "https://mcp.test/inbox", aliases: [], title: "maple tool", judgement, summary: null, flags: [], source: "s", suggestions: [{ folder: "other", score: 0.5 }] });
+  const res = await client.callTool({ name: "driftnet_search", arguments: { inbox: true, min_worth: "skip" } });
+  const items = (res.structuredContent as { items: { id: number; in_inbox: boolean; suggested_folders: { folder: string }[] }[] }).items;
+  assert.ok(items.some((i) => i.id === a.id && i.in_inbox && i.suggested_folders[0]!.folder === "other"));
+  dn.store.moveItem(a.id, "other");
+  const after = (await client.callTool({ name: "driftnet_search", arguments: { inbox: true, min_worth: "skip" } })).structuredContent as { items: { id: number }[] };
+  assert.ok(!after.items.some((i) => i.id === a.id));
+  const tool = (await client.listTools()).tools.find((t) => t.name === "driftnet_suggest_folders")!;
+  assert.equal(tool.annotations!.readOnlyHint, true);
+  const r = await client.callTool({ name: "driftnet_suggest_folders", arguments: {} });
+  assert.equal(r.isError, true);
+  assert.match(text(r), /AI model/);
   await client.close();
 });

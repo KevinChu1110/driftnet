@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { WORTH, type Digest, type Judgement, type Summary } from "./types.ts";
+import { WORTH, type Digest, type Judgement, type Suggestion, type Summary } from "./types.ts";
+import { cleanSuggestions } from "./suggest.ts";
 import { judgeState, WORTH_CRITERIA } from "./judge/index.ts";
 import { IncompleteOutput, type LlmProvider } from "./llm/types.ts";
 
@@ -33,6 +34,10 @@ function withJudgement(categories: string[]) {
     category: z.enum(categories as [string, ...string[]]),
     kind: z.enum(["repo", "product", "video", "article", "post", "other"]),
     worth: z.enum(WORTH),
+    suggestions: z
+      .array(z.object({ category: z.enum(categories as [string, ...string[]]), score: z.number() }))
+      .default([])
+      .describe("The 3 best-fitting categories for this item, best first, each with a confidence 0..1; the first is your category"),
   });
 }
 
@@ -63,6 +68,8 @@ export function normalizeSummary(out: z.infer<typeof SummarySchema>): Summary {
 export interface SummarizeResult {
   summary: Summary | null;
   judgement?: Judgement;
+  /** The model's top folders for the item (known folder ids only), best first. */
+  suggestions?: Suggestion[];
   /** The model's guess of the repo name, to be verified on GitHub — never stored as-is. */
   repoGuess?: string;
   /** Set when every attempt failed. */
@@ -129,6 +136,7 @@ export class Summarizer {
           "Also classify it.",
           "category — pick one:",
           ...Object.entries(categories).map(([k, v]) => `- ${k}: ${v}`),
+          "suggestions — the 3 best-fitting categories, best first, each with a confidence between 0 and 1; the first one is your category.",
           "worth — pick one:",
           ...WORTH.map((w, i) => `- ${w}: ${WORTH_CRITERIA[i]}`),
         ].join("\n"),
@@ -165,6 +173,10 @@ function normalize(out: Parsed): SummarizeResult {
     result.judgement = {
       isAiTool: out.ai_tool ? 1 : 0, category: out.category, kind: out.kind, worth: out.worth, engine: "llm", confidence: 1,
     };
+    // The model's own pick leads; its runners-up follow.
+    const alts = cleanSuggestions((out as { suggestions?: { category: string; score: number }[] }).suggestions, () => true);
+    const top = [{ folder: out.category, score: alts.find((a) => a.folder === out.category)?.score ?? 1 }, ...alts.filter((a) => a.folder !== out.category)];
+    result.suggestions = top.slice(0, 3);
   }
   return result;
 }

@@ -5,7 +5,8 @@ import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
 import { enrichSchema, normalizeSummary, type Summarizer } from "./summarize.ts";
-import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Summary } from "./types.ts";
+import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Suggestion, Summary } from "./types.ts";
+import { keywordSuggestions } from "./suggest.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
 import { clipTokens, digestBudget } from "./digest.ts";
 
@@ -151,6 +152,7 @@ export class Pipeline {
     }
 
     let summary = null;
+    let modelPicks: Suggestion[] = [];
     // Only "worth" gates the model. Not-quite-AI tools (a web library, a design
     // trick) are what people share too, so isAiTool is informational.
     const worthReading = judgement ? judgement.worth !== "skip" : true;
@@ -159,14 +161,20 @@ export class Pipeline {
         digest, cleanedNote.text, judgement ? undefined : this.opts.categories,
       );
       summary = r.summary ? await this.verifyPrimaryUrl(r.summary, digest, r.repoGuess) : null;
+      // Only a classification the model itself made brings its runners-up along.
+      if (!judgement && r.suggestions) modelPicks = r.suggestions.filter((x) => x.folder in this.opts.categories);
       judgement ??= r.judgement ?? null;
     }
 
     judgement ??= heuristicJudgement(digest, distrusted || flags.includes("injection"));
 
+    // The Inbox's chips: the model's top folders, or keyword overlap when there is no model answer.
+    const suggestions = modelPicks.length ? modelPicks : keywordSuggestions(this.opts.categories, {
+      name: summary?.name ?? digest.title, tags: summary?.tags ?? [], current: judgement.category,
+    });
     const item = store.upsert({
       url: digest.url, aliases: [url], title: summary?.name ?? digest.title, judgement, summary,
-      flags, source,
+      flags, source, suggestions,
     });
     store.recordShare(item.id, ctx);
     const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);

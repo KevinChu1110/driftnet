@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { FolderError, ItemError, type Store } from "@driftnet/core";
+import { FolderError, ItemError, type FolderRow, type Store } from "@driftnet/core";
 
 export const BULK_LIMIT = 500;
 
@@ -24,15 +24,21 @@ const snapshotSchema = z.array(
 );
 type Snapshot = z.infer<typeof snapshotSchema>;
 
+/** A folder-tree snapshot, kept with an AI plan's undo so the whole plan can be reverted. */
+const folderSnapshotSchema = z.array(z.object({
+  id: z.string(), parent: z.string().nullable(), name: z.string().nullable(),
+  description: z.string(), position: z.number().int(), builtin: z.number().int().min(0).max(1),
+}));
+
 /** Undo snapshots live in the store's state table, so they survive a restart; only the last few, and only for a day. */
 const UNDO_PREFIX = "undo:";
 const UNDO_KEEP = 20;
 const UNDO_TTL_MS = 24 * 3600 * 1000;
 
 /** Keep what a batch changed, return the id that undoes it, and drop snapshots beyond the newest 20. */
-export function saveUndo(store: Store, previous: Snapshot, now = Date.now()): string {
+export function saveUndo(store: Store, previous: Snapshot, now = Date.now(), folders?: FolderRow[]): string {
   const id = randomBytes(6).toString("base64url");
-  store.setState(UNDO_PREFIX + id, JSON.stringify({ at: now, previous }));
+  store.setState(UNDO_PREFIX + id, JSON.stringify({ at: now, previous, ...(folders ? { folders } : {}) }));
   const all = store.stateWithPrefix(UNDO_PREFIX).map((r) => ({ key: r.key, at: (JSON.parse(r.value) as { at: number }).at })).sort((a, b) => b.at - a.at);
   for (const old of all.slice(UNDO_KEEP)) store.deleteState(old.key);
   return id;
@@ -74,13 +80,18 @@ export function undoById(store: Store, id: string, now = Date.now()): number {
   const key = UNDO_PREFIX + id;
   const raw = store.getState(key);
   if (!raw) return 0;
-  const snap = JSON.parse(raw) as { at: number; previous: unknown };
+  const snap = JSON.parse(raw) as { at: number; previous: unknown; folders?: unknown };
   if (now - snap.at > UNDO_TTL_MS) { store.deleteState(key); return 0; }
   const previous = snapshotSchema.parse(snap.previous);
+  const folders = snap.folders ? folderSnapshotSchema.parse(snap.folders) : null;
   // Restore first: if a folder or card has since been deleted this throws and the snapshot stays.
-  store.restoreItems(previous.map(({ folder, ...rest }) => ({ ...rest, ...(folder !== undefined ? { category: folder } : {}) })));
+  // An AI plan also changed the folder tree: put that back before the cards, in the same transaction.
+  store.transaction(() => {
+    if (folders) store.restoreFolders(folders);
+    store.restoreItems(previous.map(({ folder, ...rest }) => ({ ...rest, ...(folder !== undefined ? { category: folder } : {}) })));
+  });
   store.deleteState(key);
-  return previous.length;
+  return previous.length || folders?.length || 0;
 }
 
 function failure(err: unknown): Reply {

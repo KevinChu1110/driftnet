@@ -41,6 +41,12 @@ export interface Summary {
   mentions?: { name: string; openSource: boolean }[];
 }
 
+/** A folder the classifier thought a card could go into, with its confidence (0..1). */
+export interface Suggestion {
+  folder: string;
+  score: number;
+}
+
 export interface Item {
   id: number;
   url: string;
@@ -66,6 +72,10 @@ export interface Item {
   enrichedBy?: string;
   /** The reader's own note. */
   note?: string;
+  /** Up to 3 folders the card could go into, best first (the Inbox shows them as one-tap chips). */
+  suggestions?: Suggestion[];
+  /** True once the reader (or an agent) filed the card by hand; the Inbox holds the ones that are not. */
+  placed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
