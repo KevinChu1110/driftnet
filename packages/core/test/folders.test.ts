@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { FolderError, Store } from "../src/store.ts";
+import { FolderError, ItemError, Store } from "../src/store.ts";
 
 const j = { isAiTool: 1, category: "news", kind: "repo" as const, worth: "normal" as const, engine: "jev" as const, confidence: 1 };
 const summary = { name: "x", oneLiner: "x", highlights: [], useCases: [], tags: [], primaryUrl: "https://lib.test/x", category: "coding", worth: "normal" as const };
@@ -86,4 +86,46 @@ test("two folders with the same name side by side are refused", () => {
   assert.throws(() => store.createFolder({ name: "games" }), FolderError);
   const g = store.folders().find((f) => f.name === "Games")!;
   assert.doesNotThrow(() => store.createFolder({ name: "Games", parent: g.id }), "the same name one level down is fine");
+});
+
+function seedMany(n = 3) {
+  const { store, id } = seed();
+  const ids = [id];
+  for (let i = 1; i < n; i++) ids.push(store.upsert({ url: `https://lib.test/${i}`, aliases: [], title: `t${i}`, judgement: j, summary: null, flags: [], source: "s" }).id);
+  return { store, ids };
+}
+
+test("bulk move is one transaction: user_placed is set, the earlier state comes back, a bad id changes nothing", () => {
+  const { store, ids } = seedMany();
+  store.moveItem(ids[2]!, "other"); // already placed by the reader
+  const before = store.moveItems(ids, "coding");
+  assert.deepEqual(before.map((b) => [b.id, b.category, b.user_placed]), [[ids[0], "news", 0], [ids[1], "news", 0], [ids[2], "other", 1]]);
+  for (const id of ids) assert.equal(store.get(id)!.category, "coding");
+  assert.equal(store.list({ category: "coding" }).length, 3);
+  assert.throws(() => store.moveItems([ids[0]!, 9999], "news"), ItemError);
+  assert.equal(store.get(ids[0]!)!.category, "coding", "rolled back");
+  assert.throws(() => store.moveItems(ids, "nope"), FolderError);
+  store.restoreItems(before.map((b) => ({ id: b.id, category: b.category, user_placed: b.user_placed })));
+  assert.deepEqual(ids.map((id) => store.get(id)!.category), ["news", "news", "other"]);
+});
+
+test("bulk trash and star report what undo needs and are all-or-nothing", () => {
+  const { store, ids } = seedMany();
+  store.setTrashed(ids[1]!, true);
+  const trashedBefore = store.get(ids[1]!)!.trashedAt;
+  const prev = store.setTrashedMany(ids, true);
+  assert.deepEqual(prev.map((p) => p.trashed_at === null), [true, false, true]);
+  assert.equal(store.list({ view: "trash" }).length, 3);
+  assert.throws(() => store.setTrashedMany([ids[0]!, 9999], false), ItemError);
+  assert.equal(store.list({ view: "trash" }).length, 3, "rolled back");
+  store.restoreItems(prev);
+  assert.equal(store.list({ view: "trash" }).length, 1);
+  assert.equal(store.get(ids[1]!)!.trashedAt, trashedBefore);
+  store.setFavorite(ids[0]!, true);
+  const stars = store.setFavoriteMany(ids, true);
+  assert.deepEqual(stars.map((s) => s.favorite), [1, 0, 0]);
+  assert.equal(store.list({ view: "favorites" }).length, 2, "the trashed one is not listed");
+  assert.throws(() => store.setFavoriteMany([9999], true), ItemError);
+  store.restoreItems(stars);
+  assert.equal(store.list({ view: "favorites" }).length, 1);
 });

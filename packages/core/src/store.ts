@@ -31,6 +31,8 @@ export interface Folder {
 }
 
 export class FolderError extends Error {}
+/** A bulk action named an item that doesn't exist; nothing was changed. */
+export class ItemError extends Error {}
 
 /** A free-standing note: Markdown, may point at items as #12. */
 export interface Note {
@@ -297,6 +299,47 @@ export class Store {
     return this.db.prepare("UPDATE items SET category = ?, user_placed = 1 WHERE id = ?").run(folderId, itemId).changes > 0;
   }
 
+  /** Move many items at once, all or nothing. Returns each item's earlier folder so the whole batch can be undone. */
+  moveItems(ids: number[], folderId: string): { id: number; category: string; user_placed: number }[] {
+    if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
+    return this.inTransaction(ids, "category, user_placed", (id, before) => {
+      this.db.prepare("UPDATE items SET category = ?, user_placed = 1 WHERE id = ?").run(folderId, id);
+      return { id, category: String(before.category), user_placed: Number(before.user_placed) };
+    });
+  }
+
+  /** Put items back exactly as an earlier bulk action found them (folder and placement, trash, star). */
+  restoreItems(rows: { id: number; category?: string; user_placed?: number; trashed_at?: string | null; favorite?: number }[]): void {
+    const ids = rows.map((r) => r.id);
+    for (const r of rows) if (r.category !== undefined && !this.folderExists(r.category)) throw new FolderError(`no folder ${r.category}`);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    this.inTransaction(ids, "id", (id) => {
+      const r = byId.get(id)!;
+      if (r.category !== undefined) this.db.prepare("UPDATE items SET category = ?, user_placed = ? WHERE id = ?").run(r.category, r.user_placed ?? 0, id);
+      if (r.trashed_at !== undefined) this.db.prepare("UPDATE items SET trashed_at = ? WHERE id = ?").run(r.trashed_at, id);
+      if (r.favorite !== undefined) this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(r.favorite ? 1 : 0, id);
+      return undefined;
+    });
+  }
+
+  /** Run `fn` for every id in one transaction; an unknown id rolls the whole batch back. `cols` are read first and passed in. */
+  private inTransaction<T>(ids: number[], cols: string, fn: (id: number, before: Record<string, unknown>) => T): T[] {
+    const read = this.db.prepare(`SELECT ${cols} FROM items WHERE id = ?`);
+    this.db.exec("BEGIN");
+    try {
+      const out = ids.map((id) => {
+        const before = read.get(id) as Record<string, unknown> | undefined;
+        if (!before) throw new ItemError(`no item ${id}`);
+        return fn(id, before);
+      });
+      this.db.exec("COMMIT");
+      return out;
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
   /**
    * What the judge and the model choose from: every folder, described by its
    * path and the reader's note, e.g. "Games › MapleStory — MapleStory tools".
@@ -393,6 +436,22 @@ export class Store {
 
   setFavorite(id: number, favorite: boolean): boolean {
     return this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(favorite ? 1 : 0, id).changes > 0;
+  }
+
+  /** Bulk {@link setTrashed}, all or nothing. Returns each item's earlier trash time for undo. */
+  setTrashedMany(ids: number[], trashed: boolean): { id: number; trashed_at: string | null }[] {
+    return this.inTransaction(ids, "trashed_at", (id, before) => {
+      this.setTrashed(id, trashed);
+      return { id, trashed_at: (before.trashed_at as string | null) ?? null };
+    });
+  }
+
+  /** Bulk {@link setFavorite}, all or nothing. Returns each item's earlier star for undo. */
+  setFavoriteMany(ids: number[], favorite: boolean): { id: number; favorite: number }[] {
+    return this.inTransaction(ids, "favorite", (id, before) => {
+      this.setFavorite(id, favorite);
+      return { id, favorite: Number(before.favorite) };
+    });
   }
 
   /** One vote per voter per item; voting again replaces the earlier vote. */

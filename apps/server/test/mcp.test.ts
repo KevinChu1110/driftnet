@@ -33,6 +33,15 @@ test("agents can read the folder tree, add a folder and file an item into it", a
   const bad = await client.callTool({ name: "driftnet_move_item", arguments: { id: item.id, folder: "nope" } });
   assert.equal(bad.isError, true);
   assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { id: 999, folder: "games" } })).isError, true);
+  // Several at once, all or nothing; exactly one of id / ids.
+  const second = dn.store.upsert({ url: "https://mcp.test/b", aliases: [], title: "b", judgement, summary: null, flags: [], source: "s" });
+  const many = await client.callTool({ name: "driftnet_move_item", arguments: { ids: [item.id, second.id], folder: "other" } });
+  assert.match(text(many), /Moved 2 items/);
+  assert.equal(dn.store.get(second.id)!.category, "other");
+  assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { ids: [item.id, 999], folder: "games" } })).isError, true);
+  assert.equal(dn.store.get(item.id)!.category, "other", "a bad id moves nothing");
+  assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { folder: "games" } })).isError, true);
+  assert.equal((await client.callTool({ name: "driftnet_move_item", arguments: { id: item.id, ids: [item.id], folder: "games" } })).isError, true);
   await client.close();
 });
 
