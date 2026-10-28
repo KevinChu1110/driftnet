@@ -129,3 +129,21 @@ test("bulk trash and star report what undo needs and are all-or-nothing", () => 
   store.restoreItems(stars);
   assert.equal(store.list({ view: "favorites" }).length, 1);
 });
+
+test("folder use counts: moves bump, undo and delete take them back, top folders break ties by tree order", () => {
+  const { store, id } = seed();
+  const b = store.upsert({ url: "https://lib.test/b", aliases: [], title: "b", judgement: j, summary: null, flags: [], source: "s" }).id;
+  assert.deepEqual(store.topFolders(), [], "nothing used yet");
+  store.moveItem(id, "coding");
+  store.moveItem(b, "news");
+  assert.deepEqual(store.topFolders().map((f) => f.id), ["news", "coding"], "a tie goes to tree order");
+  const before = store.moveItems([id, b], "coding");
+  assert.deepEqual(store.topFolders().map((f) => [f.id, f.uses]), [["coding", 3], ["news", 1]]);
+  store.restoreItems(before.map(({ id, category, user_placed }) => ({ id, category, user_placed })));
+  assert.equal(store.folders().find((f) => f.id === "coding")!.uses, 1);
+  store.bumpFolderUse("news", -50);
+  assert.equal(store.folders().find((f) => f.id === "news")!.uses, 0, "floors at 0");
+  assert.deepEqual(store.topFolders(1).map((f) => f.id), ["coding"]);
+  store.deleteFolder("coding");
+  assert.deepEqual(store.topFolders(), []);
+});
