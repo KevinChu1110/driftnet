@@ -238,6 +238,9 @@ claude mcp add --transport http driftnet http://localhost:8787/mcp \
   --header "Authorization: Bearer $DRIFTNET_TOKEN" --header "X-Driftnet-Agent: claude-code"
 ```
 
+Give each agent its own key instead of the admin password: **Settings → Access → Agent tokens** (or the
+*Create a token for this agent* button on a Connect card). Use the token where `$DRIFTNET_TOKEN` is.
+
 | MCP tool | Use |
 |---|---|
 | `driftnet_search` | Search the catalogue before picking a tool for a task |
@@ -333,9 +336,9 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
 | `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of extractor plugins (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
-| `DRIFTNET_TOKEN` | — | Admin password: writes, settings, MCP with every tool, the agent queue. Settable on the page |
+| `DRIFTNET_TOKEN` | — | Admin password: writes, settings, agent tokens, MCP with every tool, the agent queue. Settable on the page |
 | `DRIFTNET_READ_KEY` | — | Read-only share key (header or `?key=`): reading and the read-only MCP tools |
-| `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the password or the share key |
+| `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the password, the share key or an agent token |
 | `DRIFTNET_CLOUDFLARED` | `cloudflared` | Path to `cloudflared`, for the page's public-URL button |
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
 | `DRIFTNET_HOME` | `~/.driftnet` | Folder for `.env`, the database and the service log |
@@ -353,7 +356,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
-`GET|PUT /api/settings` (this machine, or with the token) · `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id` (admin password only) · `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -370,14 +373,20 @@ listens on `127.0.0.1`. Everything below is on the page under **⚙ Settings →
    and nothing more. If it leaks, press *New key*. The admin password is never accepted in a URL.
    Chat bots and agents put it into the card links they send you, so a link opens on your phone
    without the password; the page keeps it and removes it from the address bar.
-4. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
+4. **Agent tokens.** One named key per agent (Hermes, Claude Code, OpenClaw…) instead of the admin
+   password: *write* can add, move and tidy, *read* can only look. A token is shown once when you
+   create it and only its hash is stored. *Revoke* cuts off that one agent at once; changing the admin
+   password does not touch them. Tokens work as a Bearer header only, never in a URL, and cannot
+   change settings or make more tokens. The queue and card moves record which token did it.
+5. **Public URL.** One button opens a temporary `https://….trycloudflare.com` address through
    Cloudflare (no account; install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
    yourself, driftnet never downloads it). It needs the password, turns reading private, and closes
    when driftnet stops.
 
 Then **🔌 Connect an AI** in the sidebar has a ready-to-paste card for Claude Code, Claude.ai / Claude
 Desktop (custom connector, read-only), ChatGPT custom GPTs, any chat that can open a link, and
-Hermes / OpenClaw / pi, with the URL and the share key filled in.
+Hermes / OpenClaw / pi, with the URL and the share key filled in. The agent cards can make a token for
+that agent and put it in the snippet, so the admin password never leaves the page.
 
 <p align="center"><img src="assets/access-connect-en.jpg" alt="Access & connections in Settings, and the Connect an AI cards" width="100%"></p>
 
