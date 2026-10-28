@@ -398,6 +398,7 @@ try {
     await click("mousePressed"); await click("mouseReleased");
     await waitFor(s, `document.querySelectorAll(".swipe.selected").length === 3 && !document.getElementById("selbar").hidden`, "three selected and the bar showing");
     assert.match(await evaluate(s, `document.querySelector("#selbar .sel-n").textContent`), /3/);
+    await shoot(`web-select-${LANG}.png`);
     await evaluate(s, `document.querySelector('#selbar [data-sel="move"]').click()`);
     await waitFor(s, `document.getElementById("move-dlg").open`, "move picker for the selection");
     await evaluate(s, `document.querySelector('#mv-list [data-to="${dest}"]').click()`);
@@ -584,6 +585,8 @@ try {
     assert.ok((await evaluate(s, `document.getElementById("agent-tokens").innerText`)).includes("Claude Code"));
     await evaluate(s, `(() => { document.getElementById("at-name").value = "Dashboard"; document.getElementById("at-scope").value = "read"; document.getElementById("at-create").click(); return 1; })()`);
     await waitFor(s, `!!document.getElementById("ac-newtok")?.value`, "new token shown once");
+    await evaluate(s, `document.getElementById("agent-tokens").scrollIntoView({ block: "start" })`);
+    await shoot(`web-tokens-${LANG}.png`);
     const readToken = await evaluate(s, `document.getElementById("ac-newtok").value`);
     assert.equal((await asAgent(readToken, "/api/items")).status, 200, "a read token reads");
     assert.equal((await asAgent(readToken, "/api/ingest", { method: "POST", body: "{}" })).status, 401, "a read token can't write");

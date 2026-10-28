@@ -137,6 +137,10 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 <p align="center"><img src="assets/notes-settings-zh-TW.jpg" alt="筆記頁（可以連到卡片）和設定視窗" width="100%"></p>
 
+<p align="center"><img src="assets/select-zh-TW.jpg" alt="選了三張卡片，下方工具列可以對整批做：移動到…、最愛、垃圾桶、全選、清除" width="100%"></p>
+
+<p align="center"><img src="assets/tokens-zh-TW.jpg" alt="設定 → 存取 → Agent 專用金鑰：新金鑰只顯示一次，清單有權限和最後使用時間，可撤銷" width="100%"></p>
+
 ### Chrome 擴充
 
 <p align="center"><img src="assets/extension-zh-TW.jpg" alt="driftnet 彈出視窗疊在一則社群貼文上：已收錄，附分類、評價和三點摘要" width="100%"></p>

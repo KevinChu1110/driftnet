@@ -157,6 +157,10 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
 
 <p align="center"><img src="assets/notes-settings-en.jpg" alt="The notes page with links to cards, and the settings dialog" width="100%"></p>
 
+<p align="center"><img src="assets/select-en.jpg" alt="Three cards selected; the bar at the bottom offers Move to…, favorite, trash, select all and clear for all of them" width="100%"></p>
+
+<p align="center"><img src="assets/tokens-en.jpg" alt="Settings → Access → Agent tokens: a new token shown once, the list with scope and last use, and Revoke" width="100%"></p>
+
 ### Chrome extension
 
 <p align="center"><img src="assets/extension-en.jpg" alt="The driftnet popup over a social post: saved, with category, worth and a three-point summary" width="100%"></p>

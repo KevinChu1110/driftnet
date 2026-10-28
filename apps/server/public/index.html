@@ -302,9 +302,11 @@
   .meter[data-s="strong"] i { width: 100%; background: var(--ok); }
   .tok { justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--line); }
   .tok.revoked { opacity: .55; }
-  .tok-name { display: grid; gap: 2px; min-width: 0; }
+  .tok-name { display: grid; gap: 2px; min-width: 0; justify-items: start; }
   .tok .btn { flex: none; }
-  .keyrow select { min-height: 38px; flex: none; }
+  /* The create-token row: the name takes the room, the scope and button only what they need (the set-row rules below would stretch them). */
+  .set-row .keyrow input, #at-name { flex: 1 1 120px; width: auto; min-width: 0; }
+  .set-row .keyrow select, #at-scope { min-height: 38px; flex: 0 0 auto; width: auto; }
   .warn { background: var(--star-soft); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 4px 0 10px; }
   .warn.danger { background: var(--danger-soft); }
   .conn { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
@@ -1356,7 +1358,8 @@
   }
   function tokensPanel(a, tokens, minted) {
     const st = T().st;
-    const when = (iso) => esc(iso.slice(0, 16).replace("T", " "));
+    // Local time, the way the reader's clock shows it; the server stores UTC.
+    const when = (iso) => { const d = new Date(iso); return esc(isNaN(d) ? iso : d.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })); };
     const rows = tokens.length ? tokens.map((k) => `<div class="keyrow tok ${k.revokedAt ? "revoked" : ""}">
         <span class="tok-name"><b>${esc(k.name)}</b> <span class="badge">${esc(st.tokScopes[k.scope])}</span>
         <small>${esc(st.tokCreatedOn)} ${when(k.createdAt)} · ${esc(st.tokLastUsed)} ${k.lastUsedAt ? when(k.lastUsedAt) : esc(st.tokNever)}${k.revokedAt ? ` · ${esc(st.tokRevoked)}` : ""}</small></span>
