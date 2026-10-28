@@ -5,10 +5,16 @@ import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
 import type { Store } from "./store.ts";
 import { enrichSchema, normalizeSummary, type Summarizer } from "./summarize.ts";
-import type { Digest, IngestResult, Judgement, PageContent, ShareContext, Suggestion, Summary } from "./types.ts";
+import type { Digest, IngestResult, Item, Judgement, PageContent, ShareContext, Suggestion, Summary } from "./types.ts";
 import { keywordSuggestions } from "./suggest.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
 import { clipTokens, digestBudget } from "./digest.ts";
+
+/** A refresh of this item is already running. */
+export class RefreshBusy extends Error {}
+/** The same item was refreshed less than a minute ago. */
+export class RefreshTooSoon extends Error {}
+const REFRESH_COOLDOWN_MS = 60_000;
 
 export interface PipelineOptions {
   store: Store;
@@ -41,6 +47,8 @@ export type Engines = Pick<PipelineOptions, "judge" | "summarizer" | "minConfide
 export class Pipeline {
   /** Links being processed right now, so simultaneous shares pay once. */
   private readonly inflight = new Map<string, Promise<IngestResult>>();
+  private readonly refreshing = new Set<number>();
+  private readonly lastRefresh = new Map<number, number>();
 
   constructor(private readonly opts: PipelineOptions) {}
 
@@ -130,8 +138,24 @@ export class Pipeline {
       return { item: store.get(item.id)!, cached: true };
     }
 
+    const a = await this.analyze(digest, ctx.note);
+    digest = a.digest;
+    const { summary } = a;
+    const item = store.upsert({
+      url: digest.url, aliases: [url], title: summary?.name ?? digest.title, judgement: a.judgement, summary,
+      flags: a.flags, source: a.source, suggestions: a.suggestions,
+    });
+    store.recordShare(item.id, ctx);
+    const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
+    for (const r of related) store.linkFound(item.id, r.item.id);
+    return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
+  }
+
+  /** Guard → reputation → judge → summarise: everything between "page fetched" and "ready to store". */
+  private async analyze(digest: Digest, note: string | undefined) {
+    const { store } = this.opts;
     const cleaned = guard(digest.text);
-    const cleanedNote = ctx.note ? guard(ctx.note) : { text: undefined, flags: [] };
+    const cleanedNote = note ? guard(note) : { text: undefined, flags: [] };
     digest = { ...digest, text: cleaned.text };
     const flags = [...new Set([...cleaned.flags, ...cleanedNote.flags])];
     const source = sourceOf(digest);
@@ -172,14 +196,34 @@ export class Pipeline {
     const suggestions = modelPicks.length ? modelPicks : keywordSuggestions(this.opts.categories, {
       name: summary?.name ?? digest.title, tags: summary?.tags ?? [], current: judgement.category,
     });
-    const item = store.upsert({
-      url: digest.url, aliases: [url], title: summary?.name ?? digest.title, judgement, summary,
-      flags, source, suggestions,
-    });
-    store.recordShare(item.id, ctx);
-    const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
-    for (const r of related) store.linkFound(item.id, r.item.id);
-    return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
+    return { digest, judgement, summary, flags, source, suggestions };
+  }
+
+  /**
+   * Fetch an item's page again and redo the analysis. The reader's own data
+   * (shares, note, favorite, trash, a folder they chose) is untouched.
+   */
+  async refresh(id: number): Promise<Item | null> {
+    const { store } = this.opts;
+    const old = store.get(id);
+    if (!old) return null;
+    if (this.refreshing.has(id)) throw new RefreshBusy(`Item ${id} is already being refreshed.`);
+    if (Date.now() - (this.lastRefresh.get(id) ?? 0) < REFRESH_COOLDOWN_MS) throw new RefreshTooSoon(`Item ${id} was refreshed a moment ago; try again in a minute.`);
+    this.refreshing.add(id);
+    this.lastRefresh.set(id, Date.now());
+    try {
+      if (this.refused(old.url)) throw new BlockedUrl(`${hostOf(old.url)} is blocked in your settings`);
+      const digest = await this.followToTool(await extract(old.url));
+      // A page that is down or walled now must not wipe a good summary.
+      if (!digest.text.trim() && old.summary) throw new Error("The page returned no content; kept the existing summary.");
+      const a = await this.analyze(digest, store.notes(id, 1)[0]);
+      return store.refreshItem(id, {
+        title: a.summary?.name ?? a.digest.title, judgement: a.judgement, summary: a.summary,
+        flags: a.flags, source: a.source, suggestions: a.suggestions,
+      });
+    } finally {
+      this.refreshing.delete(id);
+    }
   }
 
   /**

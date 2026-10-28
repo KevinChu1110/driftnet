@@ -15,7 +15,7 @@ export * from "./types.ts";
 export { canonicalize, extractUrls } from "./url.ts";
 export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/index.ts";
 export { guard } from "./guard.ts";
-export { Pipeline } from "./pipeline.ts";
+export { Pipeline, RefreshBusy, RefreshTooSoon } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, loadCategories } from "./categories.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";

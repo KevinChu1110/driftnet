@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { BlockedUrl, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, LOCALES, suggestionsFor, createDriftnet, loadPlugins, type Locale, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "./bulk.ts";
 import { applySuggested, suggestFolders } from "./plan.ts";
 import { tokenRoute } from "./tokens.ts";
@@ -214,6 +214,23 @@ const server = createServer(async (req, res) => {
       const body = await readJson<unknown>(req);
       const out = path === "/api/items/bulk" ? bulkAction(dn.store, body, actorOf(req, env, dn.store)) : bulkUndo(dn.store, body);
       return send(res, out.status, out.body);
+    }
+    // Fetch a card's page again and redo its summary; the reader's note, stars, shares and chosen folder stay.
+    const refreshMatch = /^\/api\/items\/(\d+)\/refresh$/.exec(path);
+    if (req.method === "POST" && refreshMatch) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const id = Number(refreshMatch[1]);
+      if (!dn.store.get(id)) return send(res, 404, { error: "not found" });
+      try {
+        const item = await dn.pipeline.refresh(id);
+        return item ? send(res, 200, item) : send(res, 404, { error: "not found" });
+      } catch (err) {
+        if (err instanceof RefreshBusy) return send(res, 409, { error: err.message });
+        if (err instanceof RefreshTooSoon) return send(res, 429, { error: err.message });
+        if (err instanceof BlockedUrl) return send(res, 422, { error: err.message });
+        console.warn(`[driftnet] refresh ${id} failed:`, (err as Error).message);
+        return send(res, 502, { error: (err as Error).message });
+      }
     }
     const moveMatch = /^\/api\/items\/(\d+)\/move$/.exec(path);
     if (req.method === "POST" && moveMatch) {

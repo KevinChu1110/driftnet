@@ -390,6 +390,14 @@ try {
   assert.equal((await api(`/api/items/${first}`)).trashedAt, undefined);
   console.log("✓ undo restored it");
 
+  // Refresh: the button spins, then a toast says how it went (success or failure depending on the network);
+  // the card survives either way with its shares intact.
+  const sharesBefore = (await api(`/api/items/${first}`)).shareCount;
+  await evaluate(s, `document.getElementById("toast").classList.remove("show"); document.querySelector('#item-${first} [data-act="refresh"]').click()`);
+  await waitFor(s, `document.querySelector('#item-${first} [data-act="refresh"]') && !document.querySelector('#item-${first} [data-act="refresh"]').disabled && document.getElementById("toast").classList.contains("show")`, "refresh finished with a toast");
+  assert.equal((await api(`/api/items/${first}`)).shareCount, sharesBefore, "refresh keeps the shares");
+  console.log("✓ refresh button ran and reported");
+
   // Swipe right: favorite. A short swipe must not count.
   const second = (await ids())[1];
   await swipe(second, 40);

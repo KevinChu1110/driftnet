@@ -403,6 +403,28 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   );
 
   server.registerTool(
+    "driftnet_refresh_item",
+    {
+      title: "Re-fetch and re-summarise an item",
+      description:
+        "Fetch an item's page again and redo its summary, tags and rating, e.g. when it was saved behind a login wall or the page was down and only has a title. " +
+        "The reader's note, favorite, trash state, share history and any folder they chose are kept. Without a configured model the item goes back to the agent queue. " +
+        "Limited to once a minute per item; fails if the item does not exist, is being refreshed already, or the page returns nothing.",
+      inputSchema: { id: z.number().int().positive().describe("Id of the item to refresh") },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ id }) => {
+      if (!item(id)) return fail(`No item ${id}.`);
+      try {
+        const r = await dn.pipeline.refresh(id);
+        return r ? done(`Refreshed ${id}: ${r.pending ? "queued for an agent to summarise" : r.summary?.oneLiner ?? r.title}`) : fail(`No item ${id}.`);
+      } catch (err) {
+        return fail((err as Error).message);
+      }
+    },
+  );
+
+  server.registerTool(
     "driftnet_favorite_item",
     {
       title: "Star or unstar an item",

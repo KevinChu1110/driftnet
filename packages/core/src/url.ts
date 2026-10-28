@@ -6,6 +6,14 @@ const TRACKING_PARAMS = new Set([
   "mibextid", "rdid", "share_url", "fs", "xmt", "slof", "s", "t",
 ]);
 
+/** Share-tracking params that only the Chinese-market apps add (Xiaohongshu, Douyin, TikTok). Matched on those hosts only: "_t" or "did" mean something elsewhere. */
+const ASIAN_SHARE_HOSTS = ["xiaohongshu.com", "xhslink.com", "douyin.com", "iesdouyin.com", "tiktok.com"];
+const ASIAN_SHARE_PARAMS = new Set([
+  "xsec_token", "xsec_source", "share_from_user_hidden", "apptime", "share_id", "exsource", "app_platform", "app_version",
+  "author_share", "shareredirect", "type_share", "_r", "_t", "u_code", "did", "iid", "is_from_webapp", "sender_device",
+  "web_id", "region", "timestamp", "tt_from", "enter_from", "enter_method", "sec_uid", "sec_user_id", "social_share_type",
+]);
+
 export function extractUrls(text: string): string[] {
   // Pasting several links without spaces glues them together ("…?x=1https://…").
   const found = (text.match(URL_RE) ?? []).flatMap((m) => m.split(/(?=https?:\/\/)/));
@@ -40,6 +48,12 @@ export function canonicalize(raw: string): string | null {
 
   for (const key of [...u.searchParams.keys()]) {
     if (key.startsWith("utm_") || TRACKING_PARAMS.has(key)) u.searchParams.delete(key);
+  }
+
+  if (ASIAN_SHARE_HOSTS.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))) {
+    for (const key of [...u.searchParams.keys()]) {
+      if (ASIAN_SHARE_PARAMS.has(key.toLowerCase()) || key.startsWith("share_")) u.searchParams.delete(key);
+    }
   }
 
   // youtu.be/ID and youtube.com/shorts/ID → youtube.com/watch?v=ID

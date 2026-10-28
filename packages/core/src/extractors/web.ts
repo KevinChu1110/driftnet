@@ -7,7 +7,7 @@ import { canonicalize, extractUrls, hostOf } from "../url.ts";
 /** Sites that hide the post behind a login wall for anonymous fetches. */
 const SOCIAL_HOSTS = [
   "threads.net", "threads.com", "facebook.com", "fb.watch", "instagram.com", "x.com", "twitter.com",
-  "linkedin.com", "tiktok.com",
+  "linkedin.com", "tiktok.com", "xiaohongshu.com", "xhslink.com", "douyin.com", "iesdouyin.com",
 ];
 
 export function isSocial(url: string): boolean {
