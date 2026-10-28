@@ -12,6 +12,12 @@ const SummarySchema = z.object({
   use_cases: z.array(z.string()).describe("Up to 2 situations where someone would reach for it"),
   tags: z.array(z.string()).describe("Up to 5 short lowercase tags"),
   primary_url: z.string().describe("Best link to the tool itself (repo or official site) if it appears in the input, else empty"),
+  repo_guess: z
+    .string()
+    .describe(
+      "If this is an open-source project and its repository is not linked, your best guess of the GitHub repository name, " +
+        "e.g. ascii-sharks. Only the name, no owner. driftnet checks it on GitHub. Empty if unsure or not open source",
+    ),
   mentions: z
     .array(z.object({ name: z.string(), open_source: z.boolean() }))
     .describe(
@@ -40,6 +46,7 @@ type Parsed = z.infer<typeof SummarySchema> & Partial<z.infer<ReturnType<typeof 
 export function enrichSchema(categories: string[]) {
   return SummarySchema.extend({
     mentions: SummarySchema.shape.mentions.default([]),
+    repo_guess: SummarySchema.shape.repo_guess.default(""),
     primary_url: SummarySchema.shape.primary_url.default(""),
     use_cases: SummarySchema.shape.use_cases.default([]),
     tags: SummarySchema.shape.tags.default([]),
@@ -56,6 +63,8 @@ export function normalizeSummary(out: z.infer<typeof SummarySchema>): Summary {
 export interface SummarizeResult {
   summary: Summary | null;
   judgement?: Judgement;
+  /** The model's guess of the repo name, to be verified on GitHub — never stored as-is. */
+  repoGuess?: string;
   /** Set when every attempt failed. */
   error?: string;
 }
@@ -147,6 +156,8 @@ function normalize(out: Parsed): SummarizeResult {
   if (mentions.length) summary.mentions = mentions;
 
   const result: SummarizeResult = { summary };
+  const guess = typeof out.repo_guess === "string" ? out.repo_guess.trim() : "";
+  if (/^[A-Za-z0-9._-]{3,100}$/.test(guess)) result.repoGuess = guess;
   if (out.category && out.kind && out.worth && out.ai_tool !== undefined) {
     result.judgement = {
       isAiTool: out.ai_tool ? 1 : 0, category: out.category, kind: out.kind, worth: out.worth, engine: "llm", confidence: 1,

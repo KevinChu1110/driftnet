@@ -138,7 +138,7 @@ export class Pipeline {
       const r = await this.opts.summarizer.summarize(
         digest, cleanedNote.text, judgement ? undefined : this.opts.categories,
       );
-      summary = r.summary ? await this.verifyPrimaryUrl(r.summary, digest) : null;
+      summary = r.summary ? await this.verifyPrimaryUrl(r.summary, digest, r.repoGuess) : null;
       judgement ??= r.judgement ?? null;
     }
 
@@ -158,7 +158,7 @@ export class Pipeline {
    * names a tool without linking it. Keep the model's link only if it appears in
    * what we actually fetched; otherwise ask GitHub for an exact-name match.
    */
-  private async verifyPrimaryUrl(summary: Summary, digest: Digest): Promise<Summary> {
+  private async verifyPrimaryUrl(summary: Summary, digest: Digest, repoGuess?: string): Promise<Summary> {
     const seen = new Set(
       [digest.url, ...digest.outlinks, ...extractUrls(digest.text)].map((u) => canonicalize(u)).filter(Boolean),
     );
@@ -166,8 +166,13 @@ export class Pipeline {
     const { primaryUrl: _dropped, ...rest } = summary;
     if (claimed && seen.has(claimed)) return { ...rest, primaryUrl: claimed };
     if (digest.kind === "post" || digest.kind === "video") {
-      const repo = await findGithubRepo(summary.name).catch(() => null);
-      if (repo) return { ...rest, primaryUrl: repo };
+      // The name as written (may be translated in the post), then the model's guess
+      // of the repo name; either only counts if GitHub has an exact match.
+      for (const name of [summary.name, repoGuess]) {
+        if (!name) continue;
+        const repo = await findGithubRepo(name).catch(() => null);
+        if (repo) return { ...rest, primaryUrl: repo };
+      }
     }
     return rest;
   }
