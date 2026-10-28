@@ -398,6 +398,10 @@ CHROME=/path/to/chrome pnpm e2e:web             # the web page on a phone-sized 
 pnpm build:npm                                  # the npm package in dist/npm (try: cd dist/npm && npm pack)
 ```
 
+Releasing: bump the version in `apps/server/package.json`, `server.json` and `.claude-plugin/`, then push a tag
+(`git tag v0.2.0 && git push origin v0.2.0`). [`release.yml`](.github/workflows/release.yml) tests and publishes to
+npm (trusted publishing) and the MCP Registry, and creates the GitHub release — no passwords or one-time codes.
+
 Extend it: a site (a plugin file in `~/.driftnet/plugins`, like
 [`examples/plugins/hackernews.mjs`](examples/plugins/hackernews.mjs), or `registerExtractor()`), a model (`LlmProvider`), a judge (`Judge`), a chat
 platform (`handleChatText()`), browser capture (`collect.js`), or a bot language (`i18n.ts`).

@@ -368,6 +368,10 @@ CHROME=/path/to/chrome pnpm e2e:web             # 用手機尺寸和真的觸控
 pnpm build:npm                                  # 打包 npm 套件到 dist/npm（試用：cd dist/npm && npm pack）
 ```
 
+發新版：改 `apps/server/package.json`、`server.json` 和 `.claude-plugin/` 裡的版號，再推一個標籤
+（`git tag v0.2.0 && git push origin v0.2.0`）。[`release.yml`](.github/workflows/release.yml) 會跑完測試，發到 npm（受信任發佈）
+和 MCP Registry，並建立 GitHub Release，不需要任何密碼或驗證碼。
+
 可以擴充：網站（放一個外掛檔到 `~/.driftnet/plugins`，像
 [`examples/plugins/hackernews.mjs`](examples/plugins/hackernews.mjs)，或用 `registerExtractor()`）、模型（`LlmProvider`）、判斷器（`Judge`）、聊天平台（`handleChatText()`）、
 瀏覽器擷取（`collect.js`）、bot 介面語言（`i18n.ts`）。
