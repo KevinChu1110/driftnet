@@ -30,7 +30,7 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 
 <sub>實測結果。這篇貼文沒有附任何連結，driftnet 讀了說明文字，再用名稱到 GitHub 找到兩個 repo。聊天室只回一行，整理好的摘要在網頁上。</sub>
 
-<p align="center"><img src="assets/screenshot-zh-TW.jpg" alt="driftnet 網頁：左邊是分類，右邊是整理好的工具" width="100%"></p>
+<p align="center"><img src="assets/screenshot-zh-TW.jpg" alt="driftnet 網頁：左邊是自己的資料夾樹，右邊是整理好的工具" width="100%"></p>
 
 **目錄** · [為什麼](#為什麼用-driftnet) · [開始使用](#開始使用) · [接法](#接法) ·
 [模型](#模型) · [Agent](#agent) · [運作方式](#運作方式) ·
@@ -87,11 +87,14 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 ### 網頁
 
-<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：清單、☰ 側邊欄（檢視與分類）、一張卡片往左滑向垃圾桶" width="100%"></p>
+<p align="center"><img src="assets/phone-zh-TW.jpg" alt="driftnet 在手機上：☰ 側邊欄裡的資料夾樹、「移動到…」選單、一張卡片往左滑向垃圾桶" width="100%"></p>
 
-每個連結都會整理到一個網頁上，可以搜尋、依分類和類型篩選，手機也能開。在手機上，側邊欄會收進左上角的 ☰，
-搜尋框下方有一行字告訴你現在看的是哪個分類。
+每個連結都會整理到一個網頁上，可以搜尋、依資料夾和類型篩選，手機也能開。在手機上，側邊欄會收進左上角的 ☰，
+搜尋框下方有一行字告訴你現在看的是哪個資料夾。
 
+- **資料夾就是分類。**在側邊欄用 ＋ 和 ⋯ 新增、巢狀、改名、寫說明；AI 會照資料夾的路徑和說明分新連結，
+  例如「遊戲 › 楓之谷 — Artale 小工具」就會收到楓之谷的工具。卡片可以按 📁 **移動到…**，電腦上也能拖著 ⠿ 丟到資料夾；
+  自己放好的卡片不會再被 AI 搬走。刪掉資料夾時，裡面的連結會移到上一層。
 - **往右滑**加入最愛，**往左滑**移到垃圾桶；滑太短不會觸發，上下捲動也不會被當成滑動。電腦上可以按 ☆ 和 🗑，或用滑鼠拖曳。
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
 - 用瀏覽器的**加入主畫面**，就能像 App 一樣打開。
@@ -223,7 +226,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | 3. 大綱 | 標題加每段開頭；拿掉選單、麵包屑、Cookie 提示和頁尾；上限約 350 **token**，中日文一字算一個 token | 否 |
 | 4. 防污染 | 拒絕指向私有或本機位址的連結（每一次轉址都檢查）；去除隱藏字元；標記提示詞注入 | 否 |
 | 5. 信譽 | 3 票以上、好評低於 25% 的來源只存不摘要 | 否 |
-| 6. 判斷 | [Jev](https://console.typesafe.ai) 用選擇題回答分類、類型、值不值得看、有沒有注入，約 100ms | 極小的分類器 |
+| 6. 判斷 | [Jev](https://console.typesafe.ai) 用選擇題回答放哪個資料夾、類型、值不值得看、有沒有注入，約 100ms | 極小的分類器 |
 | 7. 摘要 | 只有值得看的才做一次結構化呼叫，或排進 agent 佇列 | 一次 |
 | 8. 追蹤 | 內容裡附上或提到名稱的 repo，也會查到並收錄 | 否 |
 
@@ -251,7 +254,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | 啟用 Jev 判斷；`DRIFTNET_JUDGE=off` 可關閉 |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
-| `DRIFTNET_CATEGORIES` | 內建 | 自訂分類的 JSON 檔：`{ "id": "說明" }` |
+| `DRIFTNET_CATEGORIES` | 內建 | 起始資料夾的 JSON 檔：`{ "id": "說明" }`，只在新資料庫用一次，之後直接在網頁上改 |
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
 | `DRIFTNET_TOKEN` | — | 別人連得到伺服器時，寫入、MCP 和 agent 佇列都需要它 |
 | `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取也要 token |
@@ -268,7 +271,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
-`POST /api/items/:id/{trash,restore,favorite,unfavorite}` · `POST /api/ingest` ·
+`POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 

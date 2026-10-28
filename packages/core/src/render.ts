@@ -7,10 +7,15 @@ const WORTH_MARK = { skip: "🗑", low: "·", normal: "📌", "must-see": "⭐" 
  * Plain-text reply that works on every chat platform. Adapters may render richer
  * components (Slack blocks, LINE Flex, Discord embeds) from the same IngestResult.
  */
-export function renderText(r: IngestResult, baseUrl?: string, t: Messages = messages()): string {
+export function renderText(
+  r: IngestResult,
+  baseUrl?: string,
+  t: Messages = messages(),
+  label: (folder: string) => string = (f) => categoryLabel(f, t.locale),
+): string {
   const { item } = r;
   const s = item.summary;
-  const lines = [`${WORTH_MARK[item.worth]} ${s?.name ?? item.title}｜${categoryLabel(item.category, t.locale)}`];
+  const lines = [`${WORTH_MARK[item.worth]} ${s?.name ?? item.title}｜${label(item.category)}`];
   if (s) {
     lines.push(s.oneLiner);
     for (const h of s.highlights) lines.push(`• ${h}`);
@@ -22,7 +27,7 @@ export function renderText(r: IngestResult, baseUrl?: string, t: Messages = mess
   if (s?.mentions?.length) lines.push(t.mentions + s.mentions.map((m) => m.name).join(t.listSep));
   if (r.cached) lines.push(t.cached(item.shareCount));
   if (baseUrl) lines.push(`${baseUrl}/#item-${item.id}`);
-  for (const rel of r.related ?? []) lines.push("", "↳ " + renderText(rel, baseUrl, t).replace(/\n/g, "\n  "));
+  for (const rel of r.related ?? []) lines.push("", "↳ " + renderText(rel, baseUrl, t, label).replace(/\n/g, "\n  "));
   return lines.join("\n");
 }
 
@@ -31,13 +36,18 @@ export function renderText(r: IngestResult, baseUrl?: string, t: Messages = mess
  * web page; a group chat only needs to know the link was caught. Repos found
  * inside a post are named on the same line.
  */
-export function renderLink(r: IngestResult, baseUrl?: string, t: Messages = messages()): string {
+export function renderLink(
+  r: IngestResult,
+  baseUrl?: string,
+  t: Messages = messages(),
+  label: (folder: string) => string = (f) => categoryLabel(f, t.locale),
+): string {
   const { item } = r;
   const name = (item.summary?.name ?? item.title).slice(0, 80);
   const where = baseUrl ? `${baseUrl}/#item-${item.id}` : item.summary?.primaryUrl || item.url;
   const found = (r.related ?? []).map((x) => x.item.summary?.name ?? x.item.title);
   return [
-    `${WORTH_MARK[item.worth]} ${name}｜${categoryLabel(item.category, t.locale)}`,
+    `${WORTH_MARK[item.worth]} ${name}｜${label(item.category)}`,
     found.length ? ` ${t.alsoFound}${found.join(t.listSep)}` : "",
     item.pending ? " ⏳" : "",
     r.cached ? ` ${t.seenBefore}` : "",

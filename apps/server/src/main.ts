@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { BlockedUrl, canonicalize, categoryLabels, createDriftnet, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, canonicalize, FolderError, LOCALES, createDriftnet, defaultDbPath, driftnetHome, loadHomeEnv, resolveLocale, WORTH, type Kind, type PageContent, type Worth } from "@driftnet/core";
 import { handleChatText } from "./adapters/handle.ts";
 import { handleLine } from "./adapters/line.ts";
 import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
@@ -88,14 +88,59 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(`${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
     if (req.method === "GET" && path === "/api/ui") {
-      return send(res, 200, { locale: resolveLocale(), categories: categoryLabels(Object.keys(dn.categories)) });
+      // Folder names in every locale, for clients that switch language themselves (web page, extension).
+      const categories = Object.fromEntries(
+        dn.store.folders().map((f) => [f.id, Object.fromEntries(LOCALES.map((l) => [l, dn.folderLabel(f.id, l)]))]),
+      );
+      return send(res, 200, { locale: resolveLocale(), categories });
+    }
+
+    // ── The reader's folder tree ──────────────────────────────────────────
+    if (req.method === "GET" && path === "/api/folders") {
+      return send(res, 200, dn.store.folders().map((f) => ({ ...f, label: Object.fromEntries(LOCALES.map((l) => [l, dn.folderLabel(f.id, l)])) })));
+    }
+    const folderMatch = /^\/api\/folders(?:\/([^/]+))?$/.exec(path);
+    if (folderMatch && req.method !== "GET") {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const id = folderMatch[1] ? decodeURIComponent(folderMatch[1]) : null;
+      try {
+        if (req.method === "POST" && !id) {
+          const body = await readJson<{ name?: string; description?: string; parent?: string | null }>(req);
+          return send(res, 200, dn.store.createFolder({ name: String(body.name ?? ""), ...(body.description ? { description: String(body.description) } : {}), parent: body.parent ?? null }));
+        }
+        if (req.method === "PATCH" && id) {
+          const body = await readJson<{ name?: string; description?: string; parent?: string | null; position?: number }>(req);
+          return send(res, 200, dn.store.updateFolder(id, body));
+        }
+        if (req.method === "DELETE" && id) {
+          dn.store.deleteFolder(id);
+          return send(res, 200, { ok: true });
+        }
+      } catch (err) {
+        if (err instanceof FolderError) return send(res, 400, { error: err.message });
+        throw err;
+      }
+      return send(res, 405, { error: "method not allowed" });
+    }
+    const moveMatch = /^\/api\/items\/(\d+)\/move$/.exec(path);
+    if (req.method === "POST" && moveMatch) {
+      if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
+      const { folder } = await readJson<{ folder?: string }>(req);
+      try {
+        return dn.store.moveItem(Number(moveMatch[1]), String(folder ?? ""))
+          ? send(res, 200, dn.store.get(Number(moveMatch[1])))
+          : send(res, 404, { error: "not found" });
+      } catch (err) {
+        if (err instanceof FolderError) return send(res, 400, { error: err.message });
+        throw err;
+      }
     }
     if (req.method === "GET" && path === "/api/stats") return send(res, 200, { ...dn.store.stats(), engines: dn.engines });
 
     if (req.method === "GET" && path === "/api/items") {
       const p = url.searchParams;
       const minWorth = p.get("minWorth");
-      return send(res, 200, dn.store.list({
+      const list = dn.store.list({
         ...(p.get("q") ? { q: p.get("q")! } : {}),
         ...(p.get("category") ? { category: p.get("category")! } : {}),
         ...(p.get("kind") ? { kind: p.get("kind") as Kind } : {}),
@@ -104,7 +149,16 @@ const server = createServer(async (req, res) => {
         ...(p.get("view") === "favorites" || p.get("view") === "trash" ? { view: p.get("view") as "favorites" | "trash" } : {}),
         clean: p.get("all") !== "1",
         limit: Number(p.get("limit") ?? 200),
-      }));
+      });
+      // Tools found inside each item (repos a post named or linked), by name.
+      const names = new Map(list.map((i) => [i.id, i.summary?.name ?? i.title]));
+      const found = new Map<number, { id: number; name: string }[]>();
+      for (const { parent, child } of dn.store.foundLinks()) {
+        if (!names.has(parent)) continue;
+        const name = names.get(child) ?? dn.store.get(child)?.summary?.name ?? dn.store.get(child)?.title;
+        if (name && !dn.store.get(child)?.trashedAt) found.set(parent, [...(found.get(parent) ?? []), { id: child, name }]);
+      }
+      return send(res, 200, list.map((i) => ({ ...i, found: found.get(i.id) ?? [] })));
     }
     const itemMatch = /^\/api\/items\/(\d+)(\/feedback)?$/.exec(path);
     if (req.method === "GET" && itemMatch && !itemMatch[2]) {

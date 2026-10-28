@@ -91,6 +91,7 @@ export class Pipeline {
       // The browser may see what the first pass could not, e.g. a repo linked
       // in the comments: catalogue that alongside.
       const related = depth === 0 ? await this.newReposFrom(page, hit.url, ctx) : [];
+      for (const r of related) store.linkFound(hit.id, r.item.id);
       return { item: store.get(hit.id)!, cached: true, ...(related.length ? { related } : {}) };
     }
 
@@ -150,6 +151,7 @@ export class Pipeline {
     });
     store.recordShare(item.id, ctx);
     const related = await this.resolveMentions(summary?.mentions ?? [], digest, ctx, depth);
+    for (const r of related) store.linkFound(item.id, r.item.id);
     return { item: store.get(item.id)!, cached: false, ...(related.length ? { related } : {}) };
   }
 
@@ -214,6 +216,7 @@ export class Pipeline {
     const saved = this.opts.store.enrich(id, summary, agent, { ...(category ? { category } : {}), ...(worth ? { worth } : {}) });
     const digest: Digest = { url: saved.url, kind: saved.kind, title: saved.title, text: "", outlinks: [], meta: {} };
     const related = await this.resolveMentions(summary.mentions ?? [], digest, { platform: "agent", chatId: agent }, 0);
+    for (const r of related) this.opts.store.linkFound(id, r.item.id);
     return { ok: true, result: { item: saved, cached: false, ...(related.length ? { related } : {}) } };
   }
 

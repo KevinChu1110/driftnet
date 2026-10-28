@@ -18,6 +18,19 @@ export interface Reputation {
   score: number;
 }
 
+export interface Folder {
+  id: string;
+  parent: string | null;
+  /** null: a built-in shelf, shown with its translated label until renamed. */
+  name: string | null;
+  description: string;
+  position: number;
+  /** Items directly in this folder (not counting sub-folders), trash excluded. */
+  count: number;
+}
+
+export class FolderError extends Error {}
+
 export interface ListQuery {
   /** all (default, trash excluded), favorites, or trash. */
   view?: "all" | "favorites" | "trash";
@@ -86,15 +99,38 @@ export class Store {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      -- The reader's own tree of shelves. Items point at a folder through items.category.
+      -- name NULL = a built-in shelf still showing its translated label.
+      CREATE TABLE IF NOT EXISTS folders (
+        id TEXT PRIMARY KEY,
+        parent_id TEXT REFERENCES folders(id),
+        name TEXT,
+        description TEXT NOT NULL DEFAULT '',
+        position INTEGER NOT NULL DEFAULT 0
+      );
+      -- "child was found inside parent": repos named or linked in a post.
+      CREATE TABLE IF NOT EXISTS found_in (
+        parent_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        child_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        PRIMARY KEY (parent_id, child_id)
+      );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
     `);
     // Columns added after the first release.
     const cols = new Set((this.db.prepare("PRAGMA table_info(items)").all() as { name: string }[]).map((c) => c.name));
+    // Links recorded before found_in existed live in share notes; recover them once.
+    this.db.exec(`
+      INSERT OR IGNORE INTO found_in (parent_id, child_id)
+      SELECT p.id, s.item_id FROM shares s
+      JOIN items p ON p.url = substr(s.note, CASE WHEN s.note LIKE 'Mentioned in %' THEN 14 ELSE 13 END)
+      WHERE (s.note LIKE 'Mentioned in %' OR s.note LIKE 'Linked from %') AND p.id <> s.item_id`);
     for (const [name, type] of [
       ["claimed_at", "TEXT"], ["claimed_by", "TEXT"], ["enriched_by", "TEXT"],
       ["trashed_at", "TEXT"], ["favorite", "INTEGER NOT NULL DEFAULT 0"],
+      // 1 once the reader moved the item: nobody re-classifies it after that.
+      ["user_placed", "INTEGER NOT NULL DEFAULT 0"],
     ] as const) {
       if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
     }
@@ -144,6 +180,120 @@ export class Store {
       .run(itemId, ctx.platform, ctx.chatId, ctx.userId ?? null, ctx.note?.slice(0, 1000) ?? null);
     // Shared again after being trashed: someone wants it, so it comes back.
     this.db.prepare("UPDATE items SET share_count = share_count + 1, trashed_at = NULL WHERE id = ?").run(itemId);
+  }
+
+  // ── Folders ──────────────────────────────────────────────────────────────
+
+  /** First run: the built-in (or DRIFTNET_CATEGORIES) shelves become the starting tree. */
+  seedFolders(seed: Record<string, string>): void {
+    const has = this.db.prepare("SELECT COUNT(*) AS n FROM folders").get() as { n: number };
+    if (has.n > 0) return;
+    const insert = this.db.prepare("INSERT INTO folders (id, description, position) VALUES (?, ?, ?)");
+    Object.entries(seed).forEach(([id, description], i) => insert.run(id, description, i));
+    if (!("other" in seed)) insert.run("other", "Anything that fits none of the above", Object.keys(seed).length);
+  }
+
+  folders(): Folder[] {
+    const rows = this.db
+      .prepare(
+        `SELECT f.id, f.parent_id AS parent, f.name, f.description, f.position,
+                (SELECT COUNT(*) FROM items i WHERE i.category = f.id AND i.trashed_at IS NULL) AS count
+         FROM folders f ORDER BY f.position, f.id`,
+      )
+      .all() as unknown as Folder[];
+    return rows.map((r) => ({ id: r.id, parent: r.parent ?? null, name: r.name ?? null, description: r.description, position: r.position, count: r.count }));
+  }
+
+  /** A folder and every folder below it. */
+  descendants(id: string): string[] {
+    const all = this.folders();
+    const out = [id];
+    for (let i = 0; i < out.length; i++) for (const f of all) if (f.parent === out[i]) out.push(f.id);
+    return out;
+  }
+
+  createFolder(input: { name: string; description?: string; parent?: string | null }): Folder {
+    const name = input.name.trim().slice(0, 60);
+    if (!name) throw new FolderError("a folder needs a name");
+    const parent = input.parent || null;
+    if (parent && !this.folderExists(parent)) throw new FolderError(`no folder ${parent}`);
+    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+    let id = base.length >= 2 ? base : `f-${Math.random().toString(36).slice(2, 8)}`;
+    while (this.folderExists(id)) id = `${base || "f"}-${Math.random().toString(36).slice(2, 6)}`;
+    const position = (this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM folders WHERE parent_id IS ?").get(parent) as { p: number }).p;
+    this.db.prepare("INSERT INTO folders (id, parent_id, name, description, position) VALUES (?, ?, ?, ?, ?)")
+      .run(id, parent, name, (input.description ?? "").trim().slice(0, 300), position);
+    return this.folders().find((f) => f.id === id)!;
+  }
+
+  updateFolder(id: string, patch: { name?: string; description?: string; parent?: string | null; position?: number }): Folder {
+    if (!this.folderExists(id)) throw new FolderError(`no folder ${id}`);
+    if (patch.parent !== undefined && patch.parent !== null) {
+      if (!this.folderExists(patch.parent)) throw new FolderError(`no folder ${patch.parent}`);
+      if (this.descendants(id).includes(patch.parent)) throw new FolderError("a folder can't go inside itself");
+    }
+    if (patch.name !== undefined && !patch.name.trim()) throw new FolderError("a folder needs a name");
+    this.db
+      .prepare(
+        `UPDATE folders SET
+           name = COALESCE(?, name), description = COALESCE(?, description),
+           parent_id = CASE WHEN ? THEN ? ELSE parent_id END, position = COALESCE(?, position)
+         WHERE id = ?`,
+      )
+      .run(
+        patch.name?.trim().slice(0, 60) ?? null, patch.description?.trim().slice(0, 300) ?? null,
+        patch.parent !== undefined ? 1 : 0, patch.parent ?? null, patch.position ?? null, id,
+      );
+    return this.folders().find((f) => f.id === id)!;
+  }
+
+  /** Items and sub-folders move up one level ("other" if there is no parent). "other" itself stays. */
+  deleteFolder(id: string): void {
+    if (id === "other") throw new FolderError("“other” catches everything unsorted and can't be deleted");
+    const row = this.db.prepare("SELECT parent_id AS parent FROM folders WHERE id = ?").get(id) as { parent: string | null } | undefined;
+    if (!row) throw new FolderError(`no folder ${id}`);
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare("UPDATE items SET category = ? WHERE category = ?").run(row.parent ?? "other", id);
+      this.db.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ?").run(row.parent, id);
+      this.db.prepare("DELETE FROM folders WHERE id = ?").run(id);
+      this.db.exec("COMMIT");
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
+  /** The reader put this item here; classification won't touch it again. */
+  moveItem(itemId: number, folderId: string): boolean {
+    if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
+    return this.db.prepare("UPDATE items SET category = ?, user_placed = 1 WHERE id = ?").run(folderId, itemId).changes > 0;
+  }
+
+  /**
+   * What the judge and the model choose from: every folder, described by its
+   * path and the reader's note, e.g. "Games › MapleStory — MapleStory tools".
+   */
+  folderChoices(label: (f: Folder) => string): Record<string, string> {
+    const all = this.folders();
+    const byId = new Map(all.map((f) => [f.id, f]));
+    const path = (f: Folder): string => (f.parent && byId.has(f.parent) ? `${path(byId.get(f.parent)!)} › ` : "") + label(f);
+    return Object.fromEntries(all.map((f) => [f.id, f.description ? `${path(f)} — ${f.description}` : path(f)]));
+  }
+
+  private folderExists(id: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM folders WHERE id = ?").get(id));
+  }
+
+  /** Remember that `childId` was found inside `parentId` (a repo named in a post). */
+  linkFound(parentId: number, childId: number): void {
+    if (parentId !== childId) this.db.prepare("INSERT OR IGNORE INTO found_in (parent_id, child_id) VALUES (?, ?)").run(parentId, childId);
+  }
+
+  /** Every parent → children pair, for building the tree. */
+  foundLinks(): { parent: number; child: number }[] {
+    return (this.db.prepare("SELECT parent_id AS parent, child_id AS child FROM found_in").all() as { parent: number; child: number }[])
+      .map(({ parent, child }) => ({ parent, child }));
   }
 
   /** Soft delete: hidden everywhere, restorable from the trash. Returns false if there is no such item. */
@@ -237,7 +387,7 @@ export class Store {
     const row = this.db
       .prepare(
         `UPDATE items SET summary = ?, title = ?, enriched_by = ?, claimed_at = NULL, claimed_by = NULL,
-           category = COALESCE(?, category), worth = COALESCE(?, worth),
+           category = CASE WHEN user_placed = 1 THEN category ELSE COALESCE(?, category) END, worth = COALESCE(?, worth),
            updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
          WHERE id = ? RETURNING *`,
       )
@@ -252,7 +402,12 @@ export class Store {
     const where: string[] = [query.view === "trash" ? "trashed_at IS NOT NULL" : "trashed_at IS NULL"];
     const args: (string | number)[] = [];
     if (query.view === "favorites") where.push("favorite = 1");
-    if (query.category) { where.push("category = ?"); args.push(query.category); }
+    if (query.category) {
+      // A folder shows everything below it too.
+      const ids = this.descendants(query.category);
+      where.push(`category IN (${ids.map(() => "?").join(",")})`);
+      args.push(...ids);
+    }
     if (query.kind) { where.push("kind = ?"); args.push(query.kind); }
     if (query.since) { where.push("created_at >= ?"); args.push(query.since); }
     if (query.minWorth) {

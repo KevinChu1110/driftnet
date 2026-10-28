@@ -33,7 +33,7 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 <sub>From a real run. The post had no links: driftnet read the caption and found both repos on GitHub by name. The chat gets one line; the summary is on the page.</sub>
 
-<p align="center"><img src="assets/screenshot-en.jpg" alt="The driftnet web page: categories on the left, summarised tools on the right" width="100%"></p>
+<p align="center"><img src="assets/screenshot-en.jpg" alt="The driftnet web page: your folder tree on the left, summarised tools on the right" width="100%"></p>
 
 **Contents** · [Why](#why-driftnet) · [Quick start](#quick-start) · [Ways in](#ways-in) ·
 [Models](#models) · [Agents](#agents) · [How it works](#how-it-works) ·
@@ -95,11 +95,15 @@ where to read it on the web page. Want the summary in the chat instead, or no re
 
 ### The web page
 
-<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the catalogue, the ☰ drawer with views and shelves, and a card being swiped left to the trash" width="100%"></p>
+<p align="center"><img src="assets/phone-en.jpg" alt="driftnet on a phone: the ☰ drawer with your folder tree, the Move to… picker, and a card being swiped left to the trash" width="100%"></p>
 
-Every link lands on a page you can search, filter by shelf and kind, and open from a phone. On a
+Every link lands on a page you can search, filter by folder and kind, and open from a phone. On a
 phone the sidebar folds into a ☰ drawer, and a line under the search box says what you're looking at.
 
+- **Your folders are the categories.** Add, nest, rename and describe them from the sidebar (＋ and ⋯);
+  the AI files new links by each folder's path and description, so “Games › MapleStory — Artale
+  helpers” gets the MapleStory tools. Move a card with 📁 **Move to…**, or drag it by ⠿ onto a folder
+  on a computer; a card you placed stays put. Deleting a folder moves its links up one level.
 - **Swipe right** to add a favorite, **swipe left** to move to the trash; a short swipe does nothing,
   and scrolling never counts as a swipe. On a computer, use ☆ and 🗑 or drag with the mouse.
 - **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
@@ -242,7 +246,7 @@ Most links never reach a model; the ones that do arrive as a short outline.
 | 3. Outline | Headings and the opening of each section; menus, breadcrumbs, cookie banners and footers dropped; capped at ~350 **tokens**, counting CJK at a token per character | no |
 | 4. Guard | Links to private or local addresses refused (every redirect checked); hidden Unicode stripped; prompt injection flagged | no |
 | 5. Reputation | Publishers voted below 25% (3+ votes) are stored, not summarised | no |
-| 6. Judge | [Jev](https://console.typesafe.ai) answers category, kind, worth and injection as typed choices, ~100 ms | tiny classifier |
+| 6. Judge | [Jev](https://console.typesafe.ai) answers folder, kind, worth and injection as typed choices, ~100 ms | tiny classifier |
 | 7. Summarise | One structured call, only for items worth reading, or the agent queue | one call |
 | 8. Follow | Repos linked or named in the content are looked up and catalogued too | no |
 
@@ -272,7 +276,7 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge; `DRIFTNET_JUDGE=off` disables it |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
-| `DRIFTNET_CATEGORIES` | built-in | JSON file of your own shelves: `{ "id": "description" }` |
+| `DRIFTNET_CATEGORIES` | built-in | JSON file of starting folders, `{ "id": "description" }`, used once on a new database; after that, edit folders on the page |
 | `GITHUB_TOKEN` | — | GitHub API limit from 60 to 5,000 requests per hour |
 | `DRIFTNET_TOKEN` | — | Required for writes, MCP and the agent queue once others can reach the server |
 | `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the token too |
@@ -289,7 +293,7 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
-`POST /api/items/:id/{trash,restore,favorite,unfavorite}` · `POST /api/ingest` ·
+`POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `GET /api/categories` · `GET /llms.txt` · `GET /openapi.json` · `/mcp`
 

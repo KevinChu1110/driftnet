@@ -35,7 +35,7 @@
             border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
   .lang { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; min-height: 40px; }
 
-  .layout { display: grid; grid-template-columns: 220px 1fr; max-width: 1200px; margin: 0 auto; }
+  .layout { display: grid; grid-template-columns: 256px 1fr; max-width: 1200px; margin: 0 auto; }
   nav { padding: 16px 12px; border-right: 1px solid var(--line); position: sticky; top: 65px; align-self: start; max-height: calc(100vh - 65px); overflow: auto; }
   nav .row { display: contents; }
   nav button { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0;
@@ -44,6 +44,53 @@
   nav button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   nav .count { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 400; }
   nav h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 10px 6px; }
+
+  /* The reader's folder tree. */
+  nav .folders-head { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 6px 10px; }
+  nav .folders-head h2 { margin: 0; }
+  nav .icon { width: 30px; min-width: 30px; height: 30px; padding: 0; justify-content: center; color: var(--muted); flex: none; font-size: 15px; }
+  nav .icon:hover, nav .icon:focus-visible { color: var(--text); }
+  nav .folder { display: flex; align-items: center; gap: 0; padding-left: calc(var(--depth) * 12px); border-radius: 8px; }
+  nav .folder > [data-field] { flex: 1; min-width: 0; padding-left: 4px; }
+  nav .folder > [data-field] > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  nav .twist { transition: transform .15s ease; font-size: 10px; width: 22px; min-width: 22px; }
+  nav .folder .more { width: 26px; min-width: 26px; }
+  nav .twist[aria-expanded="true"] { transform: rotate(90deg); }
+  nav .twist.leaf { visibility: hidden; }
+  nav .folder .more { opacity: 0; }
+  nav .folder:hover .more, nav .folder .more:focus-visible, nav .folder:has([aria-pressed="true"]) .more { opacity: 1; }
+  @media (hover: none) { nav .folder .more { opacity: 1; } }
+  nav .drop-over { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+  nav .folder.dragged { opacity: .45; }
+
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); padding: 18px;
+           width: min(420px, calc(100vw - 32px)); box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h3 { margin: 0 0 12px; font-size: 17px; }
+  dialog label { display: grid; gap: 4px; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  dialog input, dialog textarea, dialog select { font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+                                                 border-radius: 10px; padding: 9px 11px; width: 100%; }
+  dialog textarea { resize: vertical; }
+  .dlg-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .dlg-actions .spacer { flex: 1; }
+  .btn { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger.armed { background: var(--danger); border-color: var(--danger); color: var(--panel); }
+  .dlg-error { color: var(--danger); font-size: 13px; margin: 0 0 8px; }
+  .dlg-error:empty { display: none; }
+  .pick { display: grid; gap: 2px; max-height: min(60vh, 460px); overflow: auto; margin: 0 -6px 12px; }
+  .pick button { display: flex; justify-content: space-between; gap: 8px; border: 0; background: none; text-align: left; border-radius: 8px;
+                 padding: 9px 10px 9px calc(10px + var(--depth) * 16px); min-height: 42px; cursor: pointer; }
+  .pick button:hover, .pick button:focus-visible { background: var(--accent-soft); }
+  .pick button[aria-current="true"] { color: var(--accent); font-weight: 600; }
+  .pick .count { color: var(--muted); font-weight: 400; }
+
+  .found { font-size: 13px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+  .found a { color: var(--accent); text-decoration: none; background: var(--accent-soft); border-radius: 99px; padding: 1px 9px; }
+  .found a:hover { text-decoration: underline; }
+  .tool.grip { cursor: grab; display: none; }
+  @media (hover: hover) and (pointer: fine) { .tool.grip { display: grid; } }
 
   .menu { display: none; width: 44px; height: 44px; margin: -4px 0 -4px -8px; border: 0; border-radius: 10px; background: none; cursor: pointer;
           place-items: center; color: var(--text); }
@@ -72,7 +119,7 @@
           touch-action: pan-y; user-select: none; -webkit-user-select: none; transition: transform .22s ease; }
   .card.dragging { transition: none; }
   .swipe:target .card { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding-right: 84px; }
+  .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding-right: 168px; }
   a.name { color: var(--text); font-weight: 650; font-size: 16px; text-decoration: none; }
   a.name:hover { color: var(--accent); }
   .badge { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
@@ -123,7 +170,7 @@
     .tools { position: static; justify-content: flex-end; margin: 4px -6px -8px 0; }
     .card ul { padding-left: 18px; }
   }
-  @media (prefers-reduced-motion: reduce) { .card, .swipe, .toast, nav, .scrim { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .card, .swipe, .toast, nav, .scrim, nav .twist { transition: none; } }
 </style>
 </head>
 <body>
@@ -142,12 +189,30 @@
   <nav id="nav"></nav>
   <main id="list" aria-live="polite"></main>
 </div>
+<dialog id="folder-dlg">
+  <form id="folder-form" method="dialog">
+    <h3 id="fd-title"></h3>
+    <p class="dlg-error" id="fd-error"></p>
+    <label><span id="fd-name-l"></span><input id="fd-name" maxlength="60" autocomplete="off"></label>
+    <label><span id="fd-desc-l"></span><textarea id="fd-desc" rows="2" maxlength="300"></textarea></label>
+    <label><span id="fd-parent-l"></span><select id="fd-parent"></select></label>
+    <div class="dlg-actions">
+      <button class="btn danger" id="fd-delete" type="button"></button><span class="spacer"></span>
+      <button class="btn" id="fd-cancel" type="button"></button><button class="btn primary" id="fd-save" type="submit"></button>
+    </div>
+  </form>
+</dialog>
+<dialog id="move-dlg">
+  <h3 id="mv-title"></h3>
+  <div class="pick" id="mv-list"></div>
+  <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="mv-cancel" type="button"></button></div>
+</dialog>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
   const STRINGS = {
     en: {
       search: "Search tools, tags, links…", all: "All", favorites: "Favorites", trash: "Trash", any: "Any",
-      categories: "Categories", kind: "Kind", switchTo: "中文", nav: "Views and categories",
+      kind: "Kind", switchTo: "中文", nav: "Views and categories",
       stats: (n, s) => `${n} items · shared ${s}×`, shared: (n) => `shared ${n}×`,
       empty: "Nothing here yet — drop a link in your chat.", emptyFav: "No favorites yet — swipe a card right, or tap ☆.",
       emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
@@ -160,10 +225,16 @@
       removed: (n) => `“${n}” moved to the trash`, restored: (n) => `“${n}” restored`, faved: (n) => `★ “${n}” added to favorites`,
       undo: "Undo", tokenPrompt: "This catalogue is private. Enter its token (DRIFTNET_TOKEN).", tokenSave: "Open",
       failed: "Couldn't save — check your connection.", menu: "Menu", close: "Close menu", showing: "Showing:",
+      folders: "Folders", newFolder: "New folder", newSub: "New folder inside", editFolder: "Edit folder", folderName: "Name",
+      folderDesc: "What goes here? (driftnet's AI reads this to sort new links)", folderParent: "Inside", topLevel: "— Top level —",
+      save: "Save", cancel: "Cancel", del: "Delete folder", delSure: "Delete — its links move up",
+      moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
+      dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
+      topLevelShort: "the top level",
     },
     "zh-TW": {
       search: "搜尋工具、標籤、連結…", all: "全部", favorites: "最愛", trash: "垃圾桶", any: "不限",
-      categories: "分類", kind: "類型", switchTo: "EN", nav: "檢視與分類",
+      kind: "類型", switchTo: "EN", nav: "檢視與分類",
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
       empty: "還沒有內容，把連結丟進聊天室吧。", emptyFav: "還沒有最愛，把卡片往右滑或按 ☆。",
       emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
@@ -176,6 +247,12 @@
       removed: (n) => `已將「${n}」移到垃圾桶`, restored: (n) => `已還原「${n}」`, faved: (n) => `★ 已將「${n}」加入最愛`,
       undo: "復原", tokenPrompt: "這份清單是私人的，請輸入 token（DRIFTNET_TOKEN）。", tokenSave: "開啟",
       failed: "沒有存成功，請檢查網路。", menu: "選單", close: "關閉選單", showing: "目前顯示：",
+      folders: "資料夾", newFolder: "新資料夾", newSub: "在裡面新增資料夾", editFolder: "編輯資料夾", folderName: "名稱",
+      folderDesc: "放什麼？（driftnet 的 AI 會照這段說明把新連結分進來）", folderParent: "放在", topLevel: "— 最上層 —",
+      save: "儲存", cancel: "取消", del: "刪除資料夾", delSure: "確定刪除（內容會移到上一層）",
+      moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
+      dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
+      topLevelShort: "最上層",
     },
   };
   const state = { view: "all", category: "", kind: "", q: "" };
@@ -187,7 +264,13 @@
 
   let locale = "en";
   let catLabels = {};
+  let folders = [];
   let items = [];
+  // Folders the reader closed in the tree; remembered in this browser.
+  const collapsed = new Set((() => { try { return JSON.parse(store.get("driftnet-collapsed") ?? "[]"); } catch { return []; } })());
+  const kids = (parent) => folders.filter((f) => f.parent === parent);
+  const subtotal = (f) => f.count + kids(f.id).reduce((n, c) => n + subtotal(c), 0);
+  const folderById = (id) => folders.find((f) => f.id === id);
   const T = () => STRINGS[locale] ?? STRINGS.en;
   const catLabel = (id) => catLabels[id]?.[locale] ?? id;
 
@@ -253,7 +336,7 @@
     applyLocale();
     let stats, ui;
     try {
-      [stats, ui] = await Promise.all([api("/api/stats"), api("/api/ui")]);
+      [stats, ui, folders] = await Promise.all([api("/api/stats"), api("/api/ui"), api("/api/folders")]);
     } catch (err) {
       if (err.unauthorized) return askToken();
       throw err;
@@ -271,14 +354,22 @@
       `<div class="row">` +
       btn("view", "all", T().all, stats.items) + btn("view", "favorites", `★ ${T().favorites}`, stats.favorites) +
       btn("view", "trash", `🗑 ${T().trash}`, stats.trash || "") +
-      `<h2>${esc(T().categories)}</h2>` +
-      Object.keys(catLabels).filter((k) => stats.byCategory[k]).map((k) => btn("category", k, catLabel(k), stats.byCategory[k])).join("") +
-      `</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
+      `</div><div class="folders-head" data-drop-root><h2>${esc(T().folders)}</h2>` +
+      `<button type="button" class="icon" data-new="" title="${esc(T().newFolder)}" aria-label="${esc(T().newFolder)}">＋</button></div>` +
+      `<div class="tree" role="list">${folderRows(null, 0)}</div><h2>${esc(T().kind)}</h2><div class="row kinds">` + btn("kind", "", T().any, "") +
       Object.entries(T().kinds).map(([k, v]) => btn("kind", k, v, "")).join("") + `</div>`;
     $("nav").onclick = (e) => {
       const b = e.target.closest("button");
       if (!b) return;
       if (b.id === "menu-close") return setMenu(false);
+      if (b.dataset.twist) {
+        const id = b.dataset.twist;
+        collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id);
+        store.set("driftnet-collapsed", JSON.stringify([...collapsed]));
+        return load();
+      }
+      if (b.dataset.edit) return openFolderDialog(b.dataset.edit);
+      if (b.dataset.new !== undefined) return openFolderDialog(null, b.dataset.new || null);
       const { field, value } = b.dataset;
       // Choosing a category stays inside the current view; choosing a view clears the category.
       if (field === "view") state.category = "";
@@ -287,7 +378,183 @@
       if (isDrawer()) setMenu(false);
       render();
     };
+    attachDrops();
     render();
+  }
+
+  /** The folder tree, one row per folder: ▸ toggle, name + count (filters), ⋯ (edit). */
+  function folderRows(parent, depth) {
+    const t = T();
+    return kids(parent).map((f) => {
+      const hasKids = kids(f.id).length > 0;
+      const open = hasKids && !collapsed.has(f.id);
+      return `<div class="folder" role="listitem" data-folder="${esc(f.id)}" draggable="true" style="--depth:${depth}">
+          <button type="button" class="icon twist ${hasKids ? "" : "leaf"}" ${hasKids ? `data-twist="${esc(f.id)}" aria-expanded="${open}"` : 'tabindex="-1" aria-hidden="true"'}
+            aria-label="${esc(t.expand)}">▶</button>
+          <button type="button" data-field="category" data-value="${esc(f.id)}" aria-pressed="${state.category === f.id}" title="${esc(f.description)}">
+            <span>${esc(catLabel(f.id))}</span><span class="count">${subtotal(f) || ""}</span></button>
+          <button type="button" class="icon more" data-edit="${esc(f.id)}" title="${esc(t.editFolder)}" aria-label="${esc(t.editFolder)}: ${esc(catLabel(f.id))}">⋯</button>
+        </div>` + (open ? folderRows(f.id, depth + 1) : "");
+    }).join("");
+  }
+
+  /** "Path › Name" for a folder, used in the picker and toasts. */
+  const folderPath = (id) => { const f = folderById(id); return f?.parent ? `${folderPath(f.parent)} › ${catLabel(id)}` : catLabel(id); };
+
+  // ── Folder dialog: new / rename / describe / move / delete ───────────────
+  let editing = null;
+  function openFolderDialog(id, parent = null) {
+    const t = T();
+    const f = id ? folderById(id) : null;
+    editing = id;
+    $("fd-title").textContent = id ? t.editFolder : parent ? `${t.newSub} ${catLabel(parent)}` : t.newFolder;
+    $("fd-name-l").textContent = t.folderName;
+    $("fd-desc-l").textContent = t.folderDesc;
+    $("fd-parent-l").textContent = t.folderParent;
+    $("fd-name").value = f ? catLabel(f.id) : "";
+    $("fd-desc").value = f?.description ?? "";
+    // A folder can't move inside itself or its own sub-folders.
+    const banned = new Set();
+    if (id) for (const q = [id]; q.length;) { const x = q.pop(); banned.add(x); q.push(...kids(x).map((k) => k.id)); }
+    const opts = (p, depth) => kids(p).filter((k) => !banned.has(k.id))
+      .map((k) => `<option value="${esc(k.id)}">${"\u00a0\u00a0".repeat(depth)}${esc(catLabel(k.id))}</option>` + opts(k.id, depth + 1)).join("");
+    $("fd-parent").innerHTML = `<option value="">${esc(t.topLevel)}</option>` + opts(null, 0);
+    $("fd-parent").value = (f ? f.parent : parent) ?? "";
+    const del = $("fd-delete");
+    del.hidden = !id || id === "other";
+    del.textContent = t.del;
+    del.classList.remove("armed");
+    $("fd-cancel").textContent = t.cancel;
+    $("fd-save").textContent = t.save;
+    $("fd-error").textContent = "";
+    $("folder-dlg").showModal();
+    $("fd-name").focus();
+  }
+  $("fd-cancel").onclick = () => $("folder-dlg").close();
+  // Delete asks twice inside the dialog (no browser confirm box).
+  $("fd-delete").onclick = async () => {
+    const del = $("fd-delete");
+    if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = T().delSure; return; }
+    if (await folderWrite(`/api/folders/${encodeURIComponent(editing)}`, "DELETE")) {
+      if (state.category === editing) state.category = "";
+      $("folder-dlg").close();
+      load();
+    }
+  };
+  $("folder-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = editing ? folderById(editing) : null;
+    const name = $("fd-name").value.trim();
+    const body = { description: $("fd-desc").value.trim(), parent: $("fd-parent").value || null };
+    // Built-in folders keep their translated label until the reader renames them.
+    if (!f || name !== catLabel(f.id)) body.name = name;
+    const ok = editing
+      ? await folderWrite(`/api/folders/${encodeURIComponent(editing)}`, "PATCH", body)
+      : await folderWrite("/api/folders", "POST", body);
+    if (ok) { $("folder-dlg").close(); load(); }
+  };
+  /** Write to the folder API; a refusal (empty name, a loop) shows in the dialog. */
+  async function folderWrite(path, method, body) {
+    const token = store.get("driftnet-token");
+    try {
+      const res = await fetch(path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+                                      ...(body ? { body: JSON.stringify(body) } : {}) });
+      if (res.status === 401) { $("folder-dlg").close(); askToken(); return null; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { $("fd-error").textContent = data.error ?? T().failed; return null; }
+      return data;
+    } catch {
+      $("fd-error").textContent = T().failed;
+      return null;
+    }
+  }
+
+  // ── Move a card: picker (phones) or drag onto the sidebar (desktop) ───────
+  let moving = null;
+  function openMovePicker(id) {
+    const item = find(id);
+    if (!item) return;
+    moving = id;
+    const t = T();
+    $("mv-title").textContent = t.moveTitle(nameOf(item));
+    const rows = (p, depth) => kids(p).map((f) => `<button type="button" data-to="${esc(f.id)}" style="--depth:${depth}"
+        aria-current="${f.id === item.category}"><span>${esc(catLabel(f.id))}</span><span class="count">${subtotal(f) || ""}</span></button>` + rows(f.id, depth + 1)).join("");
+    $("mv-list").innerHTML = rows(null, 0);
+    $("mv-cancel").textContent = t.cancel;
+    $("move-dlg").showModal();
+    $("mv-list").querySelector('[aria-current="true"]')?.focus();
+  }
+  $("mv-cancel").onclick = () => $("move-dlg").close();
+  $("move-dlg").addEventListener("click", (e) => { if (e.target === $("move-dlg")) $("move-dlg").close(); });
+  $("folder-dlg").addEventListener("click", (e) => { if (e.target === $("folder-dlg")) $("folder-dlg").close(); });
+  $("mv-list").onclick = (e) => {
+    const b = e.target.closest("[data-to]");
+    if (!b) return;
+    $("move-dlg").close();
+    moveItem(moving, b.dataset.to);
+  };
+
+  async function moveItem(id, to, quiet = false) {
+    const item = find(id);
+    if (!item || item.category === to) return;
+    const from = item.category;
+    const token = store.get("driftnet-token");
+    const res = await fetch(`/api/items/${id}/move`, { method: "POST", body: JSON.stringify({ folder: to }),
+      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
+    if (res?.status === 401) return askToken();
+    if (!res?.ok) return toast(T().failed);
+    item.category = to;
+    const f = folderById(to); if (f) f.count++;
+    const old = folderById(from); if (old) old.count--;
+    const el = document.getElementById(`item-${id}`);
+    // Still inside the folder being viewed? Update the badge; otherwise it leaves the list.
+    const visible = !state.category || subtreeOf(state.category).has(to);
+    if (el && !visible) dismiss(el);
+    else if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); }
+    refreshTree();
+    if (!quiet) toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); });
+  }
+  const subtreeOf = (id) => { const out = new Set([id]); for (const q = [id]; q.length;) for (const k of kids(q.pop())) { out.add(k.id); q.push(k.id); } return out; };
+  /** Re-draw just the tree's counts after a move. */
+  function refreshTree() {
+    const tree = $("nav").querySelector(".tree");
+    if (tree) { tree.innerHTML = folderRows(null, 0); attachDrops(); }
+  }
+
+  /** Drop targets: a card (by its ⠿ grip) or a folder onto a folder; a folder onto the heading = top level. */
+  function attachDrops() {
+    for (const row of $("nav").querySelectorAll(".folder")) {
+      row.ondragstart = (e) => {
+        e.dataTransfer.setData("text/x-driftnet-folder", row.dataset.folder);
+        e.dataTransfer.effectAllowed = "move";
+        row.classList.add("dragged");
+      };
+      row.ondragend = () => row.classList.remove("dragged");
+    }
+    for (const target of $("nav").querySelectorAll(".folder, [data-drop-root]")) {
+      target.ondragover = (e) => {
+        const types = e.dataTransfer.types;
+        if (!types.includes("text/x-driftnet-item") && !types.includes("text/x-driftnet-folder")) return;
+        if (target.dataset.dropRoot !== undefined && !types.includes("text/x-driftnet-folder")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        target.classList.add("drop-over");
+      };
+      target.ondragleave = () => target.classList.remove("drop-over");
+      target.ondrop = async (e) => {
+        e.preventDefault();
+        target.classList.remove("drop-over");
+        const to = target.dataset.folder ?? null;
+        const item = e.dataTransfer.getData("text/x-driftnet-item");
+        const folder = e.dataTransfer.getData("text/x-driftnet-folder");
+        if (item && to) return moveItem(Number(item), to);
+        if (folder && folder !== to && !(to && subtreeOf(folder).has(to))) {
+          const ok = await folderWrite(`/api/folders/${encodeURIComponent(folder)}`, "PATCH", { parent: to });
+          if (ok) { toast(T().folderMoved(catLabel(folder), to ? folderPath(to) : T().topLevelShort)); load(); }
+          else toast($("fd-error").textContent || T().failed);
+        }
+      };
+    }
   }
 
   async function render() {
@@ -313,7 +580,9 @@
     const inTrash = state.view === "trash";
     const tools = inTrash
       ? `<button class="tool" type="button" data-act="restore" title="${esc(t.restore)}" aria-label="${esc(t.restore)}">↩</button>`
-      : `<button class="tool ${i.favorite ? "on" : ""}" type="button" data-act="favorite" aria-pressed="${i.favorite}"
+      : `<button class="tool grip" type="button" draggable="true" data-grip="${i.id}" title="${esc(t.dragHint)}" aria-hidden="true" tabindex="-1">⠿</button>
+         <button class="tool" type="button" data-act="move" title="${esc(t.moveTo)}" aria-label="${esc(t.moveTo)}">📁</button>
+         <button class="tool ${i.favorite ? "on" : ""}" type="button" data-act="favorite" aria-pressed="${i.favorite}"
            title="${esc(i.favorite ? t.unfavorite : t.favorite)}" aria-label="${esc(i.favorite ? t.unfavorite : t.favorite)}">${i.favorite ? "★" : "☆"}</button>
          <button class="tool" type="button" data-act="trash" title="${esc(t.remove)}" aria-label="${esc(t.remove)}">🗑</button>`;
     return `<div class="swipe" id="item-${i.id}" data-id="${i.id}">
@@ -328,6 +597,7 @@
         </div>
         ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
         ${s?.highlights?.length ? `<ul>${s.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+        ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
         ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
         <div class="meta">
           <span>#${i.id}</span><span>${esc(t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
@@ -397,7 +667,25 @@
 
   $("list").addEventListener("click", (e) => {
     const b = e.target.closest(".tool");
-    if (b) run(b.closest(".swipe"), b.dataset.act);
+    if (!b || b.dataset.grip) return;
+    if (b.dataset.act === "move") return openMovePicker(Number(b.closest(".swipe").dataset.id));
+    run(b.closest(".swipe"), b.dataset.act);
+  });
+  $("list").addEventListener("dragstart", (e) => {
+    const grip = e.target.closest?.("[data-grip]");
+    if (!grip) return;
+    e.dataTransfer.setData("text/x-driftnet-item", grip.dataset.grip);
+    e.dataTransfer.effectAllowed = "move";
+    const cardEl = grip.closest(".card");
+    e.dataTransfer.setDragImage(cardEl, 24, 24);
+  });
+  // A "found in" link to a card outside the current filter: show everything, then jump.
+  addEventListener("hashchange", () => {
+    if (/^#item-\d+$/.test(location.hash) && !document.getElementById(location.hash.slice(1))) {
+      Object.assign(state, { view: "all", category: "", kind: "", q: "" });
+      $("q").value = "";
+      load();
+    }
   });
 
   // ── Swipe: right = favorite (restore in the trash), left = trash ─────────

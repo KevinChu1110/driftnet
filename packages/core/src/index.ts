@@ -7,6 +7,7 @@ import { Pipeline } from "./pipeline.ts";
 import { Store } from "./store.ts";
 import { createProvider } from "./llm/index.ts";
 import { Summarizer } from "./summarize.ts";
+import { categoryLabel, resolveLocale, type Locale } from "./i18n.ts";
 import { defaultDbPath } from "./home.ts";
 
 export * from "./types.ts";
@@ -14,7 +15,8 @@ export { canonicalize, extractUrls } from "./url.ts";
 export { BlockedUrl, registerExtractor, type Extractor } from "./extractors/index.ts";
 export { guard } from "./guard.ts";
 export { Pipeline } from "./pipeline.ts";
-export { Store, type ListQuery, type Reputation } from "./store.ts";
+export { DEFAULT_CATEGORIES, loadCategories } from "./categories.ts";
+export { FolderError, Store, type Folder, type ListQuery, type Reputation } from "./store.ts";
 export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
 export { Summarizer } from "./summarize.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
@@ -25,7 +27,10 @@ export type { Judge, JudgeResult } from "./judge/index.ts";
 export interface Driftnet {
   pipeline: Pipeline;
   store: Store;
-  categories: Record<string, string>;
+  /** The reader's folders as the judge sees them (id → path and note). Read fresh on every access. */
+  readonly categories: Record<string, string>;
+  /** A folder's display name: the reader's name, or the built-in label in `locale`. */
+  folderLabel(id: string, locale?: Locale): string;
   engines: { judge: string; summarizer: string };
   /** Configuration problems worth printing at startup. */
   warnings: string[];
@@ -34,7 +39,11 @@ export interface Driftnet {
 /** Wires everything from environment variables. See .env.example. */
 export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   const store = new Store(env.DRIFTNET_DB ?? defaultDbPath(env));
-  const categories = loadCategories();
+  // The reader's folder tree is the taxonomy; the built-in shelves only seed it.
+  store.seedFolders(loadCategories());
+  const folderLabel = (id: string, locale: Locale = resolveLocale(env)): string =>
+    store.folders().find((f) => f.id === id)?.name ?? categoryLabel(id, locale);
+  const choices = () => store.folderChoices((f) => f.name ?? categoryLabel(f.id, "en"));
 
   const jevKey = env.TYPESAFE_API_KEY ?? readKeyFile(join(homedir(), ".typesafe", "api_key"));
   const judge = jevKey && env.DRIFTNET_JUDGE !== "off" ? new JevJudge(jevKey) : undefined;
@@ -44,7 +53,9 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
 
   const pipeline = new Pipeline({
     store,
-    categories,
+    get categories() {
+      return choices();
+    },
     ...(judge ? { judge } : {}),
     ...(summarizer ? { summarizer } : {}),
     ...(env.DRIFTNET_MIN_CONFIDENCE ? { minConfidence: Number(env.DRIFTNET_MIN_CONFIDENCE) } : {}),
@@ -52,7 +63,10 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   return {
     pipeline,
     store,
-    categories,
+    get categories() {
+      return choices();
+    },
+    folderLabel,
     engines: {
       judge: judge ? "jev" : summarizer ? "llm" : "heuristic",
       summarizer: summarizer?.label ?? "off",

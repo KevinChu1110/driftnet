@@ -28,6 +28,7 @@ export async function handleChatText(
   // DRIFTNET_REPLY: link (one line + where to read it), full (the summary in chat), off.
   const mode = process.env.DRIFTNET_REPLY ?? "link";
   if (mode === "off" || !results.length) return null;
-  if (mode === "full") return results.map((r) => `${renderText(r, base, t)}\n${t.footer(r.item.id)}`).join("\n\n");
-  return results.map((r) => renderLink(r, base, t)).join("\n");
+  const label = (folder: string) => dn.folderLabel(folder, t.locale);
+  if (mode === "full") return results.map((r) => `${renderText(r, base, t, label)}\n${t.footer(r.item.id)}`).join("\n\n");
+  return results.map((r) => renderLink(r, base, t, label)).join("\n");
 }

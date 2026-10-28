@@ -32,9 +32,15 @@ const home = mkdtempSync(join(tmpdir(), "driftnet-web-e2e-"));
 const port = await freePort();
 writeFileSync(join(home, ".env"), `PORT=${port}\nDRIFTNET_JUDGE=off\nDRIFTNET_LANGUAGE=${LANG === "zh-TW" ? "Traditional Chinese (Taiwan)" : "English"}\n`);
 const seed = `
-  import { Store } from "@driftnet/core";
+  import { loadCategories, Store } from "@driftnet/core";
   const items = JSON.parse(process.env.DEMO_ITEMS);
   const store = new Store(process.env.DEMO_DB);
+  store.seedFolders(loadCategories());
+  // A reader's own folders next to the built-in ones.
+  const zh = process.env.DEMO_LANG === "zh-TW";
+  const mine = store.createFolder({ name: zh ? "我的工作流" : "My workflow", description: "Tools I use every day" });
+  store.createFolder({ name: zh ? "設計" : "Design", description: "UI and design helpers", parent: mine.id });
+  store.updateFolder(mine.id, { position: -1 });
   for (const i of items) store.upsert({ url: i.url, aliases: [], title: i.title, flags: [], source: "demo", summary: i.summary,
     judgement: { isAiTool: 1, category: i.category, kind: i.kind, worth: i.worth, engine: "llm", confidence: 1 } });
   for (const [id, n] of [[1, 3], [2, 2], [4, 1]]) for (let k = 0; k < n; k++) store.recordShare(id, { platform: "line", chatId: "demo" });
@@ -42,7 +48,7 @@ const seed = `
 const demo = JSON.parse(readFileSync(join(HERE, "demo-items.json"), "utf8"))[LANG];
 await new Promise((resolve, reject) => {
   const p = spawn(join(SERVER, "../../node_modules/.bin/tsx"), ["--eval", seed], {
-    cwd: SERVER, stdio: "inherit", env: { ...process.env, DEMO_DB: join(home, "driftnet.db"), DEMO_ITEMS: JSON.stringify(demo) },
+    cwd: SERVER, stdio: "inherit", env: { ...process.env, DEMO_DB: join(home, "driftnet.db"), DEMO_ITEMS: JSON.stringify(demo), DEMO_LANG: LANG },
   });
   p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error("seeding failed"))));
 });
@@ -120,9 +126,46 @@ const api = (path) => fetch(`http://127.0.0.1:${port}${path}`).then((r) => r.jso
 
 let failed = false;
 try {
-  // Desktop picture first.
+  // Desktop: the folder tree, a drag onto it, and the picture.
   await viewport(1280, 820, false);
   await open();
+  {
+    const folders = await api("/api/folders");
+    const design = folders.find((f) => f.parent && f.parent === folders.find((x) => x.name && !x.parent)?.id);
+    assert.ok(design, "the demo's nested folder exists");
+    assert.ok(await evaluate(s, `!!document.querySelector('#nav .folder[data-folder="${design.id}"]')`), "nested folder shows in the tree");
+    // Drag a card by its grip onto the nested folder (synthetic HTML5 drag events carry the same DataTransfer).
+    const id = (await ids())[3];
+    await evaluate(s, `(() => {
+      const dt = new DataTransfer();
+      document.querySelector('#item-${id} [data-grip]').dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+      const row = document.querySelector('#nav .folder[data-folder="${design.id}"]');
+      row.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }));
+      row.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+      return 1;
+    })()`);
+    await waitFor(s, `document.getElementById("toast").classList.contains("show")`, "move toast");
+    const moved = await api(`/api/items?category=${design.parent}`);
+    assert.deepEqual(moved.map((i) => i.id), [id], "the card is in the folder, and its parent folder shows it");
+    assert.equal(moved[0].category, design.id);
+    await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
+    console.log("✓ desktop: dragging a card onto a nested folder moves it; the parent folder lists it");
+    // A new folder from the sidebar's ＋.
+    await evaluate(s, `document.querySelector('#nav [data-new]').click()`);
+    await waitFor(s, `document.getElementById("folder-dlg").open`, "folder dialog");
+    await evaluate(s, `(() => { document.getElementById("fd-name").value = "Later"; document.getElementById("fd-desc").value = "Read when I have time"; document.getElementById("fd-save").click(); return 1; })()`);
+    await waitFor(s, `!document.getElementById("folder-dlg").open && !!document.querySelector('#nav .folder[data-folder="later"]')`, "new folder in tree");
+    assert.equal((await api("/api/folders")).find((f) => f.id === "later").description, "Read when I have time");
+    // Deleting it asks twice, inside the dialog.
+    await evaluate(s, `document.querySelector('#nav [data-edit="later"]').click()`);
+    await waitFor(s, `document.getElementById("folder-dlg").open`, "edit dialog");
+    await evaluate(s, `document.getElementById("fd-delete").click()`);
+    assert.ok(await evaluate(s, `document.getElementById("folder-dlg").open`), "first press only arms delete");
+    await evaluate(s, `document.getElementById("fd-delete").click()`);
+    await waitFor(s, `!document.querySelector('#nav .folder[data-folder="later"]')`, "folder deleted");
+    console.log("✓ folders: ＋ creates one with a description; delete asks twice");
+    await open();
+  }
   await shoot(`web-desktop-${LANG}.png`);
 
   // Phone, with touch.
@@ -166,6 +209,23 @@ try {
     await evaluate(s, `document.activeElement.blur()`);
     await waitFor(s, `document.querySelectorAll(".swipe").length > 3`, "all items again");
     console.log("✓ ☰ drawer: opens, closes on pick / scrim / Escape, crumb shows the filter");
+  }
+
+  // 📁 Move to…: a picker on phones, with undo.
+  {
+    const id = (await ids())[0];
+    const target = (await api("/api/folders")).find((f) => f.id === "other");
+    await tap(`#item-${id} [data-act="move"]`);
+    await waitFor(s, `document.getElementById("move-dlg").open`, "move picker");
+    await shoot(`web-phone-move-${LANG}.png`);
+    await evaluate(s, `document.querySelector('#mv-list [data-to="${target.id}"]').scrollIntoView({ block: "center" })`);
+    await tap(`#mv-list [data-to="${target.id}"]`);
+    await waitFor(s, `!document.getElementById("move-dlg").open && document.getElementById("toast").classList.contains("show")`, "moved toast");
+    assert.equal((await api(`/api/items/${id}`)).category, "other");
+    await evaluate(s, `document.getElementById("toast-undo").click()`);
+    await sleep(400);
+    assert.notEqual((await api(`/api/items/${id}`)).category, "other", "undo puts it back");
+    console.log("✓ phone: 📁 picker moves a card, undo moves it back");
   }
 
   // A picture mid-swipe, then let go short of the threshold: nothing happens.

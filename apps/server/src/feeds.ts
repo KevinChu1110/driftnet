@@ -9,7 +9,8 @@ export function llmsTxt(dn: Driftnet): string {
   const byCat = new Map<string, string[]>();
   for (const i of items) {
     const line = `- [${i.summary?.name ?? i.title}](${i.summary?.primaryUrl || i.url})${i.summary ? `: ${i.summary.oneLiner}` : ""}`;
-    byCat.set(i.category, [...(byCat.get(i.category) ?? []), line]);
+    const shelf = dn.folderLabel(i.category);
+    byCat.set(shelf, [...(byCat.get(shelf) ?? []), line]);
   }
   return [
     "# driftnet",
