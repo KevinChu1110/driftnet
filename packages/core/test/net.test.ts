@@ -29,7 +29,7 @@ test("redirects are checked hop by hop", async () => {
   // With private targets allowed for the first hop only, a redirect into a
   // blocked address must still be refused once the guard is back on.
   let calls = 0;
-  const server = createServer((req, res) => {
+  const server = createServer((_req, res) => {
     calls++;
     res.writeHead(302, { location: "http://169.254.169.254/latest/meta-data/" }).end();
   });

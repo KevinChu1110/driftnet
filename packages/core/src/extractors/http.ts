@@ -72,24 +72,6 @@ export function metaTags(html: string): Record<string, string> {
   return out;
 }
 
-/** Visible text of an HTML page, without scripts, styles, nav and footer. */
-export function visibleText(html: string): string {
-  const body =
-    /<(article|main)[\s>][\s\S]*?<\/\1>/i.exec(html)?.[0] ??
-    /<body[\s>][\s\S]*<\/body>/i.exec(html)?.[0] ??
-    html;
-  return decodeEntities(
-    body
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<(script|style|noscript|svg|nav|footer|header|aside|form)[\s>][\s\S]*?<\/\1>/gi, " ")
-      .replace(/<br\s*\/?>|<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
-      .replace(/<[^>]+>/g, " "),
-  )
-    .replace(/[ \t\f\v]+/g, " ")
-    .replace(/\n\s*\n+/g, "\n")
-    .trim();
-}
-
 export function decodeEntities(s: string): string {
   return s
     .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
@@ -105,9 +87,3 @@ export function decodeEntities(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
-/** Cut to roughly `max` characters on a line boundary. */
-export function clip(text: string, max: number): string {
-  if (text.length <= max) return text;
-  const cut = text.lastIndexOf("\n", max);
-  return text.slice(0, cut > max * 0.6 ? cut : max) + "\n…";
-}

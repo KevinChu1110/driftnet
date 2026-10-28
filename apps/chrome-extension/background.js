@@ -53,7 +53,11 @@ async function send(tabId, linkUrl) {
         chat: "browser",
       }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}${res.status === 401 ? " — check the token" : ""}`);
+    if (!res.ok) {
+      // The server says why (blocked address, bad token…); show that, not just a status code.
+      const reason = await res.json().then((b) => b.error).catch(() => "");
+      throw new Error(`HTTP ${res.status}${res.status === 401 ? " — check the token" : reason ? ` — ${reason}` : ""}`);
+    }
     const [result] = await res.json();
     return await setStatus({ state: "done", result, serverUrl }, tabId);
   } catch (err) {

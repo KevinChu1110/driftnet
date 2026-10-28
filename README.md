@@ -227,9 +227,9 @@ Most links never reach a model; the ones that do arrive as a short outline.
 | Step | What happens | Model? |
 |---|---|---|
 | 1. Cache | Same link again, after stripping `utm_`, `fbclid`, `si`… and unifying share links, `youtu.be` and repo sub-paths | no |
-| 2. Extract | GitHub API + README, YouTube description, `og:` tags, or the page as you saw it (extension) | no |
+| 2. Extract | GitHub API + README, YouTube description, `og:` tags, or the page as you saw it (extension); PDFs and videos are never downloaded as text | no |
 | 3. Outline | Headings and the opening of each section; menus, breadcrumbs, cookie banners and footers dropped; capped at ~350 **tokens**, counting CJK at a token per character | no |
-| 4. Guard | Hidden Unicode stripped, prompt injection flagged | no |
+| 4. Guard | Links to private or local addresses refused (every redirect checked); hidden Unicode stripped; prompt injection flagged | no |
 | 5. Reputation | Publishers voted below 25% (3+ votes) are stored, not summarised | no |
 | 6. Judge | [Jev](https://console.typesafe.ai) answers category, kind, worth and injection as typed choices, ~100 ms | tiny classifier |
 | 7. Summarise | One structured call, only for items worth reading, or the agent queue | one call |
@@ -268,6 +268,9 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `DRIFTNET_HOME` | `~/.driftnet` | Folder for `.env`, the database and the service log |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite file |
 | `DRIFTNET_HOST` / `PORT` | `127.0.0.1` / `8787` | Listen address |
+| `DRIFTNET_ALLOW_PRIVATE_URLS` | — | `1` lets links to private or local addresses be fetched (intranet pages). Off by default: a shared link could otherwise read services on your machine or network |
+| `DRIFTNET_AGENT` | `local` | Agent name recorded by the stdio MCP server |
+| `TYPESAFE_ENDPOINT` | TypeSafe API | Jev endpoint override |
 | `TELEGRAM_BOT_TOKEN` · `DISCORD_BOT_TOKEN` | — | Chat platforms |
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack (Socket Mode, or webhook) |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |

@@ -12,7 +12,7 @@
     "dev": "pnpm --filter @driftnet/server dev",
     "start": "pnpm --filter @driftnet/server start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test packages/core/test/*.test.ts",
+    "test": "node --import tsx --test packages/core/test/*.test.ts apps/server/test/*.test.ts",
     "service:install": "scripts/service.sh install",
     "service:uninstall": "scripts/service.sh uninstall",
     "service:status": "scripts/service.sh status"

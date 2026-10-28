@@ -22,12 +22,15 @@ export interface PipelineOptions {
 
 /**
  * Link in → item out, spending as little as possible:
- *   1. cache      — a URL seen before costs nothing
- *   2. extract    — APIs and meta tags, clipped to a fixed budget (no model)
- *   3. guard      — strip hidden text, flag prompt injection (no model)
- *   4. reputation — sources the community keeps voting down skip the LLM
- *   5. judge      — Jev answers category/kind/worth for fractions of a cent
- *   6. summarize  — the only LLM call, and only for items worth reading
+ *   1. cache      — a link seen before (or being processed right now) costs nothing
+ *   2. extract    — APIs, meta tags or the browser's view of the page; private
+ *                   addresses refused; non-text responses never parsed
+ *   3. outline    — headings and section openings within a token budget
+ *   4. guard      — strip hidden text, flag prompt injection
+ *   5. reputation — sources the community keeps voting down skip the paid steps
+ *   6. judge      — Jev answers category/kind/worth for fractions of a cent
+ *   7. summarize  — the only LLM call, only for items worth reading (or the agent queue)
+ *   8. follow     — repos linked or named in the content are catalogued too
  */
 export class Pipeline {
   /** Links being processed right now, so simultaneous shares pay once. */

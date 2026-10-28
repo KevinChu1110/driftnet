@@ -210,9 +210,9 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | 步驟 | 做什麼 | 用模型？ |
 |---|---|---|
 | 1. 快取 | 同一個連結再出現時直接沿用；比對前先去掉 `utm_`、`fbclid`、`si` 等追蹤參數，並統一分享短網址、`youtu.be` 和 repo 子路徑 | 否 |
-| 2. 擷取 | GitHub API＋README、YouTube 說明、`og:` 標籤，或你在瀏覽器看到的頁面（擴充） | 否 |
+| 2. 擷取 | GitHub API＋README、YouTube 說明、`og:` 標籤，或你在瀏覽器看到的頁面（擴充）；PDF 和影片不會被當成文字下載 | 否 |
 | 3. 大綱 | 標題加每段開頭；拿掉選單、麵包屑、Cookie 提示和頁尾；上限約 350 **token**，中日文一字算一個 token | 否 |
-| 4. 防污染 | 去除隱藏字元、標記提示詞注入 | 否 |
+| 4. 防污染 | 拒絕指向私有或本機位址的連結（每一次轉址都檢查）；去除隱藏字元；標記提示詞注入 | 否 |
 | 5. 信譽 | 3 票以上、好評低於 25% 的來源只存不摘要 | 否 |
 | 6. 判斷 | [Jev](https://console.typesafe.ai) 用選擇題回答分類、類型、值不值得看、有沒有注入，約 100ms | 極小的分類器 |
 | 7. 摘要 | 只有值得看的才做一次結構化呼叫，或排進 agent 佇列 | 一次 |
@@ -249,6 +249,9 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_HOME` | `~/.driftnet` | 放 `.env`、資料庫和服務日誌的資料夾 |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite 檔案位置 |
 | `DRIFTNET_HOST`／`PORT` | `127.0.0.1`／`8787` | 監聽位址 |
+| `DRIFTNET_ALLOW_PRIVATE_URLS` | — | 設 `1` 允許抓取私有或本機位址的連結（內網頁面）。預設關閉，否則分享進來的連結可能讀到你電腦或內網上的服務 |
+| `DRIFTNET_AGENT` | `local` | stdio MCP 伺服器記錄的 agent 名稱 |
+| `TYPESAFE_ENDPOINT` | TypeSafe API | 覆寫 Jev 的端點 |
 | `TELEGRAM_BOT_TOKEN` · `DISCORD_BOT_TOKEN` | — | 聊天平台 |
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack（Socket Mode 或 webhook） |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |

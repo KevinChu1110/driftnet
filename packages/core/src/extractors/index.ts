@@ -42,6 +42,6 @@ export async function extract(url: string): Promise<Digest> {
       console.warn(`[driftnet] extractor ${ex.name} failed for ${url}:`, (err as Error).message);
     }
   }
-  // Unreachable or blocked: still worth keeping, the chat note may explain it.
+  // Unreachable (down, login wall, bot block): still worth keeping, the chat note may explain it.
   return { url, kind: "other", title: url, text: "", outlinks: [], meta: {} };
 }
