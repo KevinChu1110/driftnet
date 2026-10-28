@@ -13,7 +13,7 @@ const DATA_NOTICE =
  * agents feed the same reputation that keeps junk out.
  */
 export function createMcpServer(dn: Driftnet, agentName = "agent"): McpServer {
-  const server = new McpServer({ name: "driftnet", version: "0.1.0" });
+  const server = new McpServer({ name: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev" });
   const categories = Object.keys(dn.categories) as [string, ...string[]];
 
   server.registerTool(

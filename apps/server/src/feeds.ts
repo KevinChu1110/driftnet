@@ -26,7 +26,7 @@ export function llmsTxt(dn: Driftnet): string {
 export function openApi(serverUrl: string) {
   return {
     openapi: "3.1.0",
-    info: { title: "driftnet", version: "0.1.0", description: "Search and save shared AI tools." },
+    info: { title: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev", description: "Search and save shared AI tools." },
     servers: [{ url: serverUrl }],
     components: { securitySchemes: { bearer: { type: "http", scheme: "bearer" } } },
     security: [{ bearer: [] }],
