@@ -41,3 +41,16 @@ test("Discord catch-up reads what was missed, in order, only in channels seen be
   assert.equal(dn.store.getState("discord:last:A"), "103"); // next catch-up starts after the newest
   assert.equal(dn.store.getState("discord:last:B"), "200"); // untouched after the error
 });
+
+test("DISCORD_CHANNELS keeps driftnet out of channels it shares with another bot", async () => {
+  const dn = createDriftnet({ DRIFTNET_HOME: mkdtempSync(join(tmpdir(), "driftnet-discord-")), DRIFTNET_JUDGE: "off" });
+  process.env.DISCORD_CHANNELS = "OURS, ALSO";
+  try {
+    assert.equal(await handleDiscordMessage(dn, msg("1", "HERMES", "https://discord.test/h")), null);
+    assert.equal(dn.store.getState("discord:last:HERMES"), undefined, "not even remembered");
+    assert.ok(await handleDiscordMessage(dn, msg("2", "OURS", "https://discord.test/o")));
+    assert.ok(await handleDiscordMessage(dn, msg("3", "ALSO", "https://discord.test/p")));
+  } finally {
+    delete process.env.DISCORD_CHANNELS;
+  }
+});

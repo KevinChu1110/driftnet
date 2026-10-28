@@ -275,6 +275,7 @@ All settings are environment variables, usually in `~/.driftnet/.env`. See
 | `DRIFTNET_AGENT` | `local` | Agent name recorded by the stdio MCP server |
 | `TYPESAFE_ENDPOINT` | TypeSafe API | Jev endpoint override |
 | `TELEGRAM_BOT_TOKEN` · `DISCORD_BOT_TOKEN` | — | Chat platforms |
+| `DISCORD_CHANNELS` | — | Comma-separated channel ids driftnet listens to. Use it when the bot token is shared with another bot |
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack (Socket Mode, or webhook) |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 

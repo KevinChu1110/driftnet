@@ -14,8 +14,20 @@ export interface ChatMessage {
   createdAt: number;
 }
 
+/**
+ * DISCORD_CHANNELS (comma-separated channel ids) limits driftnet to those
+ * channels — needed when the bot token is shared with another bot (e.g. a
+ * Hermes profile restricted to its own channels), so the two never answer the
+ * same message. Empty: every channel the bot can read.
+ */
+export function channelFilter(env: NodeJS.ProcessEnv = process.env): (channelId: string) => boolean {
+  const ids = new Set((env.DISCORD_CHANNELS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  return (channelId) => ids.size === 0 || ids.has(channelId);
+}
+
 /** Handle one message and remember it as the channel's latest. Returns the reply text, if any. */
-export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage): Promise<string | null> {
+export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage, allowed = channelFilter()): Promise<string | null> {
+  if (!allowed(msg.channelId)) return null;
   dn.store.setState(LAST + msg.channelId, msg.id);
   if (msg.fromBot || !msg.content) return null;
   try {
@@ -37,8 +49,10 @@ export async function catchUp(
   fetchAfter: (channelId: string, afterId: string) => Promise<ChatMessage[]>,
 ): Promise<number> {
   let handled = 0;
+  const allowed = channelFilter();
   for (const { key, value: after } of dn.store.stateWithPrefix(LAST)) {
     const channelId = key.slice(LAST.length);
+    if (!allowed(channelId)) continue;
     try {
       const missed = (await fetchAfter(channelId, after)).sort((a, b) => a.createdAt - b.createdAt);
       if (missed.length) console.log(`[discord] catching up ${missed.length} message(s) in ${channelId}`);

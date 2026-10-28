@@ -256,6 +256,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_AGENT` | `local` | stdio MCP 伺服器記錄的 agent 名稱 |
 | `TYPESAFE_ENDPOINT` | TypeSafe API | 覆寫 Jev 的端點 |
 | `TELEGRAM_BOT_TOKEN` · `DISCORD_BOT_TOKEN` | — | 聊天平台 |
+| `DISCORD_CHANNELS` | — | driftnet 只聽這些頻道（以逗號分隔的頻道 id）。和其他 bot 共用 token 時使用 |
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack（Socket Mode 或 webhook） |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
