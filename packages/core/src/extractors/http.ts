@@ -9,7 +9,15 @@ export interface FetchResult {
   body: string;
 }
 
-const TEXTUAL = /^(text\/|application\/(xhtml\+xml|xml|json|ld\+json|rss\+xml|atom\+xml))/;
+/**
+ * Text is text/*, any JSON or XML flavour (GitHub's README endpoint answers
+ * application/vnd.github.raw+json), or anything that declares a charset.
+ * Binaries (PDF, video, images) do none of these.
+ */
+function isTextual(header: string): boolean {
+  const type = header.split(";")[0]!.trim().toLowerCase();
+  return /^text\//.test(type) || /[/+](json|xml|javascript)$/.test(type) || /;\s*charset=/i.test(header);
+}
 
 const UA =
   "Mozilla/5.0 (compatible; driftnet/0.1; +https://github.com/KevinChu1110/driftnet)";
@@ -36,9 +44,10 @@ async function fetchOnce(
     headers: { "user-agent": UA, "accept-language": "zh-TW,en;q=0.8", ...init.headers },
     signal: AbortSignal.timeout(init.timeoutMs ?? 10_000),
   });
-  const contentType = (res.headers.get("content-type") ?? "text/html").split(";")[0]!.trim().toLowerCase();
+  const header = res.headers.get("content-type") ?? "text/html";
+  const contentType = header.split(";")[0]!.trim().toLowerCase();
   // A PDF or a video is not text: reading it would feed binary to the model.
-  if (!TEXTUAL.test(contentType)) {
+  if (!isTextual(header)) {
     await res.body?.cancel();
     return { status: res.status, url: res.url, contentType, body: "" };
   }

@@ -319,6 +319,7 @@ assets · scripts       logo, banners, service installer
 
 ```bash
 pnpm typecheck && pnpm test
+CHROME=/path/to/chromium pnpm e2e:extension   # the extension in a real browser (Chrome for Testing or Chromium)
 ```
 
 Extend it: a site (`registerExtractor()`), a model (`LlmProvider`), a judge (`Judge`), a chat

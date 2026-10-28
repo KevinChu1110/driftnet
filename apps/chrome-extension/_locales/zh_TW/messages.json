@@ -1,24 +1,85 @@
 {
-  "name": { "message": "driftnet" },
-  "description": { "message": "把你正在看的貼文（登入後才看得到的內文、留言和連結）送進你的 driftnet 清單。" },
-  "actionTitle": { "message": "把這頁送到 driftnet" },
-  "menuLink": { "message": "把連結送到 driftnet" },
-  "menuPage": { "message": "把這頁送到 driftnet" },
-  "menuSelection": { "message": "把選取的內容送到 driftnet" },
-  "sending": { "message": "送到 driftnet 中…" },
-  "saved": { "message": "已收錄" },
-  "alreadySaved": { "message": "之前收錄過" },
-  "failed": { "message": "傳送失敗" },
-  "notConfigured": { "message": "請先設定 driftnet 伺服器。" },
-  "openSettings": { "message": "設定" },
-  "openItem": { "message": "在 driftnet 開啟" },
-  "cantReadPage": { "message": "這個頁面無法讀取（瀏覽器內建頁或商店頁）。" },
-  "settingsTitle": { "message": "driftnet 設定" },
-  "serverUrl": { "message": "伺服器網址" },
-  "serverHint": { "message": "這台電腦連得到的 driftnet 位址，例如 http://localhost:8787" },
-  "token": { "message": "Token（DRIFTNET_TOKEN）" },
-  "save": { "message": "儲存並測試" },
-  "savedOk": { "message": "連線成功：清單裡有 $COUNT$ 則。", "placeholders": { "count": { "content": "$1" } } },
-  "permissionDenied": { "message": "沒有取得連線到這個伺服器的權限。" },
-  "privacy": { "message": "擴充只在你按下按鈕或使用右鍵選單時讀取該分頁，讀到的內容只會送到你自己的伺服器。" }
+  "name": {
+    "message": "driftnet"
+  },
+  "description": {
+    "message": "把你正在看的貼文（登入後才看得到的內文、留言和連結）送進你的 driftnet 清單。"
+  },
+  "actionTitle": {
+    "message": "把這頁送到 driftnet"
+  },
+  "menuLink": {
+    "message": "把連結送到 driftnet"
+  },
+  "menuPage": {
+    "message": "把這頁送到 driftnet"
+  },
+  "menuSelection": {
+    "message": "把選取的內容送到 driftnet"
+  },
+  "sending": {
+    "message": "送到 driftnet 中…"
+  },
+  "saved": {
+    "message": "已收錄"
+  },
+  "alreadySaved": {
+    "message": "之前收錄過"
+  },
+  "failed": {
+    "message": "傳送失敗"
+  },
+  "notConfigured": {
+    "message": "請先設定 driftnet 伺服器。"
+  },
+  "openSettings": {
+    "message": "設定"
+  },
+  "openItem": {
+    "message": "在 driftnet 開啟"
+  },
+  "cantReadPage": {
+    "message": "這個頁面無法讀取（瀏覽器內建頁或商店頁）。"
+  },
+  "settingsTitle": {
+    "message": "driftnet 設定"
+  },
+  "serverUrl": {
+    "message": "伺服器網址"
+  },
+  "serverHint": {
+    "message": "這台電腦連得到的 driftnet 位址，例如 http://localhost:8787"
+  },
+  "token": {
+    "message": "Token（DRIFTNET_TOKEN）"
+  },
+  "save": {
+    "message": "儲存並測試"
+  },
+  "savedOk": {
+    "message": "連線成功：清單裡有 $COUNT$ 則。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "permissionDenied": {
+    "message": "沒有取得連線到這個伺服器的權限。"
+  },
+  "privacy": {
+    "message": "擴充只在你按下按鈕或使用右鍵選單時讀取該分頁，讀到的內容只會送到你自己的伺服器。"
+  },
+  "worth_skip": {
+    "message": "略過"
+  },
+  "worth_low": {
+    "message": "普通"
+  },
+  "worth_normal": {
+    "message": "值得看"
+  },
+  "worth_must_see": {
+    "message": "★ 必看"
+  }
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import { BlockedUrl, isPublicAddress, safeFetch } from "../src/extractors/net.ts";
+import { BlockedUrl, isPublicAddress, safeFetch, useResolverForTests } from "../src/extractors/net.ts";
 
 test("private, local and metadata addresses are not public", () => {
   for (const a of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0",
@@ -25,27 +25,49 @@ test("safeFetch refuses loopback targets, by IP and by name", async () => {
   }
 });
 
-test("redirects are checked hop by hop", async () => {
-  // With private targets allowed for the first hop only, a redirect into a
-  // blocked address must still be refused once the guard is back on.
-  let calls = 0;
+test("DNS rebinding: the address that is checked is the address that is connected to", async () => {
+  let hits = 0;
   const server = createServer((_req, res) => {
-    calls++;
-    res.writeHead(302, { location: "http://169.254.169.254/latest/meta-data/" }).end();
+    hits++;
+    res.end("internal");
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const { port } = server.address() as { port: number };
+  // A name that resolves to loopback at connection time.
+  const restore = useResolverForTests(async () => [{ address: "127.0.0.1", family: 4 }]);
+  try {
+    await assert.rejects(safeFetch(`http://rebind.test:${port}/`), BlockedUrl);
+    assert.equal(hits, 0, "the request must never reach the private address");
+    // Same resolver with private targets allowed: the request lands there, so the
+    // connection really uses the answer that was checked.
+    process.env.DRIFTNET_ALLOW_PRIVATE_URLS = "1";
+    assert.equal(await (await safeFetch(`http://rebind.test:${port}/`)).text(), "internal");
+    assert.equal(hits, 1);
+  } finally {
+    delete process.env.DRIFTNET_ALLOW_PRIVATE_URLS;
+    restore();
+    server.close();
+  }
+});
+
+test("redirects are checked hop by hop", async () => {
+  let hits = 0;
+  const server = createServer((req, res) => {
+    hits++;
+    if (req.url === "/go") {
+      // The first hop was allowed; the guard is back on before the redirect is followed.
+      delete process.env.DRIFTNET_ALLOW_PRIVATE_URLS;
+      return res.writeHead(302, { location: `http://127.0.0.1:${port}/secret` }).end();
+    }
+    res.end("secret");
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const { port } = server.address() as { port: number };
   process.env.DRIFTNET_ALLOW_PRIVATE_URLS = "1";
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (u: URL, init: RequestInit) => {
-    delete process.env.DRIFTNET_ALLOW_PRIVATE_URLS; // guard on again after the first hop
-    return realFetch(u, init);
-  }) as typeof fetch;
   try {
     await assert.rejects(safeFetch(`http://127.0.0.1:${port}/go`), BlockedUrl);
-    assert.equal(calls, 1);
+    assert.equal(hits, 1, "/secret must not be requested");
   } finally {
-    globalThis.fetch = realFetch;
     delete process.env.DRIFTNET_ALLOW_PRIVATE_URLS;
     server.close();
   }

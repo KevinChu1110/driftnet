@@ -1,24 +1,85 @@
 {
-  "name": { "message": "driftnet" },
-  "description": { "message": "Send the post you're looking at — text, comments and links you can see while logged in — to your driftnet catalogue." },
-  "actionTitle": { "message": "Send this page to driftnet" },
-  "menuLink": { "message": "Send link to driftnet" },
-  "menuPage": { "message": "Send this page to driftnet" },
-  "menuSelection": { "message": "Send selection to driftnet" },
-  "sending": { "message": "Sending to driftnet…" },
-  "saved": { "message": "Saved" },
-  "alreadySaved": { "message": "Already saved" },
-  "failed": { "message": "Could not send" },
-  "notConfigured": { "message": "Set your driftnet server first." },
-  "openSettings": { "message": "Settings" },
-  "openItem": { "message": "Open in driftnet" },
-  "cantReadPage": { "message": "This page can't be read (browser or store page)." },
-  "settingsTitle": { "message": "driftnet settings" },
-  "serverUrl": { "message": "Server URL" },
-  "serverHint": { "message": "Where your driftnet server is reachable from this computer, e.g. http://localhost:8787" },
-  "token": { "message": "Token (DRIFTNET_TOKEN)" },
-  "save": { "message": "Save and test" },
-  "savedOk": { "message": "Connected: $COUNT$ items in the catalogue.", "placeholders": { "count": { "content": "$1" } } },
-  "permissionDenied": { "message": "Permission to reach this server was not granted." },
-  "privacy": { "message": "The extension only reads a tab when you click it or use the right-click menu, and sends what it read to your server only." }
+  "name": {
+    "message": "driftnet"
+  },
+  "description": {
+    "message": "Send the post you're looking at — text, comments and links you can see while logged in — to your driftnet catalogue."
+  },
+  "actionTitle": {
+    "message": "Send this page to driftnet"
+  },
+  "menuLink": {
+    "message": "Send link to driftnet"
+  },
+  "menuPage": {
+    "message": "Send this page to driftnet"
+  },
+  "menuSelection": {
+    "message": "Send selection to driftnet"
+  },
+  "sending": {
+    "message": "Sending to driftnet…"
+  },
+  "saved": {
+    "message": "Saved"
+  },
+  "alreadySaved": {
+    "message": "Already saved"
+  },
+  "failed": {
+    "message": "Could not send"
+  },
+  "notConfigured": {
+    "message": "Set your driftnet server first."
+  },
+  "openSettings": {
+    "message": "Settings"
+  },
+  "openItem": {
+    "message": "Open in driftnet"
+  },
+  "cantReadPage": {
+    "message": "This page can't be read (browser or store page)."
+  },
+  "settingsTitle": {
+    "message": "driftnet settings"
+  },
+  "serverUrl": {
+    "message": "Server URL"
+  },
+  "serverHint": {
+    "message": "Where your driftnet server is reachable from this computer, e.g. http://localhost:8787"
+  },
+  "token": {
+    "message": "Token (DRIFTNET_TOKEN)"
+  },
+  "save": {
+    "message": "Save and test"
+  },
+  "savedOk": {
+    "message": "Connected: $COUNT$ items in the catalogue.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "permissionDenied": {
+    "message": "Permission to reach this server was not granted."
+  },
+  "privacy": {
+    "message": "The extension only reads a tab when you click it or use the right-click menu, and sends what it read to your server only."
+  },
+  "worth_skip": {
+    "message": "skip"
+  },
+  "worth_low": {
+    "message": "low"
+  },
+  "worth_normal": {
+    "message": "worth a look"
+  },
+  "worth_must_see": {
+    "message": "★ must-see"
+  }
 }

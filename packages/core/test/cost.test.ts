@@ -52,9 +52,16 @@ test("injected content costs neither a judge call nor a model call", async () =>
 });
 
 test("non-text responses are not downloaded or parsed", async () => {
+  const types: Record<string, string> = {
+    "/doc.pdf": "application/pdf",
+    "/clip.mp4": "video/mp4",
+    "/": "text/html; charset=utf-8",
+    "/readme": "application/vnd.github.raw+json; charset=utf-8", // GitHub's README endpoint
+    "/feed": "application/atom+xml",
+  };
   const server = createServer((req, res) => {
-    res.writeHead(200, { "content-type": req.url === "/doc.pdf" ? "application/pdf" : "text/html; charset=utf-8" });
-    res.end(req.url === "/doc.pdf" ? "%PDF-1.5 binary…" : "<title>ok</title>");
+    res.writeHead(200, { "content-type": types[req.url!]! });
+    res.end(req.url === "/doc.pdf" || req.url === "/clip.mp4" ? "\u0000binary…" : req.url === "/" ? "<title>ok</title>" : "# text");
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const { port } = server.address() as { port: number };
@@ -63,9 +70,12 @@ test("non-text responses are not downloaded or parsed", async () => {
     const pdf = await fetchText(`http://127.0.0.1:${port}/doc.pdf`);
     assert.equal(pdf.contentType, "application/pdf");
     assert.equal(pdf.body, "");
+    assert.equal((await fetchText(`http://127.0.0.1:${port}/clip.mp4`)).body, "");
     const html = await fetchText(`http://127.0.0.1:${port}/`);
     assert.equal(html.contentType, "text/html");
     assert.match(html.body, /<title>ok/);
+    assert.equal((await fetchText(`http://127.0.0.1:${port}/readme`)).body, "# text");
+    assert.equal((await fetchText(`http://127.0.0.1:${port}/feed`)).body, "# text");
   } finally {
     delete process.env.DRIFTNET_ALLOW_PRIVATE_URLS;
     server.close();

@@ -1,15 +1,18 @@
 import { lookup } from "node:dns/promises";
+import type { LookupAddress, LookupOptions } from "node:dns";
 import { BlockList, isIP } from "node:net";
+import { Agent, fetch as undiciFetch, type RequestInit as UndiciInit } from "undici";
 
 /**
  * SSRF guard. driftnet fetches whatever strangers paste into a chat, so a link
  * (or a redirect it leads to) must never reach the machine itself, the LAN, or
  * a cloud metadata endpoint — otherwise its content comes back as a "summary".
  *
- * Every hop is checked: redirects are followed by hand, and each target's DNS
- * answers must all be public. Residual risk: DNS rebinding between this lookup
- * and the connection. Set DRIFTNET_ALLOW_PRIVATE_URLS=1 to catalogue intranet
- * pages on purpose.
+ * Every hop is checked: redirects are followed by hand. Host names are checked
+ * inside the connection's own DNS lookup, so the address that was checked is
+ * the address that gets connected to: a name that resolves to a public IP for
+ * a check and to 127.0.0.1 a moment later (DNS rebinding) gets nowhere. Set
+ * DRIFTNET_ALLOW_PRIVATE_URLS=1 to catalogue intranet pages on purpose.
  */
 const blocked = new BlockList();
 for (const [net, prefix] of [
@@ -34,13 +37,47 @@ export function isPublicAddress(address: string): boolean {
   return !blocked.check(address, "ipv6");
 }
 
-async function assertPublic(url: URL): Promise<void> {
+const allowPrivate = () => process.env.DRIFTNET_ALLOW_PRIVATE_URLS === "1";
+
+type Resolver = (host: string) => Promise<LookupAddress[]>;
+let resolve: Resolver = (host) => lookup(host, { all: true, verbatim: true });
+
+/** Tests only: answer DNS from a fake resolver. Returns a function that restores the real one. */
+export function useResolverForTests(fake: Resolver): () => void {
+  const real = resolve;
+  resolve = fake;
+  return () => {
+    resolve = real;
+  };
+}
+
+/** net.connect-compatible lookup that refuses private answers. */
+function guardedLookup(
+  hostname: string,
+  options: LookupOptions,
+  callback: (err: Error | null, address: string | LookupAddress[], family?: number) => void,
+): void {
+  resolve(hostname).then(
+    (answers) => {
+      if (!answers.length) return callback(new BlockedUrl(`${hostname} did not resolve`), "");
+      if (!allowPrivate() && !answers.every((a) => isPublicAddress(a.address))) {
+        return callback(new BlockedUrl(`${hostname} resolves to a private or local address`), "");
+      }
+      if (options.all) return callback(null, answers);
+      callback(null, answers[0]!.address, answers[0]!.family);
+    },
+    (err: Error) => callback(err, ""),
+  );
+}
+
+const dispatcher = new Agent({ connect: { lookup: guardedLookup as never } });
+
+function assertAllowed(url: URL): void {
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new BlockedUrl(`${url.protocol} links are not fetched`);
-  if (process.env.DRIFTNET_ALLOW_PRIVATE_URLS === "1") return;
+  // Literal IPs never go through DNS, so they are checked here.
   const host = url.hostname.replace(/^\[|\]$/g, "");
-  const addresses = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true })).map((a) => a.address);
-  if (!addresses.length || !addresses.every(isPublicAddress)) {
-    throw new BlockedUrl(`${url.hostname} resolves to a private or local address`);
+  if (!allowPrivate() && isIP(host) && !isPublicAddress(host)) {
+    throw new BlockedUrl(`${url.hostname} is a private or local address`);
   }
 }
 
@@ -48,8 +85,15 @@ async function assertPublic(url: URL): Promise<void> {
 export async function safeFetch(input: string, init: RequestInit = {}): Promise<Response> {
   let url = new URL(input);
   for (let hop = 0; hop <= 5; hop++) {
-    await assertPublic(url);
-    const res = await fetch(url, { ...init, redirect: "manual" });
+    assertAllowed(url);
+    let res: Response;
+    try {
+      res = (await undiciFetch(url, { ...(init as UndiciInit), redirect: "manual", dispatcher })) as unknown as Response;
+    } catch (err) {
+      // undici wraps lookup errors as "fetch failed"; surface the refusal itself.
+      const cause = (err as { cause?: unknown }).cause;
+      throw cause instanceof BlockedUrl ? cause : err;
+    }
     const location = res.headers.get("location");
     if (res.status >= 300 && res.status < 400 && location) {
       await res.body?.cancel();

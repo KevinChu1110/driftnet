@@ -2,6 +2,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Driftnet } from "@driftnet/core";
 import { handleChatText } from "./handle.ts";
 
+/** Overridable for tests and Slack-compatible servers. */
+const api = (method: string) => `${process.env.SLACK_API_URL ?? "https://slack.com/api"}/${method}`;
+
 /**
  * Slack Events API webhook: POST /webhooks/slack.
  * Needs SLACK_SIGNING_SECRET and SLACK_BOT_TOKEN (scopes: channels:history,
@@ -38,7 +41,7 @@ export function onSlackEvent(dn: Driftnet, ev: any, botToken: string): void {
   handleChatText(dn, text, { platform: "slack", chatId: ev.channel, userId: ev.user })
     .then(async (reply) => {
       if (!reply) return;
-      await fetch("https://slack.com/api/chat.postMessage", {
+      await fetch(api("chat.postMessage"), {
         method: "POST",
         headers: { authorization: `Bearer ${botToken}`, "content-type": "application/json; charset=utf-8" },
         body: JSON.stringify({ channel: ev.channel, thread_ts: ev.ts, text: reply, unfurl_links: false }),
@@ -61,7 +64,7 @@ export function startSlackSocket(dn: Driftnet, appToken: string, botToken: strin
     if (stopped) return;
     try {
       const res = (await (
-        await fetch("https://slack.com/api/apps.connections.open", {
+        await fetch(api("apps.connections.open"), {
           method: "POST",
           headers: { authorization: `Bearer ${appToken}` },
         })

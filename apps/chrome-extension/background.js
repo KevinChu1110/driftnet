@@ -38,10 +38,15 @@ async function send(tabId, linkUrl) {
 
     let page;
     try {
-      [{ result: page }] = await chrome.scripting.executeScript({ target: { tabId }, func: collectPage, args: [linkUrl] });
-    } catch {
-      return await setStatus({ state: "error", message: t("cantReadPage") }, tabId);
+      // Arguments must be JSON: undefined is not, so "no link" travels as null.
+      [{ result: page }] = await chrome.scripting.executeScript({ target: { tabId }, func: collectPage, args: [linkUrl ?? null] });
+    } catch (err) {
+      // Browser pages (chrome://, the Web Store) are off-limits to every extension; say so.
+      // Anything else is a real failure and keeps its message.
+      const restricted = /cannot be scripted|cannot access|chrome:\/\/|extensions gallery/i.test(err.message);
+      return await setStatus({ state: "error", message: restricted ? t("cantReadPage") : `${t("failed")}: ${err.message}` }, tabId);
     }
+    if (!page) return await setStatus({ state: "error", message: `${t("failed")}: the page returned nothing` }, tabId);
 
     const res = await fetch(`${serverUrl}/api/ingest`, {
       method: "POST",

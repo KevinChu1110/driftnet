@@ -15,11 +15,14 @@
     "test": "node --import tsx --test packages/core/test/*.test.ts apps/server/test/*.test.ts",
     "service:install": "scripts/service.sh install",
     "service:uninstall": "scripts/service.sh uninstall",
-    "service:status": "scripts/service.sh status"
+    "service:status": "scripts/service.sh status",
+    "e2e:extension": "node apps/chrome-extension/e2e.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "ws": "^8.22.0"
   }
 }

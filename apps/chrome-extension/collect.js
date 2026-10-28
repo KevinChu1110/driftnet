@@ -4,7 +4,7 @@
  * in them. Must be self-contained — it is serialised and injected, so no
  * imports or closures.
  *
- * @param {string | undefined} linkUrl  set when the user right-clicked a link
+ * @param {string | null} linkUrl  set when the user right-clicked a link, else null
  */
 export async function collectPage(linkUrl) {
   // Social sites wrap outbound links in a redirector; keep the real target.

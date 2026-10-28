@@ -29,7 +29,10 @@ async function render(status) {
   box.textContent = cached ? t("alreadySaved") : t("saved");
   const head = el("h2", s?.name ?? item.title);
   const tags = el("div");
-  tags.append(el("span", await categoryLabel(status.serverUrl, item.category), "badge"), el("span", item.worth, "badge"));
+  tags.append(
+    el("span", await categoryLabel(status.serverUrl, item.category), "badge"),
+    el("span", t(`worth_${item.worth.replace("-", "_")}`) || item.worth, "badge"),
+  );
   $("item").append(head, tags);
   if (s?.oneLiner) $("item").append(el("p", s.oneLiner));
   if (s?.highlights?.length) {
@@ -46,6 +49,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.status) void render(changes.status.newValue);
 });
 
-const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+// popup.html?tab=<id> sends a specific tab (used by e2e.mjs, handy for debugging).
+const forced = Number(new URLSearchParams(location.search).get("tab"));
+const tabId = forced || (await chrome.tabs.query({ active: true, currentWindow: true }))[0].id;
 void render({ state: "sending" });
-chrome.runtime.sendMessage({ type: "send-tab", tabId: tab.id });
+chrome.runtime.sendMessage({ type: "send-tab", tabId });

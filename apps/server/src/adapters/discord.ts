@@ -4,47 +4,89 @@ import { handleChatText } from "./handle.ts";
 
 const LAST = "discord:last:";
 
+/** The parts of a Discord message driftnet uses, so catch-up can be tested without a gateway. */
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  content: string;
+  authorId: string;
+  fromBot: boolean;
+  createdAt: number;
+}
+
+/** Handle one message and remember it as the channel's latest. Returns the reply text, if any. */
+export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage): Promise<string | null> {
+  dn.store.setState(LAST + msg.channelId, msg.id);
+  if (msg.fromBot || !msg.content) return null;
+  try {
+    return await handleChatText(dn, msg.content, { platform: "discord", chatId: msg.channelId, userId: msg.authorId });
+  } catch (err) {
+    console.warn("[discord]", (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * The gateway does not replay what happened while driftnet was off. For every
+ * channel driftnet has seen before (never a whole server's history), read what
+ * came after the last message it handled, oldest first, without replying —
+ * answering hours-old messages would flood the channel.
+ */
+export async function catchUp(
+  dn: Driftnet,
+  fetchAfter: (channelId: string, afterId: string) => Promise<ChatMessage[]>,
+): Promise<number> {
+  let handled = 0;
+  for (const { key, value: after } of dn.store.stateWithPrefix(LAST)) {
+    const channelId = key.slice(LAST.length);
+    try {
+      const missed = (await fetchAfter(channelId, after)).sort((a, b) => a.createdAt - b.createdAt);
+      if (missed.length) console.log(`[discord] catching up ${missed.length} message(s) in ${channelId}`);
+      for (const msg of missed) {
+        await handleDiscordMessage(dn, msg);
+        handled++;
+      }
+    } catch (err) {
+      // One deleted channel or missing permission must not stop the others.
+      console.warn(`[discord] catch-up failed for ${channelId}:`, (err as Error).message);
+    }
+  }
+  return handled;
+}
+
+const toChatMessage = (m: Message): ChatMessage => ({
+  id: m.id,
+  channelId: m.channelId,
+  content: m.content,
+  authorId: m.author.id,
+  fromBot: m.author.bot,
+  createdAt: m.createdTimestamp,
+});
+
 /**
  * Discord via the gateway (no public URL needed). Needs DISCORD_BOT_TOKEN and the
  * Message Content intent enabled in the developer portal.
- *
- * The gateway does not replay what happened while driftnet was off, so the last
- * message handled per channel is remembered and anything newer is read back on
- * startup. Only channels driftnet has seen before are caught up, never a whole
- * server's history.
  */
 export function startDiscord(dn: Driftnet, token: string): () => void {
   const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages],
   });
 
-  const handle = async (msg: Message, reply: boolean) => {
-    if (msg.author.bot) return;
-    try {
-      const text = await handleChatText(dn, msg.content, { platform: "discord", chatId: msg.channelId, userId: msg.author.id });
-      if (text && reply) await msg.reply({ content: text.slice(0, 2000), flags: ["SuppressEmbeds"], allowedMentions: { parse: [] } });
-    } catch (err) {
-      console.warn("[discord]", (err as Error).message);
+  client.on(Events.MessageCreate, async (msg) => {
+    const reply = await handleDiscordMessage(dn, toChatMessage(msg));
+    if (reply) {
+      await msg
+        .reply({ content: reply.slice(0, 2000), flags: ["SuppressEmbeds"], allowedMentions: { parse: [] } })
+        .catch((err) => console.warn("[discord]", (err as Error).message));
     }
-    dn.store.setState(LAST + msg.channelId, msg.id);
-  };
-
-  client.on(Events.MessageCreate, (msg) => void handle(msg, true));
+  });
   client.once(Events.ClientReady, async (c) => {
     console.log(`[discord] ready as ${c.user.tag}`);
-    for (const { key, value: after } of dn.store.stateWithPrefix(LAST)) {
-      try {
-        const channel = await c.channels.fetch(key.slice(LAST.length));
-        if (!channel?.isTextBased()) continue;
-        const missed = [...(await channel.messages.fetch({ after, limit: 100 })).values()]
-          .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-        if (missed.length) console.log(`[discord] catching up ${missed.length} message(s) in ${key.slice(LAST.length)}`);
-        // Catch-up is quiet: replying to hours-old messages would flood the channel.
-        for (const msg of missed) await handle(msg, false);
-      } catch (err) {
-        console.warn("[discord] catch-up failed:", (err as Error).message);
-      }
-    }
+    await catchUp(dn, async (channelId, after) => {
+      const channel = await c.channels.fetch(channelId);
+      if (!channel?.isTextBased()) return [];
+      return [...(await channel.messages.fetch({ after, limit: 100 })).values()].map(toChatMessage);
+    });
   });
   void client.login(token);
   return () => void client.destroy();

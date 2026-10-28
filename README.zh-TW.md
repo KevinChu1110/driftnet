@@ -299,6 +299,7 @@ assets · scripts       logo、主視覺、服務安裝
 
 ```bash
 pnpm typecheck && pnpm test
+CHROME=/path/to/chromium pnpm e2e:extension   # 在真的瀏覽器裡測擴充（Chrome for Testing 或 Chromium）
 ```
 
 可以擴充：網站（`registerExtractor()`）、模型（`LlmProvider`）、判斷器（`Judge`）、聊天平台（`handleChatText()`）、
