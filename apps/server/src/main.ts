@@ -11,7 +11,7 @@ import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
-import { canRead, foreignOrigin, isAdmin, isLocal, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
+import { actorOf, canRead, foreignOrigin, isAdmin, isLocal, isPassword, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
 import { llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
@@ -48,7 +48,9 @@ const STATIC: Record<string, [Buffer, string]> = {
  * "admin", so without this check any page you visit could write into (and,
  * with open CORS, read) your catalogue.
  */
-const authorized = (req: IncomingMessage) => !foreignOrigin(req) && (isAdmin(req, env) || isTrustedLocal(req));
+const authorized = (req: IncomingMessage) => !foreignOrigin(req) && (isAdmin(req, env, dn.store) || isTrustedLocal(req));
+/** Authorized, and by the admin password (or this machine) rather than an agent token: a leaked token must not mint tokens or change settings. */
+const authorizedAsPassword = (req: IncomingMessage) => authorized(req) && (isPassword(req, env) || isTrustedLocal(req));
 const tunnel = new Tunnel(PORT);
 process.on("exit", () => tunnel.stop());
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { tunnel.stop(); process.exit(0); });
@@ -61,7 +63,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { 
  * Origin is refused outright.
  */
 function settingsAllowed(req: IncomingMessage): boolean {
-  if (!authorized(req)) return false;
+  if (!authorizedAsPassword(req)) return false;
   const host = req.headers.host ?? "";
   // No password yet: only this machine itself, never something a tunnel or proxy forwarded.
   if (!token(env) && !isLocal(req)) return false;
@@ -149,7 +151,7 @@ const server = createServer(async (req, res) => {
     // OAuth discovery probes (Claude.ai connectors): there is none, say so plainly instead of "unauthorized".
     if (path.startsWith("/.well-known/")) return send(res, 404, { error: "not found" });
     if (triedCredentials(req) && throttled(req)) return send(res, 429, { error: "too many wrong passwords; try again in 15 minutes" });
-    if (req.method === "GET" && !canRead(req, env) && !isTrustedLocal(req)) return send(res, 401, { error: "unauthorized" });
+    if (req.method === "GET" && !canRead(req, env, dn.store) && !isTrustedLocal(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "GET" && path === "/llms.txt") return send(res, 200, llmsTxt(dn), "text/plain; charset=utf-8");
     if (req.method === "GET" && path === "/openapi.json") return send(res, 200, openApi(env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL || `${url.protocol}//${url.host}`));
     if (req.method === "GET" && path === "/api/categories") return send(res, 200, dn.categories);
@@ -161,7 +163,7 @@ const server = createServer(async (req, res) => {
       // First run: nothing configured yet, so the page opens the settings to get started.
       const setup = !envFile && dn.engines.summarizer === "off" && dn.engines.judge === "heuristic" && !dn.store.stats().items;
       return send(res, 200, {
-        locale: resolveLocale(), categories, setup, role: role(req, env), local: isLocal(req), passwordSet: !!token(env),
+        locale: resolveLocale(), categories, setup, role: role(req, env, dn.store), local: isLocal(req), passwordSet: !!token(env),
         port: PORT, summaries: dn.engines.summarizer !== "off",
       });
     }
@@ -198,7 +200,7 @@ const server = createServer(async (req, res) => {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const { folder } = await readJson<{ folder?: string }>(req);
       try {
-        return dn.store.moveItem(Number(moveMatch[1]), String(folder ?? ""))
+        return dn.store.moveItem(Number(moveMatch[1]), String(folder ?? ""), actorOf(req, env, dn.store) ?? (token(env) ? undefined : "admin"))
           ? send(res, 200, dn.store.get(Number(moveMatch[1])))
           : send(res, 404, { error: "not found" });
       } catch (err) {
@@ -282,6 +284,23 @@ const server = createServer(async (req, res) => {
         }
       }
       return send(res, 200, { ...settings.view(), engines: dn.engines, plugins, ...accessView(req) });
+    }
+    // Agent tokens: one named key per agent. Admin password only, never a token itself.
+    const tokenMatch = /^\/api\/agent-tokens(?:\/([^/]+))?$/.exec(path);
+    if (tokenMatch) {
+      const id = tokenMatch[1] ? decodeURIComponent(tokenMatch[1]) : null;
+      if (!authorizedAsPassword(req) || (!token(env) && !isLocal(req))) return send(res, 403, { error: token(env) ? "unauthorized" : "set an admin password to manage agent tokens remotely" });
+      if (req.method === "GET" && !id) return send(res, 200, dn.store.listAgentTokens());
+      if (req.method === "POST" && !id) {
+        if (!/^application\/json\b/.test(req.headers["content-type"] ?? "")) return send(res, 415, { error: "send application/json" });
+        const body = await readJson<{ name?: string; scope?: string }>(req);
+        if (!String(body.name ?? "").trim()) throw new BadRequest("name is required");
+        if (body.scope !== "read" && body.scope !== "write") throw new BadRequest("scope must be read or write");
+        // The token is in this response and nowhere else.
+        return send(res, 200, dn.store.createAgentToken({ name: String(body.name), scope: body.scope }));
+      }
+      if (req.method === "DELETE" && id) return dn.store.revokeAgentToken(id) ? send(res, 200, { ok: true }) : send(res, 404, { error: "not found" });
+      return send(res, 405, { error: "method not allowed" });
     }
     // A fresh read-only key; the old one stops working at once.
     if (req.method === "POST" && path === "/api/read-key") {
@@ -396,11 +415,11 @@ const server = createServer(async (req, res) => {
 
     // MCP over Streamable HTTP, stateless: a fresh server per request.
     if (path === "/mcp") {
-      // The admin password gets every tool; the read-only key (header or ?key=) only the reading ones.
+      // The admin password or a write token gets every tool; the read-only key (header or ?key=) or a read token only the reading ones.
       const admin = authorized(req);
-      if (!admin && !canRead(req, env)) return send(res, 401, { error: "unauthorized" });
+      if (!admin && !canRead(req, env, dn.store)) return send(res, 401, { error: "unauthorized" });
       const agent = (req.headers["x-driftnet-agent"] as string | undefined)?.slice(0, 40) ?? "agent";
-      const mcp = createMcpServer(dn, agent, { readOnly: !admin });
+      const mcp = createMcpServer(dn, agent, { readOnly: !admin, actor: actorOf(req, env, dn.store) ?? (admin && !token(env) ? "admin" : undefined) });
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on("close", () => { void transport.close(); void mcp.close(); });
       await mcp.connect(transport);
@@ -413,7 +432,7 @@ const server = createServer(async (req, res) => {
       if (!token(env) || !authorized(req)) return send(res, 401, { error: "unauthorized (set an admin password)" });
       const body = await readJson<{ limit?: number; agent?: string }>(req);
       const agent = `agent:${String(body.agent ?? "http").slice(0, 40)}`;
-      const items = dn.store.claimPending(agent, Number(body.limit ?? 5));
+      const items = dn.store.claimPending(agent, Number(body.limit ?? 5), 30, actorOf(req, env, dn.store));
       return send(res, 200, {
         pending: dn.store.pendingCount(),
         language: env.DRIFTNET_LANGUAGE || "English",

@@ -1,6 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
+import { hashToken, type Store } from "@driftnet/core";
 
 /**
  * Who may do what. Two keys, both read from the environment on every request
@@ -12,7 +13,13 @@ import type { IncomingMessage } from "node:http";
  *                      someone can read the catalogue, nothing more, and a new
  *                      one is a click away.
  *
- * DRIFTNET_ACCESS=private makes reads need either key; public leaves reads open.
+ * Agents can also carry their own named tokens (see Store.createAgentToken): a
+ * write token counts as admin for everything except settings, a read token as
+ * the read-only key. Revoking one cuts that agent off and nothing else, and they
+ * survive a change of the admin password. Pass the store to the functions below
+ * to honour them; without it only the two keys count.
+ *
+ * DRIFTNET_ACCESS=private makes reads need either key or a token; public leaves reads open.
  */
 export const token = (env: NodeJS.ProcessEnv) => env.DRIFTNET_TOKEN || undefined;
 export const readKey = (env: NodeJS.ProcessEnv) => env.DRIFTNET_READ_KEY || undefined;
@@ -28,8 +35,35 @@ function same(given: string | null | undefined, want: string | undefined): boole
 const bearer = (req: IncomingMessage) => (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "").trim() || null;
 const queryKey = (req: IncomingMessage) => new URL(req.url ?? "/", "http://x").searchParams.get("key");
 
+/**
+ * The agent token in the Authorization header, if it is active. Only a header,
+ * never a URL. The lookup is by sha256 of the given value, a fixed-length digest
+ * of a random token, so there is nothing to time. Marks the token as used.
+ */
+export function agentOf(req: IncomingMessage, store: Store | undefined): { id: string; name: string; scope: "read" | "write" } | null {
+  const given = bearer(req);
+  if (!store || !given) return null;
+  const found = store.findAgentToken(hashToken(given));
+  if (found) store.touchAgentToken(found.id);
+  return found;
+}
+
+/** Who to write in the audit columns: "admin", or "agent:<token id>". Undefined when it can't be told. */
+export function actorOf(req: IncomingMessage, env: NodeJS.ProcessEnv, store: Store | undefined): string | undefined {
+  const a = agentOf(req, store);
+  if (a) return `agent:${a.id}`;
+  const t = token(env);
+  return t && same(bearer(req), t) ? "admin" : undefined;
+}
+
 /** Writes and everything else that changes state. With no admin password set, anyone who can reach the server. */
-export function isAdmin(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
+export function isAdmin(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: Store): boolean {
+  const t = token(env);
+  return !t || same(bearer(req), t) || agentOf(req, store)?.scope === "write";
+}
+
+/** The admin password itself (or no password at all), not an agent token: settings and token management. */
+export function isPassword(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
   const t = token(env);
   return !t || same(bearer(req), t);
 }
@@ -39,15 +73,15 @@ export function isAdmin(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
  * header or as ?key=. The admin password is never accepted in a URL, where it
  * would end up in history, logs and chat transcripts.
  */
-export function canRead(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
-  if (!isPrivate(env) || isAdmin(req, env)) return true;
+export function canRead(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: Store): boolean {
+  if (!isPrivate(env) || isAdmin(req, env, store)) return true;
   const k = readKey(env);
-  return same(bearer(req), k) || same(queryKey(req), k);
+  return same(bearer(req), k) || same(queryKey(req), k) || !!agentOf(req, store);
 }
 
-/** A read-only caller: has the share key, not the admin password. */
-export function readOnly(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
-  return !!token(env) && !isAdmin(req, env);
+/** A read-only caller: has the share key or a read token, not the admin password or a write token. */
+export function readOnly(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: Store): boolean {
+  return !!token(env) && !isAdmin(req, env, store);
 }
 
 /**
@@ -90,9 +124,9 @@ export function foreignOrigin(req: IncomingMessage): boolean {
 }
 
 /** What the page may offer: admin (change things), reader (look only), none (asks for a key). */
-export function role(req: IncomingMessage, env: NodeJS.ProcessEnv): "admin" | "reader" | "none" {
-  if (isTrustedLocal(req) || (token(env) ? isAdmin(req, env) : true)) return "admin";
-  return canRead(req, env) ? "reader" : "none";
+export function role(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: Store): "admin" | "reader" | "none" {
+  if (isTrustedLocal(req) || (token(env) ? isAdmin(req, env, store) : true)) return "admin";
+  return canRead(req, env, store) ? "reader" : "none";
 }
 
 /**
