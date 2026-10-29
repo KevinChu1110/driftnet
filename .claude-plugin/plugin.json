@@ -1,6 +1,6 @@
 {
   "name": "driftnet",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Look up, save and rate AI tools people shared in group chats — a local catalogue your agent can search before picking a tool, and help keep tidy.",
   "author": {
     "name": "Kevin Chu",
@@ -23,7 +23,10 @@
         "-y",
         "driftnet",
         "mcp"
-      ]
+      ],
+      "env": {
+        "DRIFTNET_AGENT": "claude-code"
+      }
     }
   }
 }
