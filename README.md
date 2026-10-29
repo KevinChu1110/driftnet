@@ -162,6 +162,8 @@ Most links never reach a model; the ones that do arrive as a short outline.
 6. **Filed in your folders.** The AI uses each folder's path and description; new links wait in the Inbox with two or three suggested folders, and one tap files them.
 7. **Shown, and offered to agents.** It appears on the web page, and agents get it over MCP, `/llms.txt`, `/feed.xml` or the outgoing webhook. Export takes it all with you.
 
+**Reels and shorts.** Many shared reels only say the tool's name out loud. When a link on Instagram, Facebook, Threads, TikTok, YouTube Shorts or X is a video whose page text says almost nothing, driftnet reads the video itself with tools already on your machine, cheapest first and stopping as soon as there is enough text: (1) captions, title and description from `yt-dlp`, no download; (2) the video at low quality (at most 60 MB and the first 3 minutes), one frame every 2 seconds, read by `tesseract` (English and Chinese if installed); (3) only if still thin, the audio through `whisper` (`whisper-cli` from whisper.cpp also works, with `DRIFTNET_WHISPER_MODEL` set). What it finds is added to the text as labelled `[captions]`, `[on-screen text]` and `[speech]` sections (6,000 characters at most) and goes through the same guard as page text; the card gets a "read from video" mark. Every tool is optional: whatever is missing is skipped, and `DRIFTNET_VIDEO=off` turns it all off. Tools run without a shell, in a private temp folder that is always deleted, with your driftnet secrets removed from their environment, a time limit per step, links to private or local addresses refused, and one video at a time.
+
 <details>
 <summary><b>All eight steps</b></summary>
 
@@ -534,6 +536,8 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
 | `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
 | `DRIFTNET_HEALTH` | `off` | `weekly` re-checks links about once a week and marks dead, archived and stale cards (see Link health). Off by default: it makes network requests |
+| `DRIFTNET_VIDEO` | `auto` | `off` never reads videos; `auto` uses whichever of `yt-dlp`, `ffmpeg`, `tesseract` and `whisper` are installed (see Reels and shorts) |
+| `DRIFTNET_YTDLP`, `DRIFTNET_FFMPEG`, `DRIFTNET_TESSERACT`, `DRIFTNET_WHISPER` | found on `PATH` | Full path of a tool that is not on `PATH` (`whisper` may also be `whisper-cli`; whisper.cpp needs `DRIFTNET_WHISPER_MODEL`, a model file) |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of extractor plugins (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | Admin password: writes, settings, agent tokens, MCP with every tool, the agent queue. Settable on the page |
 | `DRIFTNET_READ_KEY` | — | Read-only share key (header or `?key=`): reading and the read-only MCP tools |
@@ -641,8 +645,6 @@ platform (`handleChatText()`), browser capture (`collect.js`), or a bot language
 
 **Good first issues**, found by running driftnet on links people actually share:
 
-- [ ] **Video.** Captions and on-screen text with local OCR first, local speech-to-text second; many
-      reels only say the tool's name out loud.
 - [ ] **Extension polish.** Threads / X / Instagram capture, a Chrome Web Store build.
 - [ ] **More adapters.** Native Gemini, Bedrock, Vertex; more judges.
 

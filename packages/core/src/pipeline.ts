@@ -1,6 +1,7 @@
 import { BlockedUrl, extract, isSocial } from "./extractors/index.ts";
 import { findGithubRepo, matchGithub } from "./extractors/github.ts";
 import { safeFetch } from "./extractors/net.ts";
+import { enrichFromVideo } from "./extractors/video.ts";
 import { normalizeMedia } from "./media.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
@@ -177,6 +178,10 @@ export class Pipeline {
   /** Guard → reputation → judge → summarise: everything between "page fetched" and "ready to store". */
   private async analyze(digest: Digest, note: string | undefined) {
     const { store } = this.opts;
+    // Reels and shorts that say nothing in text: captions, on-screen text, speech (local tools, optional).
+    // Done before the guard, so what the video says is checked like page text.
+    const video = await enrichFromVideo(digest);
+    digest = video.digest;
     const cleaned = guard(digest.text);
     const cleanedNote = note ? guard(note) : { text: undefined, flags: [] };
     // Title, meta values and picture captions reach the judge and the model too.
@@ -195,7 +200,7 @@ export class Pipeline {
       return { ...m, alt: g.text };
     });
     digest = { ...digest, text: cleaned.text, title: cleanedTitle.text, meta, ...(media ? { media } : {}) };
-    const flags = [...new Set([...cleaned.flags, ...cleanedNote.flags, ...extra])];
+    const flags = [...new Set([...cleaned.flags, ...cleanedNote.flags, ...extra, ...video.flags])];
     const source = sourceOf(digest);
 
     const rep = store.reputation(source);
