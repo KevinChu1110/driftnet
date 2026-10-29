@@ -25,7 +25,9 @@
      "open-source",
      "self-hosted"
     ],
-    "primaryUrl": "https://github.com/paperclipai/paperclip"
+    "primaryUrl": "https://github.com/paperclipai/paperclip",
+    "demo": "一個網頁儀表板，把 AI 代理排成組織圖：每個代理有角色、預算和任務看板，可以看著它們接工作、完成工作。",
+    "why": "有人分享它，是因為能自架、把好幾個寫程式的代理當成一個團隊來管，不用在一堆終端機之間切換。"
    }
   },
   {
@@ -212,7 +214,9 @@
      "self-hosted",
      "typescript"
     ],
-    "primaryUrl": "https://github.com/paperclipai/paperclip"
+    "primaryUrl": "https://github.com/paperclipai/paperclip",
+    "demo": "A web dashboard with an org chart of agents: each one has a role, a budget and a task board, and you watch them pick up and finish work.",
+    "why": "Shared as a self-hosted way to run several coding agents as one team instead of juggling terminals."
    }
   },
   {

@@ -30,7 +30,7 @@ const TEXT = {
     chatUser: "Mia", channel: "reading-list", userMsg: "look at this https://www.facebook.com/reel/…",
     reply: (id) => `Paperclip — open-source control plane for AI agent teams · driftnet.example/#item-${id}`,
     search: "agents",
-    caps: ["Drop a link in any chat", "It becomes a sorted, explained card", "Search everything you saved", "Summary, demo, why it matters, related cards", "Or see it as a mind map", ""],
+    caps: ["Drop a link in any chat", "It becomes a sorted, explained card", "Search everything you saved", "What it is, what you'll see, why it matters", "Or see it as a mind map", ""],
     tagline: "Drop links in a chat. Get sorted, explained, searchable cards.", agent: "Your agents read the same catalogue over MCP.", typing: "driftnet is typing",
   },
   "zh-TW": {
@@ -38,7 +38,7 @@ const TEXT = {
     chatUser: "小米", channel: "待看清單", userMsg: "看看這個 https://www.facebook.com/reel/…",
     reply: (id) => `Paperclip — 開源的 AI 代理團隊控制台 · driftnet.example/#item-${id}`,
     search: "代理",
-    caps: ["在任何聊天室丟出連結", "自動變成分類好、附說明的卡片", "搜尋你存過的一切", "摘要、示範、為什麼值得看、相關卡片", "也能用心智圖瀏覽", ""],
+    caps: ["在任何聊天室丟出連結", "自動變成分類好、附說明的卡片", "搜尋你存過的一切", "它是什麼、會看到什麼、為什麼值得看", "也能用心智圖瀏覽", ""],
     tagline: "把連結丟進聊天室，變成分類好、可搜尋的卡片。", agent: "你的代理也能透過 MCP 讀同一份資料。", typing: "driftnet 正在輸入",
   },
 };
