@@ -305,21 +305,42 @@ driftnet 只要模型做一件事：把 JSON schema 填好。由你決定誰來�
 | `DRIFTNET_LLM_PROVIDER` | 使用 | 金鑰 |
 |---|---|---|
 | `anthropic` | Claude（官方 SDK） | `DRIFTNET_LLM_API_KEY` |
-| `openai` | 所有相容 OpenAI 格式的服務：OpenAI、Gemini、Grok、DeepSeek、OpenRouter、LiteLLM、**Ollama／LM Studio** | `DRIFTNET_LLM_API_KEY`（本機不用） |
+| `openai` | 所有相容 OpenAI 格式的服務：OpenAI、Grok、DeepSeek、OpenRouter、LiteLLM、**Ollama／LM Studio** | `DRIFTNET_LLM_API_KEY`（本機不用） |
+| `gemini` | 直接接 Google 的 Gemini API（JSON schema 輸出） | `DRIFTNET_LLM_API_KEY` 或 `GEMINI_API_KEY` |
+| `bedrock` | Amazon Bedrock，Converse API，用 SigV4 簽章（不裝 AWS SDK） | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`（＋`AWS_SESSION_TOKEN`），或 `AWS_BEARER_TOKEN_BEDROCK` |
+| `vertex` | Google Cloud 上的 Gemini（Vertex AI） | 服務帳戶 JSON 檔（`GOOGLE_APPLICATION_CREDENTIALS`），或把存取權杖填在 `DRIFTNET_LLM_API_KEY` |
 | `claude-cli` | **你的 Claude 訂閱**，透過同一台機器上已登入的 Claude Code | 不用 |
 | `gemini-cli` | **你的 Google 帳號**，透過同一台機器上已登入的 Gemini CLI | 不用 |
 | *（不填）* | 不用模型：照樣擷取、列出（有開 Jev 也會判斷），並排進 [agent 佇列](#讓你的-agent-來讀) | 不用 |
 
 ```bash
-DRIFTNET_LLM_PROVIDER=openai
-DRIFTNET_LLM_MODEL=gemini-3.8-flash
+# Gemini API。模型可不填（預設 gemini-flash-latest，永遠指向目前的 Flash 模型）
+DRIFTNET_LLM_PROVIDER=gemini
 DRIFTNET_LLM_API_KEY=...
-DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+
+# Amazon Bedrock：填 Bedrock 主控台上的模型或推論設定檔 ID，且該區域你有權限
+DRIFTNET_LLM_PROVIDER=bedrock
+DRIFTNET_LLM_MODEL=<模型 ID>
+DRIFTNET_LLM_REGION=us-east-1            # 或 AWS_REGION
+AWS_ACCESS_KEY_ID=...  AWS_SECRET_ACCESS_KEY=...   # 臨時憑證再加 AWS_SESSION_TOKEN
+# ……或不用上面三個 AWS 變數，改設 AWS_BEARER_TOKEN_BEDROCK=<Bedrock API 金鑰>
+
+# Google Vertex AI：填你那個區域有的 Gemini 模型 ID
+DRIFTNET_LLM_PROVIDER=vertex
+DRIFTNET_LLM_MODEL=<模型 ID>
+DRIFTNET_LLM_REGION=us-central1          # 預設；也可填 global
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+GOOGLE_CLOUD_PROJECT=my-project          # 金鑰檔裡有寫專案就可以不填
 ```
 
 > [!NOTE]
 > driftnet **刻意不讀** `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`。這些變數一旦 export，會改變其他工具的計費方式，
-> 例如 Claude Code 會從訂閱額度改走 API 計費。
+> 例如 Claude Code 會從訂閱額度改走 API 計費。雲端供應商則會讀各自雲端的標準變數
+> （`AWS_*`、`GOOGLE_*`、`GEMINI_API_KEY`），因為憑證本來就放在那裡。
+
+`gemini`、`bedrock`、`vertex` 只連固定的供應商網址，簽章和權杖快取都自己做（不裝任何雲端 SDK），逾時 30 秒，
+429／5xx 重試一次，錯誤會顯示供應商原本的訊息，但絕不印出金鑰。Bedrock 沒有每個模型都支援的強制 schema 輸出，
+所以 schema 放在提示裡，回覆照樣用 schema 驗證。不管選哪個供應商，driftnet 都不統計 token 或花費。
 
 不論哪家模型，回覆都會照 schema 驗證；被截斷或拒答時重試一次；模型給的連結，只有真的出現在抓到的內容裡才會保留。
 
@@ -344,6 +365,35 @@ DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 > 也不要拿來替別人提供服務。
 
 </details>
+
+### 判斷器
+
+判斷器在問模型之前，先決定每個連結的資料夾、類型和值不值得看。用 `DRIFTNET_JUDGE` 選：
+
+| `DRIFTNET_JUDGE` | 做什麼 |
+|---|---|
+| *（不填）* | 有 TypeSafe 金鑰就用 [Jev](https://console.typesafe.ai)，否則交給模型 |
+| `jev` | 只用 Jev |
+| `rules` | **免費，不用模型。** 先看你的規則檔，再看頁面用字和資料夾名稱、說明的重疊。沒把握就讓位，由模型（或「other」）決定 |
+| `llm`／`heuristic`／`off` | 不用獨立的判斷器：交給模型，沒有模型就放「other」 |
+| *名稱* | 外掛新增的判斷器 |
+
+規則檔用 `DRIFTNET_JUDGE_RULES` 指定，一行一條，由上往下第一條符合的生效：
+
+```text
+# 樣式                   -> 資料夾（ID 或資料夾名稱）
+github.com/*             -> coding        # 網域＋路徑，* 代表任意字元
+youtube.com              -> videos        # 只寫網域時，子網域也算
+kind:repo                -> coding        # repo、product、video、article、post 或 other
+contains:酸種             -> cooking       # 標題或內文裡出現這個詞
+```
+
+### 外掛
+
+`~/.driftnet/plugins` 裡的檔案可以匯出 `{ extractors, providers, judges }`（都是選填；單一擷取器或擷取器清單仍然可用）。
+供應商寫成 `名稱: (env) => ({ label, complete })`，用 `DRIFTNET_LLM_PROVIDER=名稱` 選；判斷器寫成
+`名稱: (env) => ({ name, judge })`，用 `DRIFTNET_JUDGE=名稱` 選。範例見
+[`examples/plugins/rainbow-judge.mjs`](examples/plugins/rainbow-judge.mjs)。
 
 ## Agent
 
@@ -442,9 +492,15 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 
 | 變數 | 預設 | 用途 |
 |---|---|---|
-| `DRIFTNET_LLM_PROVIDER` | *（關閉）* | `anthropic`、`openai`、`claude-cli`、`gemini-cli` 或留空 |
-| `DRIFTNET_LLM_MODEL` | — | 模型名稱。`anthropic`、`openai` 必填；`claude-cli` 預設 `haiku` |
-| `DRIFTNET_LLM_API_KEY` | — | 該供應商的金鑰（Ollama／LM Studio 不用） |
+| `DRIFTNET_LLM_PROVIDER` | *（關閉）* | `anthropic`、`openai`、`gemini`、`bedrock`、`vertex`、`claude-cli`、`gemini-cli`、外掛名稱，或留空 |
+| `DRIFTNET_LLM_MODEL` | — | 模型名稱。`anthropic`、`openai`、`bedrock`、`vertex` 必填；`gemini` 預設 `gemini-flash-latest`；`claude-cli` 預設 `haiku` |
+| `DRIFTNET_LLM_API_KEY` | — | 該供應商的金鑰（Ollama／LM Studio 不用；`vertex` 可填存取權杖代替金鑰檔） |
+| `DRIFTNET_LLM_REGION` | `vertex`：`us-central1` | `bedrock`（沒填時用 `AWS_REGION`）和 `vertex` 的區域 |
+| `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` · `AWS_SESSION_TOKEN` | — | `bedrock` 的憑證 |
+| `AWS_BEARER_TOKEN_BEDROCK` | — | `bedrock` 改用 Bedrock API 金鑰，不用上面三個 |
+| `GOOGLE_APPLICATION_CREDENTIALS` · `DRIFTNET_VERTEX_CREDENTIALS` | — | `vertex`：服務帳戶金鑰檔（第二個也可以直接放 JSON 內容） |
+| `GOOGLE_CLOUD_PROJECT` | 取自金鑰檔 | `vertex` 的專案 |
+| `GEMINI_API_KEY` | — | `DRIFTNET_LLM_API_KEY` 沒填時，`gemini` 用這個 |
 | `DRIFTNET_LLM_BASE_URL` | OpenAI | `openai` 供應商的端點 |
 | `DRIFTNET_LLM_EFFORT` | `anthropic`：`low` | `anthropic`：`low`～`xhigh`；`openai`：`reasoning_effort`；`claude-cli`：`--effort` |
 | `DRIFTNET_CLI_PATH` | `claude`／`gemini` | `claude-cli`／`gemini-cli` 使用的執行檔 |
@@ -454,6 +510,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_LOCALE` | 跟 `DRIFTNET_LANGUAGE` | 強制 bot 自己的用語用 `en` 或 `zh-TW` |
 | `DRIFTNET_REPLY` | `link` | 聊天回覆：`link`（一行＋網頁連結）、`full`（摘要直接貼在聊天室）或 `off` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | 啟用 Jev 判斷；`DRIFTNET_JUDGE=off` 可關閉 |
+| `DRIFTNET_JUDGE` | 有金鑰就 Jev | `jev`、`rules`、`llm`、`heuristic`、`off` 或外掛的判斷器（見[判斷器](#判斷器)） |
+| `DRIFTNET_JUDGE_RULES` | — | `rules` 判斷器的規則檔 |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
 | `DRIFTNET_FOLDERS` | `ai` | 新資料庫的起始資料夾樣板：`ai`（AI 與程式）、`research`（論文、文章、資料集……）或 `everyday`（料理、旅行、理財……）。清單還是空的時候，網頁上也能選 |
@@ -469,7 +527,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
-| `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 擷取器外掛（`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
+| `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 外掛（擷取器、供應商、判斷器；`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、管理 agent 金鑰、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
 | `DRIFTNET_READ_KEY` | — | 唯讀分享碼（放 header 或 `?key=`）：只能讀，MCP 也只有讀取類工具 |
 | `DRIFTNET_ACCESS` | `public` | `public`：任何人都能讀。`private`：讀取要密碼、分享碼或 agent 金鑰 |
@@ -571,7 +629,6 @@ pnpm demo -- --many --private --password demo-pass-123 --read-key demo-share-key
 - [ ] **影片。** 先用字幕和本機 OCR 讀畫面上的字，再用本機語音轉文字；很多 reels 只用講的報工具名稱。
 - [ ] **豐富回覆。** LINE Flex、Slack Block Kit、Discord embed、用表情符號投票。
 - [ ] **擴充打磨。** Threads／X／Instagram 專屬擷取、上架 Chrome 線上應用程式商店。
-- [ ] **更多轉接。** 原生 Gemini、Bedrock、Vertex，以及更多判斷器。
 
 ## 支持
 

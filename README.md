@@ -334,21 +334,45 @@ driftnet asks a model for one thing: fill in a JSON schema. Pick who answers.
 | `DRIFTNET_LLM_PROVIDER` | Uses | Key |
 |---|---|---|
 | `anthropic` | Claude through the official SDK | `DRIFTNET_LLM_API_KEY` |
-| `openai` | Anything OpenAI-compatible: OpenAI, Gemini, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio** | `DRIFTNET_LLM_API_KEY` (none for local) |
+| `openai` | Anything OpenAI-compatible: OpenAI, Grok, DeepSeek, OpenRouter, LiteLLM, **Ollama / LM Studio** | `DRIFTNET_LLM_API_KEY` (none for local) |
+| `gemini` | Google's Gemini API directly (JSON-schema output) | `DRIFTNET_LLM_API_KEY` or `GEMINI_API_KEY` |
+| `bedrock` | Amazon Bedrock, Converse API, signed with SigV4 (no AWS SDK) | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (+ `AWS_SESSION_TOKEN`), or `AWS_BEARER_TOKEN_BEDROCK` |
+| `vertex` | Gemini on Google Cloud (Vertex AI) | A service-account JSON file (`GOOGLE_APPLICATION_CREDENTIALS`), or an access token in `DRIFTNET_LLM_API_KEY` |
 | `claude-cli` | **Your Claude subscription**, via Claude Code logged in on the same machine | none |
 | `gemini-cli` | **Your Google account**, via Gemini CLI logged in on the same machine | none |
 | *(empty)* | No model. Links are still extracted and listed (judged too if Jev is on), and wait in the [agent queue](#let-your-agent-do-the-reading) | none |
 
 ```bash
-DRIFTNET_LLM_PROVIDER=openai
-DRIFTNET_LLM_MODEL=gemini-3.8-flash
+# Gemini API. The model is optional (default: gemini-flash-latest, which tracks the current Flash model)
+DRIFTNET_LLM_PROVIDER=gemini
 DRIFTNET_LLM_API_KEY=...
-DRIFTNET_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+
+# Amazon Bedrock: a model or inference-profile id from your Bedrock console, in a region you have access to
+DRIFTNET_LLM_PROVIDER=bedrock
+DRIFTNET_LLM_MODEL=<model id>
+DRIFTNET_LLM_REGION=us-east-1            # or AWS_REGION
+AWS_ACCESS_KEY_ID=...  AWS_SECRET_ACCESS_KEY=...   # + AWS_SESSION_TOKEN for temporary credentials
+# …or, instead of the three AWS variables: AWS_BEARER_TOKEN_BEDROCK=<Bedrock API key>
+
+# Google Vertex AI: a Gemini model id that exists in your region
+DRIFTNET_LLM_PROVIDER=vertex
+DRIFTNET_LLM_MODEL=<model id>
+DRIFTNET_LLM_REGION=us-central1          # default; "global" also works
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+GOOGLE_CLOUD_PROJECT=my-project          # optional if the key file names its project
 ```
 
 > [!NOTE]
 > driftnet never reads `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Exporting those changes how other
-> tools bill you: Claude Code, for one, switches from your subscription to API billing.
+> tools bill you: Claude Code, for one, switches from your subscription to API billing. The cloud
+> providers do read their own cloud's standard variables (`AWS_*`, `GOOGLE_*`, `GEMINI_API_KEY`),
+> because that is where those credentials live.
+
+`gemini`, `bedrock` and `vertex` talk to fixed vendor hosts, sign and cache tokens themselves (no
+cloud SDK is installed), time out after 30 s, retry 429 / 5xx once, and show the vendor's own error
+message without ever printing a key. Bedrock has no schema-enforced output that every model supports,
+so the schema goes in the prompt and the reply is validated like any other. driftnet keeps no count
+of tokens or spend, whichever provider you pick.
 
 Whatever the provider, replies are validated against the schema; truncated or refused answers are
 retried once, and a link the model gives is kept only if it appears in what was fetched.
@@ -376,6 +400,35 @@ plan's limits.
 > and don't use it to serve other people.
 
 </details>
+
+### Judges
+
+A judge files each link (folder, kind, worth) before the model is asked. `DRIFTNET_JUDGE` picks one:
+
+| `DRIFTNET_JUDGE` | Does |
+|---|---|
+| *(empty)* | [Jev](https://console.typesafe.ai) if a TypeSafe key is set, otherwise the model files it |
+| `jev` | Jev only |
+| `rules` | **Free, no model.** Your rules file first, then word overlap with your folder names and descriptions. When it isn't sure it steps aside and the model (or "other") decides |
+| `llm` / `heuristic` / `off` | No separate judge: the model files it, or "other" when there is no model |
+| *a name* | A judge added by a plugin |
+
+The rules file is `DRIFTNET_JUDGE_RULES`, one rule per line, first match wins:
+
+```text
+# pattern                -> folder (an id or the folder's name)
+github.com/*             -> coding        # host + path, * matches anything
+youtube.com              -> videos        # a bare host also covers its subdomains
+kind:repo                -> coding        # repo, product, video, article, post or other
+contains:sourdough       -> cooking       # a word in the title or text
+```
+
+### Plugins
+
+A file in `~/.driftnet/plugins` may export `{ extractors, providers, judges }` (all optional; a lone
+extractor or a list of extractors still works). A provider is `name: (env) => ({ label, complete })`
+and is chosen with `DRIFTNET_LLM_PROVIDER=name`; a judge is `name: (env) => ({ name, judge })` chosen
+with `DRIFTNET_JUDGE=name`. See [`examples/plugins/rainbow-judge.mjs`](examples/plugins/rainbow-judge.mjs).
 
 ## Agents
 
@@ -481,9 +534,15 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DRIFTNET_LLM_PROVIDER` | *(off)* | `anthropic`, `openai`, `claude-cli`, `gemini-cli` or empty |
-| `DRIFTNET_LLM_MODEL` | — | Model name. Required for `anthropic` and `openai`; `claude-cli` defaults to `haiku` |
-| `DRIFTNET_LLM_API_KEY` | — | Key for that provider (none for Ollama / LM Studio) |
+| `DRIFTNET_LLM_PROVIDER` | *(off)* | `anthropic`, `openai`, `gemini`, `bedrock`, `vertex`, `claude-cli`, `gemini-cli`, a plugin's name, or empty |
+| `DRIFTNET_LLM_MODEL` | — | Model name. Required for `anthropic`, `openai`, `bedrock` and `vertex`; `gemini` defaults to `gemini-flash-latest`; `claude-cli` to `haiku` |
+| `DRIFTNET_LLM_API_KEY` | — | Key for that provider (none for Ollama / LM Studio; for `vertex`, an access token instead of a key file) |
+| `DRIFTNET_LLM_REGION` | `us-central1` (vertex) | Region for `bedrock` (falls back to `AWS_REGION`) and `vertex` |
+| `AWS_ACCESS_KEY_ID` · `AWS_SECRET_ACCESS_KEY` · `AWS_SESSION_TOKEN` | — | `bedrock` credentials |
+| `AWS_BEARER_TOKEN_BEDROCK` | — | `bedrock` with a Bedrock API key instead of the three above |
+| `GOOGLE_APPLICATION_CREDENTIALS` · `DRIFTNET_VERTEX_CREDENTIALS` | — | `vertex`: service-account key file (or its JSON text in the second) |
+| `GOOGLE_CLOUD_PROJECT` | from the key file | `vertex` project |
+| `GEMINI_API_KEY` | — | `gemini` key when `DRIFTNET_LLM_API_KEY` is empty |
 | `DRIFTNET_LLM_BASE_URL` | OpenAI | Endpoint for the `openai` provider |
 | `DRIFTNET_LLM_EFFORT` | `anthropic`: `low` | `anthropic`: `low`–`xhigh`; `openai`: `reasoning_effort`; `claude-cli`: `--effort` |
 | `DRIFTNET_CLI_PATH` | `claude` / `gemini` | CLI binary for `claude-cli` / `gemini-cli` |
@@ -493,6 +552,8 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_LOCALE` | from `DRIFTNET_LANGUAGE` | Force the bot's own words to `en` or `zh-TW` |
 | `DRIFTNET_REPLY` | `link` | Chat replies: `link` (one line + web link), `full` (the summary in chat) or `off` |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge; `DRIFTNET_JUDGE=off` disables it |
+| `DRIFTNET_JUDGE` | Jev if keyed | `jev`, `rules`, `llm`, `heuristic`, `off` or a plugin's judge ([Judges](#judges)) |
+| `DRIFTNET_JUDGE_RULES` | — | Rules file for the `rules` judge |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
 | `DRIFTNET_FOLDERS` | `ai` | Starting folder template on a new database: `ai` (AI & coding), `research` (papers, articles, datasets…) or `everyday` (cooking, travel, money…). An empty catalogue also offers the choice on the page |
@@ -508,7 +569,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
 | `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
 | `DRIFTNET_HEALTH` | `off` | `weekly` re-checks links about once a week and marks dead, archived and stale cards (see Link health). Off by default: it makes network requests |
-| `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of extractor plugins (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
+| `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of plugins: extractors, providers, judges (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | Admin password: writes, settings, agent tokens, MCP with every tool, the agent queue. Settable on the page |
 | `DRIFTNET_READ_KEY` | — | Read-only share key (header or `?key=`): reading and the read-only MCP tools |
 | `DRIFTNET_ACCESS` | `public` | `public`: anyone can read. `private`: reads need the password, the share key or an agent token |
@@ -619,7 +680,6 @@ platform (`handleChatText()`), browser capture (`collect.js`), or a bot language
       reels only say the tool's name out loud.
 - [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, voting by reaction.
 - [ ] **Extension polish.** Threads / X / Instagram capture, a Chrome Web Store build.
-- [ ] **More adapters.** Native Gemini, Bedrock, Vertex; more judges.
 
 ## Support
 

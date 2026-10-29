@@ -1,7 +1,7 @@
 import { WORTH, type Digest, type Kind } from "../types.ts";
 import { judgeState, WORTH_CRITERIA, type Judge, type JudgeResult } from "./index.ts";
 
-const ENDPOINT = process.env.TYPESAFE_ENDPOINT ?? "https://api.typesafe.ai/v1/systemone";
+export const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 
 const KINDS: Record<Kind, string> = {
   repo: "A source code repository",
@@ -25,7 +25,7 @@ type JevAnswer =
  */
 export class JevJudge implements Judge {
   readonly name = "jev" as const;
-  constructor(private readonly apiKey: string, private readonly timeoutMs = 4000) {}
+  constructor(private readonly apiKey: string, private readonly timeoutMs = 4000, private readonly endpoint: string = JEV_ENDPOINT) {}
 
   async judge(digest: Digest, note: string | undefined, categories: Record<string, string>): Promise<JudgeResult | null> {
     const questions = {
@@ -39,7 +39,7 @@ export class JevJudge implements Judge {
       },
     };
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await fetch(this.endpoint, {
         method: "POST",
         headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
         body: JSON.stringify({ model: "jev-latest", state: judgeState(digest, note), questions }),

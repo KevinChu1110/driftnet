@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadCategories } from "./categories.ts";
 import { JevJudge } from "./judge/jev.ts";
+import { createJudge, judgeFactory, type Judge } from "./judge/index.ts";
+import { loadRulesFile, RulesJudge } from "./judge/rules.ts";
 import { Pipeline, type Engines } from "./pipeline.ts";
 import { Store } from "./store.ts";
 import { createProvider } from "./llm/index.ts";
@@ -22,9 +24,11 @@ export { mediaSigOk, normalizeMedia, publicItem, publicMedia, setMediaSecret, ty
 export { safeFetch } from "./extractors/net.ts";
 export { HealthChecker, healthFor, isPrivateTarget } from "./health.ts";
 export { cardLink } from "./render.ts";
-export { loadPlugins, type PluginApi } from "./plugins.ts";
+export { loadPlugins, type PluginApi, type PluginExports } from "./plugins.ts";
 export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation, type RepoFacts } from "./store.ts";
-export { createProvider, IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./llm/index.ts";
+export { createProvider, registerProvider, IncompleteOutput, parseStructured, type LlmProvider, type ProviderFactory, type StructuredRequest } from "./llm/index.ts";
+export { registerJudge, type JudgeFactory } from "./judge/index.ts";
+export { parseRules, RulesJudge } from "./judge/rules.ts";
 export { Summarizer, summaryDepth, DEPTHS, type Depth } from "./summarize.ts";
 export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
@@ -110,8 +114,7 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
 
 /** Judge, model and rules from settings; rebuilt when the settings page saves. */
 function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { judge: string; summarizer: string }; llm: LlmProvider | undefined } {
-  const jevKey = env.TYPESAFE_API_KEY || readKeyFile(join(homedir(), ".typesafe", "api_key"));
-  const judge = jevKey && env.DRIFTNET_JUDGE !== "off" ? new JevJudge(jevKey) : undefined;
+  const judge = buildJudge(env);
   const llm = createProvider(env);
   const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "", summaryDepth(env)) : undefined;
   const blockedDomains = (env.DRIFTNET_BLOCK_DOMAINS ?? "").split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^\*?\./, "")).filter(Boolean);
@@ -124,8 +127,47 @@ function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { jud
       ...(minConfidence !== undefined && Number.isFinite(minConfidence) ? { minConfidence } : {}),
       ...(blockedDomains.length ? { blockedDomains } : {}),
     },
-    labels: { judge: judge ? "jev" : summarizer ? "llm" : "heuristic", summarizer: summarizer?.label ?? "off" },
+    labels: { judge: judge ? judge.name : summarizer ? "llm" : "heuristic", summarizer: summarizer?.label ?? "off" },
   };
+}
+
+/**
+ * DRIFTNET_JUDGE picks who files each link before (or instead of) the model:
+ *   (empty)  Jev when a TypeSafe key is set, otherwise the model
+ *   jev      Jev only; says so when there is no key
+ *   rules    the zero-cost rules judge (folder descriptions + DRIFTNET_JUDGE_RULES)
+ *   llm / heuristic / off   no separate judge: the model classifies, or "other" without one
+ *   <name>   a judge a plugin registered
+ * Registered names are looked up first, so a plugin may replace a built-in.
+ */
+function buildJudge(env: NodeJS.ProcessEnv): Judge | undefined {
+  const choice = (env.DRIFTNET_JUDGE ?? "").trim().toLowerCase();
+  const jev = (): JevJudge | undefined => {
+    const key = env.TYPESAFE_API_KEY || readKeyFile(join(homedir(), ".typesafe", "api_key"));
+    return key ? new JevJudge(key, undefined, env.TYPESAFE_ENDPOINT || undefined) : undefined;
+  };
+  if (judgeFactory(choice)) return createJudge(choice, env);
+  switch (choice) {
+    case "":
+      return jev();
+    case "off":
+    case "llm":
+    case "heuristic":
+      return undefined;
+    case "jev": {
+      const j = jev();
+      if (!j) console.warn("[driftnet] DRIFTNET_JUDGE=jev but there is no TYPESAFE_API_KEY; no judge is active");
+      return j;
+    }
+    case "rules": {
+      const judge = new RulesJudge({ rules: loadRulesFile(env.DRIFTNET_JUDGE_RULES) });
+      for (const e of judge.errors) console.warn(`[driftnet] DRIFTNET_JUDGE_RULES ${e}`);
+      return judge;
+    }
+    default:
+      console.warn(`[driftnet] DRIFTNET_JUDGE=${choice} is not a built-in or registered judge; no judge is active`);
+      return undefined;
+  }
 }
 
 function readKeyFile(path: string): string | undefined {
