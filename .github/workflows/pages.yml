@@ -1,0 +1,46 @@
+name: Pages
+
+# The web demo: the real page with an in-browser stand-in for the API (see demo/ and scripts/build-demo.mjs).
+# In the repository settings, Pages must use "GitHub Actions" as its source.
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/server/public/**
+      - apps/server/e2e/demo-*
+      - apps/server/e2e/fixtures/**
+      - demo/**
+      - scripts/build-demo.mjs
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:demo
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/demo
+      - id: deployment
+        uses: actions/deploy-pages@v4
