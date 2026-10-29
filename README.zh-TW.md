@@ -7,7 +7,7 @@
 
 [English](README.md) · **繁體中文**
 
-[📖 這是什麼](#-這是什麼) · [🎥 實際看看](#-實際看看) · [✨ 核心功能](#-核心功能) · [🚀 開始使用](#-開始使用) · [連結怎麼被處理](#連結怎麼被處理) · [接法](#接法) · [網頁](#網頁) · [模型](#模型) · [Agent](#agent) · [設定](#設定) · [放上網路](#放上網路選用) · [資料去哪裡](#資料去哪裡) · [參與開發](#參與開發)
+[📖 這是什麼](#-這是什麼) · [🎥 實際看看](#-實際看看) · [✨ 核心功能](#-核心功能) · [🚀 開始使用](#-開始使用) · [連結怎麼被處理](#連結怎麼被處理) · [接法](#接法) · [指令列](#指令列) · [網頁](#網頁) · [模型](#模型) · [Agent](#agent) · [設定](#設定) · [放上網路](#放上網路選用) · [資料去哪裡](#資料去哪裡) · [參與開發](#參與開發)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
@@ -187,6 +187,22 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
 <sub>Discord 實測畫面：一則訊息兩個連結，各回一行。使用者名稱和伺服器網址已隱藏。</sub>
+
+## 指令列
+
+driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話。`search` 和 `export` 在它沒開時也能用（直接讀 `~/.driftnet/driftnet.db`）；`add` 和 `import` 需要它在跑。
+
+| 指令 | 範例 |
+|---|---|
+| `driftnet add <url> [--note "…"]` | `npx driftnet add https://github.com/acme/widget --note "demo 要用"` |
+| `driftnet search [關鍵字…] [--folder id] [--kind …] [--view inbox\|favorites\|trash] [--limit N] [--json]` | `npx driftnet search 向量資料庫 --kind repo --limit 5` |
+| `driftnet open [id]` | `npx driftnet open 12` |
+| `driftnet export [--format json\|md\|vault] [-o 檔案]` | `npx driftnet export --format vault -o links.zip` |
+| `driftnet import <檔案> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
+| `driftnet status` | `npx driftnet status` |
+| `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
+
+連到別台機器：加 `--url http://host:8787 --token <密碼>`（或設 `DRIFTNET_URL`、`DRIFTNET_TOKEN`；密碼也會從 `~/.driftnet/.env` 讀）。
 
 ## 網頁
 
