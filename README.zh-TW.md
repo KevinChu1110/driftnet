@@ -9,6 +9,8 @@
 
 [📖 這是什麼](#-這是什麼) · [🎥 實際看看](#-實際看看) · [✨ 核心功能](#-核心功能) · [🚀 開始使用](#-開始使用) · [連結怎麼被處理](#連結怎麼被處理) · [接法](#接法) · [指令列](#指令列) · [網頁](#網頁) · [模型](#模型) · [Agent](#agent) · [設定](#設定) · [放上網路](#放上網路選用) · [資料去哪裡](#資料去哪裡) · [參與開發](#參與開發)
 
+[![線上試玩](https://img.shields.io/badge/%E2%96%B6%20%E7%B7%9A%E4%B8%8A%E8%A9%A6%E7%8E%A9-%E5%85%8D%E5%AE%89%E8%A3%9D-2459e0)](https://kevinchu1110.github.io/driftnet/) &nbsp; **[線上試玩](https://kevinchu1110.github.io/driftnet/)**：真正的網頁加上範例卡片，直接在瀏覽器裡玩，免安裝，資料不會離開你的電腦。
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
 [![CI](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml)
@@ -80,7 +82,7 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 
 ## 🚀 開始使用
 
-不需要伺服器，也不需要雲端帳號。需要 Node.js 22.13 以上。
+不需要伺服器，也不需要雲端帳號。需要 Node.js 22.13 以上。想先看看？**[線上試玩](https://kevinchu1110.github.io/driftnet/)** 直接在瀏覽器跑真正的網頁，免安裝。
 
 ### 讓 agent 幫你裝
 
