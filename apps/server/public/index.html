@@ -759,6 +759,14 @@
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
         savedServer: "Saved — already in effect", chat: "Chat replies", webhook: "Outgoing webhook", feed: "Feed (RSS)", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
+        impTitle: "Import bookmarks", impHelp: "Bring in a bookmarks file from your browser (HTML), Pocket, Raindrop (CSV), a driftnet JSON list, or any text with links.",
+        impFile: "Choose a file", impKeep: "Keep my bookmark folders (under Imported)", impReading: "Reading the file…",
+        impConfirm: (n, dup) => `Import ${n} links (${dup} already there)? With a model set up, each new link is one model call.`,
+        impNone: (dup, skip) => `Nothing new to import (${dup} already there, ${skip} skipped).`, impCapped: (n) => `Only the first ${n} links are taken in one import.`,
+        impSkipped: (n) => `${n} skipped (not web links, or private addresses).`, impStart: "Start import", impBusy: "An import is already running. Try again when it finishes.",
+        impProgress: (done, total, added, failed) => `Importing… ${done} of ${total} (${added} added, ${failed} failed)`,
+        impDone: (total, added, already, failed) => `Done: ${added} added, ${already} already there, ${failed} failed (of ${total}).`,
+        impFailedRun: "The import stopped unexpectedly.", impBadFile: "Couldn't read that file.",
         accessStatus: (pw, key, url) => `Password: ${pw === "✓" ? "set" : "not set"} · Share key: ${key === "✓" ? "made" : "none"} · Public URL: ${url === "—" ? "off" : url}`,
         access: "Access & connections",
         password: "Admin password", passwordHelp: "Once set, adding links, changing settings and agents that write all need it. At least 8 characters, no spaces.",
@@ -893,6 +901,14 @@
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
         savedServer: "已儲存，馬上生效", chat: "聊天室回覆", webhook: "對外 Webhook", feed: "訂閱源（RSS）", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
         tabGeneral: "一般", tabAccess: "存取", tabAi: "AI",
+        impTitle: "匯入書籤", impHelp: "匯入瀏覽器的書籤檔（HTML）、Pocket、Raindrop（CSV）、driftnet 的 JSON 清單，或任何含有連結的文字檔。",
+        impFile: "選擇檔案", impKeep: "保留我的書籤資料夾（放在「Imported」底下）", impReading: "讀取檔案中…",
+        impConfirm: (n, dup) => `匯入 ${n} 個連結（${dup} 個已經有了）？若已設定模型，每個新連結都會呼叫一次模型。`,
+        impNone: (dup, skip) => `沒有新的連結可匯入（${dup} 個已經有了，略過 ${skip} 個）。`, impCapped: (n) => `一次最多匯入前 ${n} 個連結。`,
+        impSkipped: (n) => `略過 ${n} 個（不是網頁連結，或是內網位址）。`, impStart: "開始匯入", impBusy: "已有匯入正在進行，請等它完成再試。",
+        impProgress: (done, total, added, failed) => `匯入中… ${done} / ${total}（新增 ${added}、失敗 ${failed}）`,
+        impDone: (total, added, already, failed) => `完成：新增 ${added}、原本就有 ${already}、失敗 ${failed}（共 ${total}）。`,
+        impFailedRun: "匯入意外中止。", impBadFile: "讀不了這個檔案。",
         accessStatus: (pw, key, url) => `密碼：${pw === "✓" ? "已設定" : "未設定"} · 分享碼：${key === "✓" ? "已產生" : "沒有"} · 公開網址：${url === "—" ? "關閉" : url}`,
         access: "存取與連線",
         password: "管理密碼", passwordHelp: "設定之後，新增連結、改設定、agent 寫入都需要它。至少 8 個字元，不能有空白。",
@@ -1521,7 +1537,7 @@
       const yes = (b) => (b ? "✓" : "—");
       const accessStatus = `<p class="set-status">${esc(st.accessStatus(yes(a.passwordSet), yes(a.readKey), a.tunnel.running ? a.tunnel.url : "—"))}</p>`;
       server = {
-        general: group("language") + group("chat") + group("webhook"),
+        general: group("language") + group("chat") + group("webhook") + importPanel(),
         access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) + pairPanel(serverSettings.access) : ""),
         ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,
@@ -1545,6 +1561,72 @@
     $("settings-dlg").showModal();
     $("st-body").querySelector('[data-tab-btn][aria-selected="true"]')?.focus();
   }
+  /** Settings › Import bookmarks: pick a file, preview the counts (dry run), confirm, then watch the job. */
+  let importContent = "", importTimer = null;
+  function importPanel() {
+    const st = T().st;
+    importContent = ""; clearInterval(importTimer);
+    return `<fieldset class="set-group" id="import-panel"><legend>${esc(st.impTitle)}</legend>
+      <small>${esc(st.impHelp)}</small>
+      <label class="set-row"><span>${esc(st.impFile)}</span><input type="file" id="im-file" accept=".html,.htm,.csv,.json,.txt,.md"></label>
+      <label class="set-row check"><input type="checkbox" id="im-keep"><span>${esc(st.impKeep)}</span></label>
+      <p class="set-status" id="im-status" role="status" aria-live="polite"></p>
+      <div><button class="btn primary" type="button" id="im-start" hidden>${esc(st.impStart)}</button></div></fieldset>`;
+  }
+  async function importCall(body) {
+    const token = store.get("driftnet-token");
+    const res = await fetch("/api/import", { method: "POST", body: JSON.stringify(body),
+      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
+    if (res?.status === 401) { askToken(); return null; }
+    return res ? { status: res.status, body: await res.json().catch(() => ({})) } : null;
+  }
+  $("st-body").addEventListener("change", async (e) => {
+    if (e.target.id !== "im-file") return;
+    const st = T().st, out = $("im-status"), go = $("im-start");
+    go.hidden = true; importContent = ""; clearInterval(importTimer);
+    const file = e.target.files?.[0];
+    if (!file) { out.textContent = ""; return; }
+    out.textContent = st.impReading;
+    const content = await new Promise((ok) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result));
+      r.onerror = () => ok(null);
+      r.readAsText(file);
+    });
+    if (content === null) { out.textContent = st.impBadFile; return; }
+    const r = await importCall({ content, dryRun: true });
+    if (!r || r.status !== 200) { out.textContent = r?.body?.error ?? T().failed; return; }
+    const d = r.body;
+    importContent = content;
+    out.textContent = [d.total ? st.impConfirm(d.total, d.duplicates) : st.impNone(d.duplicates, d.skipped),
+      d.total && d.skipped ? st.impSkipped(d.skipped) : "", d.capped ? st.impCapped(5000) : ""].filter(Boolean).join(" ");
+    go.hidden = !d.total;
+  });
+  $("st-body").addEventListener("click", async (e) => {
+    if (e.target.id !== "im-start") return;
+    const st = T().st, out = $("im-status"), go = $("im-start");
+    go.hidden = true;
+    const r = await importCall({ content: importContent, folders: $("im-keep").checked ? "keep" : "none" });
+    importContent = "";
+    if (!r) { out.textContent = T().failed; return; }
+    if (r.status === 409) { out.textContent = st.impBusy; return; }
+    if (r.status !== 202) { out.textContent = r.body?.error ?? T().failed; return; }
+    const job = r.body.job;
+    out.textContent = st.impProgress(0, r.body.total, 0, 0);
+    const token = store.get("driftnet-token");
+    const tick = async () => {
+      if (!out.isConnected) return clearInterval(importTimer);
+      const p = await fetch(`/api/import/${job}`, { headers: token ? { authorization: `Bearer ${token}` } : {} }).then((x) => x.ok ? x.json() : null).catch(() => null);
+      if (!p) return;
+      if (p.state === "running") out.textContent = st.impProgress(p.done, p.total, p.added, p.failed);
+      else {
+        clearInterval(importTimer);
+        out.textContent = p.state === "done" ? st.impDone(p.total, p.added, p.already, p.failed) : st.impFailedRun;
+        if (p.state === "done" && p.added) load();
+      }
+    };
+    importTimer = setInterval(tick, 2000);
+  });
   let settingsOpener = null;
   $("settings-dlg").addEventListener("close", () => { if (settingsOpener?.isConnected) settingsOpener.focus(); });
   $("st-cancel").onclick = () => $("settings-dlg").close();
