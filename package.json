@@ -23,7 +23,8 @@
     "demo": "node apps/server/e2e/demo-server.mjs",
     "demo:gif": "node scripts/demo-gif.mjs",
     "build:demo": "node scripts/build-demo.mjs",
-    "e2e:demo": "node apps/server/e2e/demo-site.mjs"
+    "e2e:demo": "node apps/server/e2e/demo-site.mjs",
+    "build:site": "node scripts/build-site.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

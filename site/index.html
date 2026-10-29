@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>driftnet</title>
+<meta name="description" content="Drop links in your group chat. driftnet finds the real project, explains it and keeps it searchable. Runs on your computer, any model or none.">
+<meta property="og:title" content="driftnet">
+<meta property="og:description" content="Catch the links before they drift away.">
+<meta property="og:image" content="https://kevinchu1110.github.io/driftnet/assets/og.jpg">
+<meta property="og:url" content="https://kevinchu1110.github.io/driftnet/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/bricolage-grotesque@5.2.8/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/jetbrains-mono@5.2.8/index.css">
+<style>
+/* One theme family (sea ink on cool chalk), one accent (buoy orange), two radii:
+   10px for controls, 14px for media and panels. */
+:root {
+  --bg: #f3f6f6;
+  --surface: #ffffff;
+  --ink: #0f1d26;
+  --ink-2: #44535d;
+  --ink-3: #6b7a84;
+  --line: #d9e1e3;
+  --sea: #123444;
+  --sea-2: #1c4a5e;
+  --tint: #e6eef0;
+  --accent: #d9572b;
+  --accent-ink: #ffffff;
+  --shadow: 0 20px 50px -24px rgb(18 52 68 / .35);
+  --r-ctl: 10px;
+  --r-media: 14px;
+  --display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, "PingFang TC", "Noto Sans TC", sans-serif;
+  --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+  --mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b151b;
+    --surface: #10202a;
+    --ink: #e7eef1;
+    --ink-2: #b2c0c7;
+    --ink-3: #8a9aa3;
+    --line: #20343f;
+    --sea: #0f2a37;
+    --sea-2: #173d4f;
+    --tint: #132a35;
+    --accent: #ef7346;
+    --accent-ink: #1a0d07;
+    --shadow: 0 20px 50px -24px rgb(0 0 0 / .6);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
+/* Chinese has no spaces: break headings at punctuation, not mid-phrase. */
+:lang(zh) h1, :lang(zh) h2, :lang(zh) h3 { word-break: keep-all; overflow-wrap: anywhere; }
+img { display: block; max-width: 100%; height: auto; }
+/* Grid children must be allowed to shrink below their content (960px images, unbreakable CJK runs). */
+.hero > *, .bento > *, .yours .grid > *, .final .box > *, .cell.wide > * { min-width: 0; }
+html, body { overflow-x: clip; }
+a { color: inherit; }
+.wrap { width: min(1200px, 100% - 40px); margin-inline: auto; }
+
+/* nav */
+.nav { height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 650 19px/1 var(--display); text-decoration: none; letter-spacing: -.01em; }
+.brand img { width: 28px; height: 28px; }
+.nav-links { display: flex; align-items: center; gap: 22px; font-size: 15px; }
+.nav-links a { text-decoration: none; color: var(--ink-2); }
+.nav-links a:hover { color: var(--ink); }
+.lang { border: 1px solid var(--line); background: transparent; color: var(--ink-2); font: 500 13px/1 var(--body); padding: 8px 11px; border-radius: var(--r-ctl); cursor: pointer; }
+.lang:hover { color: var(--ink); border-color: var(--ink-3); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: center; padding: 40px 0 88px; min-height: min(calc(100dvh - 68px), 820px); }
+.hero h1 { font: 700 clamp(38px, 4.2vw, 54px)/1.06 var(--display); letter-spacing: -.035em; margin: 0 0 22px; text-wrap: balance; }
+.hero p { font-size: 18px; color: var(--ink-2); max-width: 34ch; margin: 0 0 32px; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 20px; border-radius: var(--r-ctl); font: 600 16px/1 var(--body); text-decoration: none; white-space: nowrap; transition: transform .18s cubic-bezier(.16,1,.3,1), background .2s; }
+.btn:active { transform: translateY(1px) scale(.985); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { transform: translateY(-1px); }
+.copy { background: var(--surface); border: 1px solid var(--line); color: var(--ink); font-family: var(--mono); font-size: 15px; cursor: pointer; }
+.copy .hint { font-family: var(--body); font-size: 13px; color: var(--ink-3); }
+.copy:hover { border-color: var(--ink-3); }
+.shot { border-radius: var(--r-media); overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); background: var(--surface); }
+.hero .shot { aspect-ratio: 960 / 600; }
+.hero .shot img { width: 100%; height: 100%; object-fit: cover; }
+
+/* the current */
+.current { background: var(--sea); color: #e7eef1; padding: 80px 0 72px; overflow: hidden; }
+.current h2 { font: 650 clamp(30px, 3.6vw, 44px)/1.1 var(--display); letter-spacing: -.025em; margin: 0 0 14px; }
+.current p { color: #b9cbd3; max-width: 52ch; margin: 0 0 44px; font-size: 17px; }
+.band { display: flex; gap: 14px; width: max-content; animation: drift 46s linear infinite; }
+.band + .band { margin-top: 14px; animation-duration: 58s; animation-direction: reverse; }
+.chip { font: 450 14px/1 var(--mono); color: #cfe0e7; background: rgb(255 255 255 / .06); border: 1px solid rgb(255 255 255 / .12); padding: 12px 16px; border-radius: 999px; white-space: nowrap; }
+.chip.caught { background: var(--accent); color: #1a0d07; border-color: transparent; font-weight: 600; }
+@keyframes drift { to { transform: translateX(-50%); } }
+
+/* features: asymmetric bento, 4 cells for 4 points */
+.section { padding: 112px 0; }
+.section > .wrap > h2 { font: 650 clamp(30px, 3.6vw, 44px)/1.1 var(--display); letter-spacing: -.025em; margin: 0 0 48px; max-width: 18ch; }
+.bento { display: grid; grid-template-columns: 1.25fr 1fr; grid-template-rows: auto auto; gap: 20px; }
+.cell { border-radius: var(--r-media); background: var(--surface); border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
+.cell .text { padding: 26px 28px 28px; }
+.cell h3 { font: 650 22px/1.2 var(--display); letter-spacing: -.015em; margin: 0 0 8px; }
+.cell p { margin: 0; color: var(--ink-2); max-width: 46ch; }
+.cell img { border-top: 1px solid var(--line); }
+.cell.tall { grid-row: span 2; }
+.cell.tall img { flex: 1; object-fit: cover; object-position: top; min-height: 0; }
+.cell.agent { background: var(--sea-2); border-color: transparent; color: #e7eef1; }
+.cell.agent p { color: #b9cbd3; }
+.cell.wide { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1.4fr; align-items: center; }
+.cell.wide img { border-top: 0; border-left: 1px solid var(--line); height: 100%; object-fit: cover; object-position: top left; }
+pre.code { margin: 18px 0 0; font: 450 14px/1.7 var(--mono); background: rgb(0 0 0 / .22); border-radius: var(--r-ctl); padding: 14px 16px; white-space: pre-wrap; color: #e7eef1; }
+pre.code .c { color: #8fb0be; }
+
+/* sources: logo row */
+.sources { padding: 24px 0 112px; }
+.sources p { color: var(--ink-2); margin: 0 0 28px; font-size: 17px; }
+.logos { display: flex; flex-wrap: wrap; align-items: center; gap: 40px 52px; }
+.logos img { height: 30px; width: auto; opacity: .8; transition: opacity .2s; }
+.logos img:hover { opacity: 1; }
+.logos .mono-src { filter: grayscale(1) contrast(1.1); }
+@media (prefers-color-scheme: dark) { .logos .mono-src { filter: grayscale(1) invert(1) brightness(1.4); } }
+
+/* yours: statement + facts */
+.yours { padding: 104px 0; border-top: 1px solid var(--line); }
+.yours .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: start; }
+.yours h2 { font: 650 clamp(32px, 4vw, 52px)/1.06 var(--display); letter-spacing: -.03em; margin: 0; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 32px; margin: 0; }
+.facts dt { font: 650 18px/1.3 var(--display); margin-bottom: 4px; }
+.facts dd { margin: 0; color: var(--ink-2); font-size: 15px; }
+
+/* final */
+.final { padding: 96px 0 120px; }
+.final .box { border-radius: var(--r-media); background: var(--surface); border: 1px solid var(--line); padding: 56px; display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: end; }
+.final h2 { font: 650 clamp(30px, 3.4vw, 42px)/1.1 var(--display); letter-spacing: -.025em; margin: 0 0 12px; }
+.final p { color: var(--ink-2); margin: 0; max-width: 48ch; }
+.final .ctas { justify-content: flex-end; }
+footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--ink-3); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+footer a { color: var(--ink-2); }
+
+/* entrance and reveal: tell the order of the story, nothing loops except the current */
+@media (prefers-reduced-motion: no-preference) {
+  .rise { opacity: 0; transform: translateY(18px); animation: rise .8s cubic-bezier(.16,1,.3,1) forwards; animation-delay: calc(var(--i, 0) * 90ms); }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+  .reveal.in { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .band { animation: none; flex-wrap: wrap; width: auto; }
+  .band + .band { display: none; }
+}
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 36px; min-height: 0; padding: 24px 0 64px; }
+  .hero p { max-width: none; }
+  .bento { grid-template-columns: minmax(0, 1fr); }
+  .cell.tall { grid-row: auto; }
+  .cell.wide { grid-template-columns: minmax(0, 1fr); }
+  .cell.wide img { border-left: 0; border-top: 1px solid var(--line); }
+  .yours .grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .final .box { grid-template-columns: minmax(0, 1fr); padding: 32px 24px; }
+  .final .ctas { justify-content: flex-start; }
+  .section { padding: 80px 0; }
+}
+@media (max-width: 560px) {
+  .wrap { width: calc(100% - 32px); }
+  .nav-links { gap: 14px; }
+  .nav-links .hide-sm { display: none; }
+  .facts { grid-template-columns: 1fr; }
+  .logos { gap: 28px 36px; }
+}
+</style>
+</head>
+<body>
+<header class="wrap nav">
+  <a class="brand" href="./"><img src="assets/logo.svg" alt="" width="28" height="28">driftnet</a>
+  <nav class="nav-links">
+    <a href="demo/" data-i18n="navDemo">Demo</a>
+    <a href="https://github.com/KevinChu1110/driftnet">GitHub</a>
+    <button class="lang" type="button" id="lang" aria-label="Switch language">中文</button>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <div>
+      <h1 class="rise" style="--i:0" data-i18n="heroTitle">Catch the links before they drift away.</h1>
+      <p class="rise" style="--i:1" data-i18n="heroSub">Drop links in your group chat. driftnet finds the real project, explains it, and keeps it searchable.</p>
+      <div class="ctas rise" style="--i:2">
+        <a class="btn btn-primary" href="demo/" data-i18n="tryDemo">Try the demo</a>
+        <button class="btn copy" type="button" data-copy="npx driftnet">npx driftnet <span class="hint" data-i18n="copy">copy</span></button>
+      </div>
+    </div>
+    <div class="shot rise" style="--i:2">
+      <img src="assets/demo-en.gif" data-src-zh="assets/demo-zh-TW.gif" alt="A link dropped in a chat becomes a summarised card on the driftnet page" width="960" height="600" fetchpriority="high">
+    </div>
+  </section>
+
+  <section class="current" aria-labelledby="current-h">
+    <div class="wrap">
+      <h2 id="current-h" class="reveal" data-i18n="currentTitle">Your feed is a current.</h2>
+      <p class="reveal" data-i18n="currentSub">Good finds float past once. You paste them somewhere "for later" and they are gone. driftnet is the net you leave in the water.</p>
+    </div>
+    <div aria-hidden="true">
+      <div class="band">
+        <span class="chip">facebook.com/share/r/1DfVB2odi3</span><span class="chip">threads.com/@ai.weekly/post/DQx7</span><span class="chip caught">Paperclip</span><span class="chip">youtu.be/d0w4w9WgX</span><span class="chip">x.com/i/status/1984220</span><span class="chip caught">markitdown</span><span class="chip">instagram.com/reel/DPk3x</span><span class="chip">github.com/openai/whisper</span><span class="chip caught">ThinkRail</span><span class="chip">dev.to/t/llm/top</span>
+        <span class="chip">facebook.com/share/r/1DfVB2odi3</span><span class="chip">threads.com/@ai.weekly/post/DQx7</span><span class="chip caught">Paperclip</span><span class="chip">youtu.be/d0w4w9WgX</span><span class="chip">x.com/i/status/1984220</span><span class="chip caught">markitdown</span><span class="chip">instagram.com/reel/DPk3x</span><span class="chip">github.com/openai/whisper</span><span class="chip caught">ThinkRail</span><span class="chip">dev.to/t/llm/top</span>
+      </div>
+      <div class="band">
+        <span class="chip">t.me/ai_tools_daily/2841</span><span class="chip caught">ascii-sharks</span><span class="chip">reddit.com/r/LocalLLaMA/comments/1x</span><span class="chip">xhslink.com/a/9fQ2</span><span class="chip caught">Taste Skill</span><span class="chip">news.ycombinator.com/item?id=41</span><span class="chip">huggingface.co/spaces/</span><span class="chip caught">Whisper.cpp</span><span class="chip">medium.com/tag/agents</span>
+        <span class="chip">t.me/ai_tools_daily/2841</span><span class="chip caught">ascii-sharks</span><span class="chip">reddit.com/r/LocalLLaMA/comments/1x</span><span class="chip">xhslink.com/a/9fQ2</span><span class="chip caught">Taste Skill</span><span class="chip">news.ycombinator.com/item?id=41</span><span class="chip">huggingface.co/spaces/</span><span class="chip caught">Whisper.cpp</span><span class="chip">medium.com/tag/agents</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <h2 class="reveal" data-i18n="whatTitle">It reads the post so you don't have to.</h2>
+      <div class="bento">
+        <article class="cell tall reveal">
+          <div class="text">
+            <h3 data-i18n="f1Title">From a reel to the repo</h3>
+            <p data-i18n="f1Body">A post with no link? driftnet reads the caption, the comments and even what the video says, then finds the project it is about.</p>
+          </div>
+          <img src="assets/card-modal-en.jpg" data-src-zh="assets/card-modal-zh-TW.jpg" alt="A driftnet card: what it is, what you'll see and why it was shared" loading="lazy" width="1600" height="1000">
+        </article>
+        <article class="cell reveal">
+          <div class="text">
+            <h3 data-i18n="f2Title">Your folders, not ours</h3>
+            <p data-i18n="f2Body">Each card lands in your own folder tree. Move one by hand and it stays there.</p>
+          </div>
+          <img src="assets/map-en.jpg" data-src-zh="assets/map-zh-TW.jpg" alt="The folder tree drawn as a mind map" loading="lazy" width="1600" height="1000">
+        </article>
+        <article class="cell agent reveal">
+          <div class="text">
+            <h3 data-i18n="f3Title">Your agents look here first</h3>
+            <p data-i18n="f3Body">Claude Code, Cursor and Codex search the same catalogue over MCP before picking a tool.</p>
+            <pre class="code"><span class="c"># connect the agents on this machine</span>
+npx driftnet init</pre>
+          </div>
+        </article>
+        <article class="cell wide reveal">
+          <div class="text">
+            <h3 data-i18n="f4Title">Find it a year later</h3>
+            <p data-i18n="f4Body">Search by word, in Chinese too, or by meaning with a local model. Every card says what it is in your language.</p>
+          </div>
+          <img src="assets/cards-en.jpg" data-src-zh="assets/cards-zh-TW.jpg" alt="The card list with search" loading="lazy" width="1600" height="1000">
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="sources">
+    <div class="wrap">
+      <p class="reveal" data-i18n="sourcesSub">Catches links from the chats you already use, the browser, and your agents.</p>
+      <div class="logos reveal">
+        <img src="https://cdn.simpleicons.org/discord/44535d/b2c0c7" alt="Discord" width="30" height="30">
+        <img src="https://cdn.simpleicons.org/telegram/44535d/b2c0c7" alt="Telegram" width="30" height="30">
+        <img class="mono-src" src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/slack/slack-original.svg" alt="Slack" width="30" height="30">
+        <img src="https://cdn.simpleicons.org/line/44535d/b2c0c7" alt="LINE" width="30" height="30">
+        <img src="https://cdn.simpleicons.org/googlechrome/44535d/b2c0c7" alt="Chrome extension" width="30" height="30">
+        <img src="https://cdn.simpleicons.org/modelcontextprotocol/44535d/b2c0c7" alt="Model Context Protocol" width="30" height="30">
+        <img src="https://cdn.simpleicons.org/claude/44535d/b2c0c7" alt="Claude" width="30" height="30">
+      </div>
+    </div>
+  </section>
+
+  <section class="yours">
+    <div class="wrap grid">
+      <h2 class="reveal" data-i18n="yoursTitle">Runs on your computer. Stays yours.</h2>
+      <dl class="facts reveal">
+        <div><dt data-i18n="y1t">No account</dt><dd data-i18n="y1d">One command starts it. Nothing to sign up for.</dd></div>
+        <div><dt data-i18n="y2t">Any model, or none</dt><dd data-i18n="y2d">Ollama, Claude, GPT, Gemini. Without one, your agent writes the summaries.</dd></div>
+        <div><dt data-i18n="y3t">One file to keep</dt><dd data-i18n="y3d">Everything sits in a single SQLite file, with one-click backups.</dd></div>
+        <div><dt data-i18n="y4t">Open source</dt><dd data-i18n="y4d">MIT licensed. Read every line it runs.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <div class="box reveal">
+        <div>
+          <h2 data-i18n="finalTitle">Start catching.</h2>
+          <p data-i18n="finalSub">Needs Node.js 22 or newer. Or paste one line to your AI agent and let it set things up.</p>
+        </div>
+        <div class="ctas">
+          <button class="btn copy" type="button" data-copy="npx driftnet">npx driftnet <span class="hint" data-i18n="copy">copy</span></button>
+          <a class="btn btn-primary" href="demo/" data-i18n="tryDemo">Try the demo</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span data-i18n="footer">MIT licensed. Built by Kevin Chu.</span>
+    <span><a href="https://github.com/KevinChu1110/driftnet">GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+const T = {
+  zh: {
+    navDemo: "試玩", tryDemo: "線上試玩", copy: "複製", copied: "已複製",
+    heroTitle: "連結漂走之前，先撈起來。",
+    heroSub: "丟進群組的連結，driftnet 會追到真正的專案、寫好說明，一年後還找得到。",
+    currentTitle: "動態消息是一條水流。",
+    currentSub: "好東西只漂過一次。你貼到某個地方說「之後再看」，然後就沒有然後了。driftnet 是你放進水裡的那張網。",
+    whatTitle: "它幫你把貼文讀完。",
+    f1Title: "從 reels 追到 repo", f1Body: "貼文沒附連結？driftnet 會讀說明、留言，連影片裡講的話都會聽，然後找到它介紹的專案。",
+    f2Title: "照你的資料夾放", f2Body: "每張卡片都放進你自己的資料夾。你手動移過的，它就不會再動。",
+    f3Title: "agent 會先來這裡查", f3Body: "Claude Code、Cursor、Codex 挑工具之前，會先透過 MCP 查這份清單。",
+    f4Title: "一年後還找得到", f4Body: "用字搜尋，中文也行；接上本機模型還能用意思搜尋。每張卡片都用你的語言說明它是什麼。",
+    sourcesSub: "從你本來就在用的聊天室、瀏覽器和 agent 收連結。",
+    yoursTitle: "跑在你的電腦上，資料是你的。",
+    y1t: "不用註冊", y1d: "一行指令就啟動，沒有帳號要申請。",
+    y2t: "任何模型，或完全不接", y2d: "Ollama、Claude、GPT、Gemini 都行。沒接模型，就讓你的 agent 寫摘要。",
+    y3t: "只有一個檔案", y3d: "全部放在一個 SQLite 檔裡，備份一鍵完成。",
+    y4t: "開放原始碼", y4d: "MIT 授權，跑的每一行程式你都看得到。",
+    finalTitle: "開始撈吧。", finalSub: "需要 Node.js 22 以上。或者貼一句話給你的 AI agent，讓它幫你裝好。",
+    footer: "MIT 授權。Kevin Chu 製作。", lang: "EN"
+  }
+};
+const EN = {};
+document.querySelectorAll("[data-i18n]").forEach((el) => { EN[el.dataset.i18n] = el.textContent; });
+Object.assign(EN, { copied: "copied", lang: "中文" });
+const imgs = [...document.querySelectorAll("img[data-src-zh]")].map((img) => ({ img, en: img.getAttribute("src"), zh: img.dataset.srcZh }));
+let lang;
+try { lang = localStorage.getItem("driftnet-site-lang") || ""; } catch { lang = ""; }
+if (lang !== "en" && lang !== "zh") lang = (navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en";
+function apply(next) {
+  lang = next;
+  const dict = lang === "zh" ? T.zh : EN;
+  document.documentElement.lang = lang === "zh" ? "zh-Hant-TW" : "en";
+  document.querySelectorAll("[data-i18n]").forEach((el) => { const v = dict[el.dataset.i18n]; if (v) el.textContent = v; });
+  imgs.forEach(({ img, en, zh }) => { img.src = lang === "zh" ? zh : en; });
+  document.getElementById("lang").textContent = dict.lang;
+  try { localStorage.setItem("driftnet-site-lang", lang); } catch {}
+}
+if (lang === "zh") apply("zh");
+document.getElementById("lang").addEventListener("click", () => apply(lang === "zh" ? "en" : "zh"));
+
+document.querySelectorAll("[data-copy]").forEach((btn) => btn.addEventListener("click", async () => {
+  const hint = btn.querySelector(".hint");
+  try { await navigator.clipboard.writeText(btn.dataset.copy); } catch { return; }
+  const dict = lang === "zh" ? T.zh : EN;
+  hint.textContent = dict.copied;
+  setTimeout(() => { hint.textContent = dict.copy; }, 1600);
+}));
+
+if ("IntersectionObserver" in window) {
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15 });
+  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+} else {
+  document.querySelectorAll(".reveal").forEach((el) => el.classList.add("in"));
+}
+</script>
+</body>
+</html>

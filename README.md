@@ -9,7 +9,7 @@
 
 [📖 What it is](#-what-it-is) · [🎥 See it work](#-see-it-work) · [✨ Core features](#-core-features) · [🚀 Quick start](#-quick-start) · [How links are handled](#how-your-links-are-handled) · [Ways in](#ways-in) · [Command line](#command-line) · [Web page](#the-web-page) · [Models](#models) · [Agents](#agents) · [Settings](#settings) · [Online](#putting-it-online-optional) · [Your data](#where-your-data-goes) · [Contributing](#contributing)
 
-[![Try the demo](https://img.shields.io/badge/%E2%96%B6%20Try%20the%20demo-no%20install-2459e0)](https://kevinchu1110.github.io/driftnet/) &nbsp; **[Try the demo](https://kevinchu1110.github.io/driftnet/)**: the real page with sample cards, right in your browser. Nothing to install, nothing leaves your machine.
+[![Try the demo](https://img.shields.io/badge/%E2%96%B6%20Try%20the%20demo-no%20install-2459e0)](https://kevinchu1110.github.io/driftnet/demo/) &nbsp; **[Website](https://kevinchu1110.github.io/driftnet/)** · **[Try the demo](https://kevinchu1110.github.io/driftnet/demo/)**: the real page with sample cards, right in your browser. Nothing to install, nothing leaves your machine.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
@@ -87,7 +87,7 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 ## 🚀 Quick start
 
 Everything runs on your own computer: no server to rent, no account. Want a look first?
-**[Try the demo](https://kevinchu1110.github.io/driftnet/)** runs the real page in your browser.
+**[Try the demo](https://kevinchu1110.github.io/driftnet/demo/)** runs the real page in your browser.
 
 ### Easiest: let your AI agent install it
 

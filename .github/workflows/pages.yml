@@ -1,6 +1,7 @@
 name: Pages
 
-# The web demo: the real page with an in-browser stand-in for the API (see demo/ and scripts/build-demo.mjs).
+# The site: the landing page (site/) at the root and the web demo under demo/ (the real page with an
+# in-browser stand-in for the API, see demo/ and scripts/build-demo.mjs). Built by scripts/build-site.mjs.
 # In the repository settings, Pages must use "GitHub Actions" as its source.
 on:
   push:
@@ -11,6 +12,9 @@ on:
       - apps/server/e2e/fixtures/**
       - demo/**
       - scripts/build-demo.mjs
+      - scripts/build-site.mjs
+      - site/**
+      - assets/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -37,10 +41,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build:demo
+      - run: pnpm build:site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/demo
+          path: dist/site
       - id: deployment
         uses: actions/deploy-pages@v4
