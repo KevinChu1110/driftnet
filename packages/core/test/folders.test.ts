@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import { FolderError, ItemError, Store } from "../src/store.ts";
 
 const j = { isAiTool: 1, category: "news", kind: "repo" as const, worth: "normal" as const, engine: "jev" as const, confidence: 1 };
@@ -79,7 +80,11 @@ test("found-in links are recorded once and recovered from old share notes", () =
   old.recordShare(c, { platform: "http", chatId: "x", note: "Mentioned in https://fb.test/p" });
   // The recovery runs once per database: a database from before it existed has no marker yet.
   assert.deepEqual(new Store(file).foundLinks(), [], "already recovered once: not repeated");
+  // Simulate a pre-versioning database: no marker, schema version unstamped (the catch-up runs when it is stamped).
   old.setState("found_in_recovered", "0");
+  const raw = new DatabaseSync(file);
+  raw.exec("DROP TABLE item_fts; PRAGMA user_version = 0");
+  raw.close();
   assert.deepEqual(new Store(file).foundLinks(), [{ parent: p, child: c }]);
 });
 
