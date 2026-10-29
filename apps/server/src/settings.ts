@@ -21,13 +21,13 @@ export interface Setting {
 }
 
 export const SETTINGS: readonly Setting[] = [
-  { key: "DRIFTNET_LLM_PROVIDER", group: "model", choices: ["", "anthropic", "openai", "claude-cli", "gemini-cli"] },
+  { key: "DRIFTNET_LLM_PROVIDER", group: "model", choices: ["", "anthropic", "openai", "gemini", "bedrock", "vertex", "claude-cli", "gemini-cli"] },
   { key: "DRIFTNET_LLM_MODEL", group: "model" },
   { key: "DRIFTNET_LLM_BASE_URL", group: "model" },
   { key: "DRIFTNET_LLM_API_KEY", group: "model", secret: true },
   { key: "DRIFTNET_LLM_EFFORT", group: "model", choices: ["", "low", "medium", "high", "xhigh"] },
   { key: "TYPESAFE_API_KEY", group: "model", secret: true },
-  { key: "DRIFTNET_JUDGE", group: "model", choices: ["", "off"] },
+  { key: "DRIFTNET_JUDGE", group: "model", choices: ["", "jev", "rules", "llm", "heuristic", "off"] },
   { key: "GITHUB_TOKEN", group: "model", secret: true },
   { key: "DRIFTNET_LANGUAGE", group: "language", max: 60 },
   { key: "DRIFTNET_LOCALE", group: "language", choices: ["", "en", "zh-TW"] },
@@ -57,6 +57,16 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_FFMPEG", group: "rules", max: 500 },
   { key: "DRIFTNET_TESSERACT", group: "rules", max: 500 },
   { key: "DRIFTNET_WHISPER", group: "rules", max: 500 },
+  // Cloud providers (bedrock, vertex) and the rules judge. Keys are write-only like the other secrets;
+  // the credentials setting is a file path, never the key itself.
+  { key: "DRIFTNET_LLM_REGION", group: "model", max: 60 },
+  { key: "AWS_ACCESS_KEY_ID", group: "model", secret: true },
+  { key: "AWS_SECRET_ACCESS_KEY", group: "model", secret: true },
+  { key: "AWS_SESSION_TOKEN", group: "model", secret: true, max: 4000 },
+  { key: "AWS_BEARER_TOKEN_BEDROCK", group: "model", secret: true, max: 4000 },
+  { key: "GOOGLE_CLOUD_PROJECT", group: "model", max: 100 },
+  { key: "DRIFTNET_VERTEX_CREDENTIALS", group: "model", max: 500 },
+  { key: "DRIFTNET_JUDGE_RULES", group: "rules", max: 500 },
 ];
 
 export class SettingsError extends Error {}

@@ -15,10 +15,18 @@
       "packageArguments": [{ "type": "positional", "value": "mcp" }],
       "environmentVariables": [
         { "name": "DRIFTNET_HOME", "description": "Where settings and the catalogue live (default ~/.driftnet)", "isRequired": false, "format": "string" },
-        { "name": "DRIFTNET_LLM_PROVIDER", "description": "anthropic, openai, claude-cli or gemini-cli; empty for no summaries", "isRequired": false, "format": "string" },
+        { "name": "DRIFTNET_LLM_PROVIDER", "description": "anthropic, openai, gemini, bedrock, vertex, claude-cli or gemini-cli; empty for no summaries", "isRequired": false, "format": "string" },
         { "name": "DRIFTNET_LLM_MODEL", "description": "Model name for that provider", "isRequired": false, "format": "string" },
-        { "name": "DRIFTNET_LLM_API_KEY", "description": "API key for that provider", "isRequired": false, "format": "string", "isSecret": true },
+        { "name": "DRIFTNET_LLM_API_KEY", "description": "API key for that provider (gemini also reads GEMINI_API_KEY; for vertex it may be a raw access token)", "isRequired": false, "format": "string", "isSecret": true },
         { "name": "DRIFTNET_LLM_BASE_URL", "description": "OpenAI-compatible endpoint for the openai provider (Ollama, OpenRouter, Gemini…)", "isRequired": false, "format": "string" },
+        { "name": "DRIFTNET_LLM_REGION", "description": "Region for the bedrock provider (or AWS_REGION) and the vertex provider (default us-central1)", "isRequired": false, "format": "string" },
+        { "name": "AWS_ACCESS_KEY_ID", "description": "bedrock provider: AWS access key ID (with AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN for temporary credentials)", "isRequired": false, "format": "string", "isSecret": true },
+        { "name": "AWS_SECRET_ACCESS_KEY", "description": "bedrock provider: AWS secret access key", "isRequired": false, "format": "string", "isSecret": true },
+        { "name": "AWS_BEARER_TOKEN_BEDROCK", "description": "bedrock provider: a Bedrock API key, used instead of the AWS keys", "isRequired": false, "format": "string", "isSecret": true },
+        { "name": "GOOGLE_APPLICATION_CREDENTIALS", "description": "vertex provider: path to a service-account JSON key file (or DRIFTNET_VERTEX_CREDENTIALS)", "isRequired": false, "format": "string" },
+        { "name": "GOOGLE_CLOUD_PROJECT", "description": "vertex provider: Google Cloud project id (optional when the key file names one)", "isRequired": false, "format": "string" },
+        { "name": "DRIFTNET_JUDGE", "description": "Who files each link before the model: jev, rules (free, no model), llm, heuristic, off, or a plugin's judge name", "isRequired": false, "format": "string" },
+        { "name": "DRIFTNET_JUDGE_RULES", "description": "Path to a rules file for the rules judge, one 'pattern -> folder' per line", "isRequired": false, "format": "string" },
         { "name": "DRIFTNET_LANGUAGE", "description": "Language summaries are written in (default English)", "isRequired": false, "format": "string" },
         { "name": "DRIFTNET_AGENT", "description": "Name recorded for this agent's saves and votes (default local)", "isRequired": false, "format": "string" }
       ]

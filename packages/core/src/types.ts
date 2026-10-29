@@ -39,7 +39,8 @@ export interface Judgement {
   category: string;
   kind: Kind;
   worth: Worth;
-  engine: "jev" | "llm" | "heuristic";
+  /** Which judge decided: "jev", "llm", "heuristic", "rules", or the name of a registered judge. */
+  engine: string;
   confidence: number; // 0..1, lowest confidence among the questions
 }
 

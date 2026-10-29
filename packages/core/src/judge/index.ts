@@ -7,7 +7,7 @@ import { clipTokens, digestBudget } from "../digest.ts";
  * cent, and the summarizer only runs on items the judge says are worth it.
  */
 export interface Judge {
-  name: Judgement["engine"];
+  name: string;
   judge(digest: Digest, note: string | undefined, categories: Record<string, string>): Promise<JudgeResult | null>;
 }
 
@@ -40,3 +40,5 @@ export const WORTH_CRITERIA = [
   "A real tool, project or guide someone could try or learn from",
   "Notably novel or useful: a new capability, a big release, or an exceptionally good resource",
 ];
+
+export { registerJudge, createJudge, judgeFactory, registeredJudges, type JudgeFactory } from "./registry.ts";
