@@ -120,6 +120,18 @@ export class Pipeline {
     const { store } = this.opts;
 
     const hit = store.findByUrl(url);
+    // Stored without a summary but a model is configured now: try again (the refresh cooldown applies),
+    // unless the item was blocked on purpose or the judge found it not worth reading.
+    if (hit && !hit.summary && !page?.text && this.opts.summarizer && hit.worth !== "skip"
+      && !hit.flags.some((f) => f === "injection" || f === "low-reputation")) {
+      store.recordShare(hit.id, ctx);
+      try {
+        await this.refresh(hit.id);
+      } catch (err) {
+        if (!(err instanceof RefreshTooSoon || err instanceof RefreshBusy)) console.warn(`[driftnet] re-analysis of #${hit.id} failed: ${(err as Error).message}`);
+      }
+      return { item: store.get(hit.id)!, cached: true };
+    }
     // Page content from a logged-in browser can rescue an item that was stored
     // without a summary (login wall); otherwise a repeat link costs nothing.
     if (hit && (!page?.text || hit.summary)) {
@@ -167,8 +179,23 @@ export class Pipeline {
     const { store } = this.opts;
     const cleaned = guard(digest.text);
     const cleanedNote = note ? guard(note) : { text: undefined, flags: [] };
-    digest = { ...digest, text: cleaned.text };
-    const flags = [...new Set([...cleaned.flags, ...cleanedNote.flags])];
+    // Title, meta values and picture captions reach the judge and the model too.
+    const cleanedTitle = guard(digest.title);
+    const meta: Digest["meta"] = {};
+    const extra: string[] = [...cleanedTitle.flags];
+    for (const [k, v] of Object.entries(digest.meta)) {
+      if (typeof v !== "string") { meta[k] = v; continue; }
+      const g = guard(v);
+      meta[k] = g.text;
+      extra.push(...g.flags);
+    }
+    const media = digest.media?.map((m) => {
+      const g = guard(m.alt);
+      extra.push(...g.flags);
+      return { ...m, alt: g.text };
+    });
+    digest = { ...digest, text: cleaned.text, title: cleanedTitle.text, meta, ...(media ? { media } : {}) };
+    const flags = [...new Set([...cleaned.flags, ...cleanedNote.flags, ...extra])];
     const source = sourceOf(digest);
 
     const rep = store.reputation(source);
@@ -221,7 +248,6 @@ export class Pipeline {
     if (this.refreshing.has(id)) throw new RefreshBusy(`Item ${id} is already being refreshed.`);
     if (Date.now() - (this.lastRefresh.get(id) ?? 0) < REFRESH_COOLDOWN_MS) throw new RefreshTooSoon(`Item ${id} was refreshed a moment ago; try again in a minute.`);
     this.refreshing.add(id);
-    this.lastRefresh.set(id, Date.now());
     try {
       if (this.refused(old.url)) throw new BlockedUrl(`${hostOf(old.url)} is blocked in your settings`);
       const digest = await this.followToTool(await extract(old.url));
@@ -233,6 +259,8 @@ export class Pipeline {
         flags: a.flags, source: a.source, suggestions: a.suggestions,
         media: normalizeMedia(a.digest.media),
       });
+      // The cooldown starts once a refresh worked: a failed one (page down, model error) can be retried at once.
+      this.lastRefresh.set(id, Date.now());
       if (item) this.done(item, "item.updated");
       return item;
     } finally {
@@ -282,7 +310,13 @@ export class Pipeline {
       .filter((repo) => repo !== from && !this.refused(repo) && !this.opts.store.findByUrl(repo))
       .slice(0, 3);
     const out: IngestResult[] = [];
-    for (const repo of repos) out.push(await this.ingest(repo, { ...ctx, note: `Linked from ${from}` }, 1));
+    for (const repo of repos) {
+      try {
+        out.push(await this.ingest(repo, { ...ctx, note: `Linked from ${from}` }, 1));
+      } catch (err) {
+        console.warn(`[driftnet] linked repo ${repo} skipped: ${(err as Error).message}`);
+      }
+    }
     return out;
   }
 
@@ -331,7 +365,12 @@ export class Pipeline {
     for (const m of mentions.filter((m) => m.openSource).slice(0, 4)) {
       const repo = await findGithubRepo(m.name).catch(() => null);
       if (!repo || repo === digest.url) continue;
-      if (!this.refused(repo)) out.push(await this.ingest(repo, { ...ctx, note: `Mentioned in ${digest.url}` }, depth + 1));
+      if (this.refused(repo)) continue;
+      try {
+        out.push(await this.ingest(repo, { ...ctx, note: `Mentioned in ${digest.url}` }, depth + 1));
+      } catch (err) {
+        console.warn(`[driftnet] mentioned repo ${repo} skipped: ${(err as Error).message}`);
+      }
     }
     return out;
   }

@@ -1,10 +1,17 @@
 const URL_RE = /https?:\/\/[^\s<>"'）)\]}，。、]+/giu;
 
-/** Query params that only track who shared what; dropping them makes dedup work. */
+/** Query params that only track who shared what, on any site; dropping them makes dedup work. */
 const TRACKING_PARAMS = new Set([
-  "fbclid", "gclid", "igshid", "igsh", "si", "feature", "ref", "ref_src", "ref_url",
-  "mibextid", "rdid", "share_url", "fs", "xmt", "slof", "s", "t",
+  "fbclid", "gclid", "igshid", "igsh", "ref_src", "ref_url", "mibextid", "rdid", "share_url",
 ]);
+
+/** Short generic names ("s", "t", "ref"…) are tracking on the social/video sites below, but real parameters elsewhere (phpBB's viewtopic.php?t=123). */
+const SOCIAL_HOSTS = [
+  "youtube.com", "youtu.be", "x.com", "twitter.com", "instagram.com", "facebook.com", "fb.com", "fb.watch",
+  "threads.net", "threads.com", "spotify.com", "tiktok.com", "linkedin.com", "reddit.com",
+];
+const SOCIAL_PARAMS = new Set(["s", "t", "ref", "feature", "fs", "si", "xmt", "slof"]);
+const onHost = (host: string, hosts: string[]) => hosts.some((h) => host === h || host.endsWith(`.${h}`));
 
 /** Share-tracking params that only the Chinese-market apps add (Xiaohongshu, Douyin, TikTok). Matched on those hosts only: "_t" or "did" mean something elsewhere. */
 const ASIAN_SHARE_HOSTS = ["xiaohongshu.com", "xhslink.com", "douyin.com", "iesdouyin.com", "tiktok.com"];
@@ -44,14 +51,18 @@ export function canonicalize(raw: string): string | null {
   if (u.protocol !== "http:" && u.protocol !== "https:") return null;
 
   u.protocol = "https:";
-  u.hash = "";
+  // Hash-routed apps (#/page, #!/page) keep their page in the fragment; any other fragment is just an anchor.
+  if (!/^#[/!]/.test(u.hash)) u.hash = "";
   u.hostname = u.hostname.toLowerCase().replace(/^(www|m|mobile)\./, "");
 
   for (const key of [...u.searchParams.keys()]) {
     if (key.startsWith("utm_") || TRACKING_PARAMS.has(key)) u.searchParams.delete(key);
   }
+  if (onHost(u.hostname, SOCIAL_HOSTS)) {
+    for (const key of [...u.searchParams.keys()]) if (SOCIAL_PARAMS.has(key)) u.searchParams.delete(key);
+  }
 
-  if (ASIAN_SHARE_HOSTS.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))) {
+  if (onHost(u.hostname, ASIAN_SHARE_HOSTS)) {
     for (const key of [...u.searchParams.keys()]) {
       if (ASIAN_SHARE_PARAMS.has(key.toLowerCase()) || key.startsWith("share_")) u.searchParams.delete(key);
     }

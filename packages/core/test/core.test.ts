@@ -11,6 +11,20 @@ test("canonicalize strips tracking and unifies hosts", () => {
   assert.equal(canonicalize("https://www.threads.com/@a/post/X?xmt=1&igshid=2"), "https://threads.net/@a/post/X");
   assert.equal(canonicalize("http://example.com/a/?utm_source=x&b=1#top"), "https://example.com/a?b=1");
   assert.equal(canonicalize("ftp://example.com"), null);
+  assert.equal(canonicalize("https://www.youtube.com/watch?v=abc&si=foo&feature=share&t=5"), "https://youtube.com/watch?v=abc");
+  assert.equal(canonicalize("https://x.com/a/status/1?s=20&t=zz"), "https://x.com/a/status/1");
+  assert.equal(canonicalize("https://example.com/p?igsh=1&fbclid=2&mibextid=3"), "https://example.com/p");
+});
+
+test("canonicalize keeps short params on ordinary sites and hash routes", () => {
+  const a = canonicalize("https://forum.example.org/viewtopic.php?t=123");
+  const b = canonicalize("https://forum.example.org/viewtopic.php?t=456");
+  assert.equal(a, "https://forum.example.org/viewtopic.php?t=123");
+  assert.notEqual(a, b);
+  assert.equal(canonicalize("https://example.com/search?s=cats&ref=nav"), "https://example.com/search?ref=nav&s=cats");
+  assert.equal(canonicalize("https://app.example.com/#/docs/42"), "https://app.example.com/#/docs/42");
+  assert.equal(canonicalize("https://app.example.com/#!/docs/42"), "https://app.example.com/#!/docs/42");
+  assert.equal(canonicalize("https://example.com/a#section"), "https://example.com/a");
 });
 
 test("canonicalize drops Xiaohongshu, Douyin and TikTok share tracking but keeps the content", () => {

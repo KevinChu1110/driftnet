@@ -99,26 +99,43 @@ function assertAllowed(url: URL, allowHost?: string): void {
 }
 
 /**
- * fetch() that refuses private targets on every hop. Max 5 redirects.
+ * fetch() that refuses private targets on every hop. Max 5 redirects (none with `redirect: "manual"`).
+ * Across origins, credentials are dropped; 301/302/303 turn a POST into a body-less GET.
  * `allowHost`: one host name the caller was told to reach on purpose (the user's own webhook); redirects elsewhere stay guarded.
  */
 export async function safeFetch(input: string, init: RequestInit = {}, allowHost?: string): Promise<Response> {
   let url = new URL(input);
+  let opts: RequestInit = init;
   const allow = allowHost?.toLowerCase().replace(/^\[|\]$/g, "");
   for (let hop = 0; hop <= 5; hop++) {
     assertAllowed(url, allow);
     let res: Response;
     try {
-      res = (await undiciFetch(url, { ...(init as UndiciInit), redirect: "manual", dispatcher: dispatcherFor(allow) })) as unknown as Response;
+      res = (await undiciFetch(url, { ...(opts as UndiciInit), redirect: "manual", dispatcher: dispatcherFor(allow) })) as unknown as Response;
     } catch (err) {
       // undici wraps lookup errors as "fetch failed"; surface the refusal itself.
       const cause = (err as { cause?: unknown }).cause;
       throw cause instanceof BlockedUrl ? cause : err;
     }
     const location = res.headers.get("location");
+    // redirect: "manual" hands the 3xx back (webhooks must not be bounced to another host).
+    if (init.redirect === "manual") return res;
     if (res.status >= 300 && res.status < 400 && location) {
       await res.body?.cancel();
-      url = new URL(location, url);
+      const next = new URL(location, url);
+      // Credentials belong to the host they were meant for, not to wherever a redirect leads.
+      if (next.origin !== url.origin) {
+        const headers = new Headers(opts.headers);
+        for (const h of ["authorization", "cookie", "x-driftnet-signature"]) headers.delete(h);
+        opts = { ...opts, headers };
+      }
+      if ([301, 302, 303].includes(res.status) && opts.method && opts.method.toUpperCase() !== "GET" && opts.method.toUpperCase() !== "HEAD") {
+        const headers = new Headers(opts.headers);
+        for (const h of ["content-type", "content-length"]) headers.delete(h);
+        const { body: _body, ...rest } = opts;
+        opts = { ...rest, method: "GET", headers };
+      }
+      url = next;
       continue;
     }
     return res;

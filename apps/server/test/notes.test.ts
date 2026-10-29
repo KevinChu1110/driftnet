@@ -55,3 +55,9 @@ test("export: Markdown and an Obsidian/Notion vault, without flagged items", () 
   execFileSync("unzip", ["-q", "v.zip"], { cwd: dir });
   assert.equal(readFileSync(join(dir, "driftnet/Coding agents/Tool A B.md"), "utf8"), item.data);
 });
+
+test("export: names made of dots cannot climb out of the vault", () => {
+  const item = { id: 1, title: "..", url: "https://a.test", kind: "repo", worth: "normal", shareCount: 0, favorite: false, createdAt: "2026-01-01T00:00:00Z", category: "x", summary: null, note: null } as never;
+  const files = toVault({ items: [item], chat: new Map(), notes: [], path: () => ["..", ".hidden"] });
+  assert.deepEqual(files.map((f) => f.path), ["driftnet/untitled/hidden/untitled.md"]);
+});

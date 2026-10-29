@@ -20,11 +20,11 @@ export interface JudgeResult {
 /** The state string every judge sees. Keep it short: it is billed per token. */
 export function judgeState(digest: Digest, note: string | undefined): string {
   const meta = Object.entries(digest.meta)
-    .map(([k, v]) => `${k}=${v}`)
+    .map(([k, v]) => `${k}=${String(v).replace(/\s+/g, " ").slice(0, 200)}`)
     .join(", ");
   return [
     `URL: ${digest.url}`,
-    `Title: ${digest.title}`,
+    `Title: ${digest.title.replace(/\s+/g, " ").trim().slice(0, 200)}`,
     meta && `Meta: ${meta}`,
     note && `Shared with note: ${clipTokens(note, 150)}`,
     // Extractors already outline and budget the content; this is a safety net.

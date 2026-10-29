@@ -77,6 +77,9 @@ test("found-in links are recorded once and recovered from old share notes", () =
   const p = old.upsert({ url: "https://fb.test/p", aliases: [], title: "post", judgement: j, summary: null, flags: [], source: "s" }).id;
   const c = old.upsert({ url: "https://github.com/a/b", aliases: [], title: "b", judgement: j, summary: null, flags: [], source: "s" }).id;
   old.recordShare(c, { platform: "http", chatId: "x", note: "Mentioned in https://fb.test/p" });
+  // The recovery runs once per database: a database from before it existed has no marker yet.
+  assert.deepEqual(new Store(file).foundLinks(), [], "already recovered once: not repeated");
+  old.setState("found_in_recovered", "0");
   assert.deepEqual(new Store(file).foundLinks(), [{ parent: p, child: c }]);
 });
 
