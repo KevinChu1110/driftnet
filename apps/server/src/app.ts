@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { mediaSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@driftnet/core";
+import { mediaSigOk, packSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@driftnet/core";
 import { canRead, clientIp, foreignOrigin, hostAllowed, isAdmin, isLocal, isPassword, isTrustedLocal, token, Tunnel } from "./access.ts";
 import { Settings } from "./settings.ts";
 import { BadRequest, readBody, readJson, type App, type Ctx, type Route } from "./route.ts";
@@ -10,6 +10,7 @@ import { routes as folders } from "./routes/folders.ts";
 import { routes as importRoutes } from "./routes/import.ts";
 import { routes as items } from "./routes/items.ts";
 import { routes as notes } from "./routes/notes.ts";
+import { routes as packs } from "./routes/packs.ts";
 import { routes as settingsRoutes } from "./routes/settings.ts";
 import { routes as system } from "./routes/system.ts";
 
@@ -19,7 +20,7 @@ import { routes as system } from "./routes/system.ts";
  * file and listing it here; `access` is required, so a route cannot be added
  * without saying who may call it.
  */
-export const routes: Route[] = [...system, ...folders, ...items, ...importRoutes, ...notes, ...digest, ...settingsRoutes];
+export const routes: Route[] = [...system, ...folders, ...packs, ...items, ...importRoutes, ...notes, ...digest, ...settingsRoutes];
 
 const asset = (file: string) => readFileSync(new URL(`../public/${file}`, import.meta.url));
 
@@ -64,8 +65,13 @@ export function createApp(opts: AppOptions): Server {
     const ref = m ? dn.store.get(Number(m[1]))?.media?.[Number(m[2])] : undefined;
     return !!ref && mediaSigOk(Number(m![1]), Number(m![2]), ref.url, sig);
   }
+  /** A pack's signed link opens that folder's pack only. */
+  function signedPack(path: string, sig: string | null): boolean {
+    const m = /^\/api\/folders\/([^/]+)\/pack$/.exec(path);
+    return !!m && packSigOk(dn.store, decodeURIComponent(m[1]!), sig);
+  }
   const readOk = (req: IncomingMessage, path: string, url: URL) =>
-    canRead(req, env, dn.store) || isTrustedLocal(req) || signedMedia(path, url.searchParams.get("s"));
+    canRead(req, env, dn.store) || isTrustedLocal(req) || signedMedia(path, url.searchParams.get("s")) || signedPack(path, url.searchParams.get("s"));
 
   /**
    * Guessing passwords: after 20 refused attempts that carried a password or key,

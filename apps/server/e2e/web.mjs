@@ -787,6 +787,13 @@ try {
     await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 }, s);
     await waitFor(s, `!document.getElementById("cmd-dlg").open && document.querySelector('[data-field="category"][data-value="${f.id}"]')?.getAttribute("aria-pressed") === "true"`, "Enter jumped to the folder");
     console.log("✓ command palette: Ctrl+K opens it, a folder name + Enter jumps there");
+    // Share as pack: the folder dialog opens the pack dialog, which offers the download (no public address here, so no link).
+    await evaluate(s, `openFolderDialog(${JSON.stringify(f.id)})`);
+    await waitFor(s, `document.getElementById("folder-dlg").open && !document.getElementById("fd-pack").hidden`, "folder dialog has Share as pack");
+    await evaluate(s, `document.getElementById("fd-pack").click()`);
+    await waitFor(s, `document.getElementById("pack-dlg").open && document.getElementById("pk-name").value.length > 0 && document.getElementById("pk-download").textContent.length > 0 && !document.getElementById("pk-nolink").hidden`, "pack dialog open");
+    assert.equal(await evaluate(s, `document.getElementById("pk-link-box").hidden`), true, "no link without a public address");
+    await evaluate(s, `document.getElementById("pk-close").click()`);
     // Back to everything, then the split view at a wide window: cards on the left, the map on the right.
     await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
     await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "all cards");

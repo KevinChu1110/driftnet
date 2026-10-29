@@ -27,7 +27,7 @@ Commands (talk to a running driftnet; search and export also read the database d
                   [--view inbox|favorites|trash] [--limit N] [--json]
   driftnet open [id]                    open the web page (or one card) in the browser
   driftnet export [--format json|md|vault] [-o file]   (vault is a zip: needs -o)
-  driftnet import <file> [--keep-folders] [--yes]      import a bookmarks file
+  driftnet import <file|pack link> [--keep-folders] [--yes]  import bookmarks or a pack
   driftnet status                       is it running, how many links, where the data lives
   driftnet completion bash|zsh          print a shell completion script
   driftnet init [--client claude-code|claude-desktop|cursor|windsurf|codex|all] [--remote URL --token T] [--yes] [--dry-run]

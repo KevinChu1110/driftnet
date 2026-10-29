@@ -39,7 +39,7 @@ export interface Judgement {
   category: string;
   kind: Kind;
   worth: Worth;
-  /** Which judge decided: "jev", "llm", "heuristic", "rules", or the name of a registered judge. */
+  /** Which judge decided: "jev", "llm", "heuristic", "rules", "pack" (imported from a folder pack), or the name of a registered judge. */
   engine: string;
   confidence: number; // 0..1, lowest confidence among the questions
 }
