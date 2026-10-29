@@ -29,6 +29,7 @@ export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
 export { sendWebhook, sendDigestWebhook, shouldNotify, webhookPayload, signBody } from "./webhook.ts";
+export { IMPORT_CAP, IMPORT_FOLDER, IMPORT_FORMATS, detectFormat, importFolder, parseImport, planImport, runImport, type ImportEntry, type ImportFormat, type ImportPlan, type ImportProgress } from "./import.ts";
 export { renderLink, renderText } from "./render.ts";
 export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
 export type { Judge, JudgeResult } from "./judge/index.ts";

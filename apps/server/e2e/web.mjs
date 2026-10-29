@@ -372,6 +372,15 @@ try {
     await evaluate(s, `document.getElementById("toast").classList.remove("show")`);
     await sleep(300);
     await shoot(`web-settings-${LANG}.png`);
+    // Import bookmarks: a file is read in the browser and previewed (dry run); nothing is ingested until Start.
+    await evaluate(s, `(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['<DL><DT><A HREF="https://import-e2e.test/a">A</A><DT><A HREF="https://import-e2e.test/b">B</A></DL>'], "bookmarks.html", { type: "text/html" }));
+      const input = document.getElementById("im-file"); input.files = dt.files;
+      input.dispatchEvent(new Event("change", { bubbles: true })); return 1; })()`);
+    await waitFor(s, `/2/.test(document.getElementById("im-status").textContent) && !document.getElementById("im-start").hidden`, "import preview with a Start button");
+    assert.equal(await api("/api/items?q=import-e2e").then((r) => r.length), 0, "a preview adds nothing");
+    console.log("✓ settings: import bookmarks previews the count before starting");
     await evaluate(s, `(() => {
       document.querySelector('[data-key="DRIFTNET_SUMMARY_RULES"]').value = "Say whether it is free.";
       document.querySelector('[data-pref="sort"]').value = "newest";

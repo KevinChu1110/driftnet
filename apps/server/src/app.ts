@@ -7,6 +7,7 @@ import { Settings } from "./settings.ts";
 import { BadRequest, readBody, readJson, type App, type Ctx, type Route } from "./route.ts";
 import { routes as digest } from "./routes/digest.ts";
 import { routes as folders } from "./routes/folders.ts";
+import { routes as importRoutes } from "./routes/import.ts";
 import { routes as items } from "./routes/items.ts";
 import { routes as notes } from "./routes/notes.ts";
 import { routes as settingsRoutes } from "./routes/settings.ts";
@@ -18,7 +19,7 @@ import { routes as system } from "./routes/system.ts";
  * file and listing it here; `access` is required, so a route cannot be added
  * without saying who may call it.
  */
-export const routes: Route[] = [...system, ...folders, ...items, ...notes, ...digest, ...settingsRoutes];
+export const routes: Route[] = [...system, ...folders, ...items, ...importRoutes, ...notes, ...digest, ...settingsRoutes];
 
 const asset = (file: string) => readFileSync(new URL(`../public/${file}`, import.meta.url));
 

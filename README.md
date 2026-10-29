@@ -268,6 +268,12 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   newest, most shared), compact cards, tags, chat text, light or dark.
 - **Export** everything as one Markdown file, or as a zip of Markdown files with front matter that
   Obsidian opens as a vault and Notion imports (Import → Markdown & CSV).
+- **Import bookmarks.** ⚙ Settings → *Import bookmarks* takes a browser bookmarks file (Chrome, Firefox,
+  Safari, Edge: HTML), a Pocket export (HTML or CSV), a Raindrop CSV, a JSON list of links, or any text
+  or Markdown with links in it. It shows how many are new before anything starts; tick *Keep my bookmark
+  folders* to mirror them under an **Imported** folder, otherwise the classifier sorts as usual. Links you
+  already have, repeats, non-web and private addresses are skipped, up to 5,000 per import. With a model
+  set up, each new link is one model call, so hundreds of links mean hundreds of calls.
 - **Shared links open read-only.** A card link from a chat bot or an agent carries the read-only share
   key, so it opens on a phone without a password; edit buttons appear after **Unlock** with the admin
   password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
@@ -521,7 +527,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
+`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` · `GET /api/import/:job` ·
 `GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
