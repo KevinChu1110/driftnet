@@ -464,8 +464,8 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
 | `DRIFTNET_FOLDERS` | `ai` | Starting folder template on a new database: `ai` (AI & coding), `research` (papers, articles, datasets…) or `everyday` (cooking, travel, money…). An empty catalogue also offers the choice on the page |
-| `DRIFTNET_WEBHOOK_URL` | — | POST each new or updated card here as JSON (`item.added` / `item.updated`), 5 s timeout, one retry |
-| `DRIFTNET_WEBHOOK_SECRET` | — | Signs the body: `X-Driftnet-Signature: sha256=<hmac>` |
+| `DRIFTNET_WEBHOOK_URL` | — | POST each card change here as JSON (`item.added` / `item.updated` / `item.trashed` / `item.restored`), 5 s timeout, one retry after 1 s, redirects not followed |
+| `DRIFTNET_WEBHOOK_SECRET` | — | Signs each delivery: `X-Driftnet-Signature: sha256=<hmac of "<X-Driftnet-Timestamp>.<body>">`. Reject old timestamps to stop replays; `X-Driftnet-Delivery` stays the same on the retry |
 | `DRIFTNET_WEBHOOK_ALLOW_LOCAL` | — | `1` allows a webhook on a private address (n8n on your LAN), for that exact host only |
 | `DRIFTNET_CATEGORIES` | built-in | JSON file of starting folders, `{ "id": "description" }`, used once on a new database; after that, edit folders on the page |
 | `GITHUB_TOKEN` | — | GitHub API limit from 60 to 5,000 requests per hour |

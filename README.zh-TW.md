@@ -427,8 +427,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
 | `DRIFTNET_FOLDERS` | `ai` | 新資料庫的起始資料夾樣板：`ai`（AI 與程式）、`research`（論文、文章、資料集……）或 `everyday`（料理、旅行、理財……）。清單還是空的時候，網頁上也能選 |
-| `DRIFTNET_WEBHOOK_URL` | — | 每張新增或更新的卡片以 JSON POST 到這裡（`item.added`／`item.updated`），逾時 5 秒、重試一次 |
-| `DRIFTNET_WEBHOOK_SECRET` | — | 為內容簽章：`X-Driftnet-Signature: sha256=<hmac>` |
+| `DRIFTNET_WEBHOOK_URL` | — | 卡片有變動就以 JSON POST 到這裡（`item.added`／`item.updated`／`item.trashed`／`item.restored`），逾時 5 秒、1 秒後重試一次、不跟隨轉址 |
+| `DRIFTNET_WEBHOOK_SECRET` | — | 為每次推送簽章：`X-Driftnet-Signature: sha256=<"<X-Driftnet-Timestamp>.<內容>" 的 hmac>`。拒收太舊的時間戳記即可防重送；重試時 `X-Driftnet-Delivery` 不變 |
 | `DRIFTNET_WEBHOOK_ALLOW_LOCAL` | — | 設 `1` 允許 Webhook 打到內網位址（例如區網裡的 n8n），只限你填的那台主機 |
 | `DRIFTNET_CATEGORIES` | 內建 | 起始資料夾的 JSON 檔：`{ "id": "說明" }`，只在新資料庫用一次，之後直接在網頁上改 |
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
