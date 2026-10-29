@@ -10,7 +10,7 @@
       "name": "driftnet",
       "source": "./",
       "description": "Search, save and file the links people share in your chats.",
-      "version": "0.10.1"
+      "version": "0.10.2"
     }
   ]
 }
