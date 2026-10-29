@@ -1,7 +1,7 @@
 import { BlockedUrl, extract, isSocial } from "./extractors/index.ts";
 import { findGithubRepo, matchGithub } from "./extractors/github.ts";
 import { safeFetch } from "./extractors/net.ts";
-import { enrichFromVideo } from "./extractors/video.ts";
+import { enrichFromVideo, type VideoDeps } from "./extractors/video.ts";
 import { normalizeMedia } from "./media.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
@@ -29,6 +29,8 @@ export interface PipelineOptions {
   minReputation?: number;
   /** Links on these domains (and their subdomains) are refused. */
   blockedDomains?: string[];
+  /** Tests only: fake video tools, process runner and environment. */
+  video?: VideoDeps;
 }
 
 /** The parts of a pipeline that settings can change while it runs. */
@@ -180,7 +182,8 @@ export class Pipeline {
     const { store } = this.opts;
     // Reels and shorts that say nothing in text: captions, on-screen text, speech (local tools, optional).
     // Done before the guard, so what the video says is checked like page text.
-    const video = await enrichFromVideo(digest);
+    // What the model can be shown decides whether watch/vision can run at all (text-only models: they never do).
+    const video = await enrichFromVideo(digest, { ...this.opts.video, media: this.opts.summarizer?.media ?? {} });
     digest = video.digest;
     const cleaned = guard(digest.text);
     const cleanedNote = note ? guard(note) : { text: undefined, flags: [] };
@@ -223,9 +226,11 @@ export class Pipeline {
     // Only "worth" gates the model. Not-quite-AI tools (a web library, a design
     // trick) are what people share too, so isAiTool is informational.
     const worthReading = judgement ? judgement.worth !== "skip" : true;
-    if (this.opts.summarizer && worthReading && !distrusted && !flags.includes("injection")) {
+    // A video nobody could read at all (no captions, OCR, speech, watch or frames) is not worth a model call that
+    // could only guess from a title: it stays pending, flagged "needs-transcript", for an agent with video tools.
+    if (this.opts.summarizer && worthReading && !distrusted && !flags.includes("injection") && !video.needsTranscript) {
       const r = await this.opts.summarizer.summarize(
-        digest, cleanedNote.text, judgement ? undefined : this.opts.categories,
+        digest, cleanedNote.text, judgement ? undefined : this.opts.categories, video.attachments,
       );
       summary = r.summary ? await this.verifyPrimaryUrl(r.summary, digest, r.repoGuess) : null;
       // Only a classification the model itself made brings its runners-up along.

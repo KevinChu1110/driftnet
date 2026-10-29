@@ -17,6 +17,8 @@ export interface OpenAICompatibleOptions {
  */
 export class OpenAICompatibleProvider implements LlmProvider {
   readonly label: string;
+  /** Pictures only, and only used when the reader asked for them (DRIFTNET_VIDEO_FRAMES=vision): the model must be a vision model. */
+  readonly media = { images: true };
 
   constructor(private readonly opts: OpenAICompatibleOptions) {
     this.label = `openai:${opts.model}${opts.baseUrl.includes("api.openai.com") ? "" : ` @ ${new URL(opts.baseUrl).host}`}`;
@@ -34,7 +36,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
         max_completion_tokens: req.maxTokens,
         messages: [
           { role: "system", content: req.system },
-          { role: "user", content: req.user },
+          { role: "user", content: userContent(req) },
         ],
         response_format: {
           type: "json_schema",
@@ -78,4 +80,14 @@ export function strictJsonSchema(schema: z.ZodType): Record<string, unknown> {
     return out;
   };
   return walk(z.toJSONSchema(schema)) as Record<string, unknown>;
+}
+
+/** Plain text, or text plus `image_url` data URLs when frames are attached. Other attachment kinds are ignored. */
+export function userContent(req: StructuredRequest<z.ZodType>): string | Record<string, unknown>[] {
+  const images = (req.attachments ?? []).filter((a) => a.type === "image");
+  if (!images.length) return req.user;
+  return [
+    { type: "text", text: req.user },
+    ...images.map((a) => ({ type: "image_url", image_url: { url: `data:${a.mime};base64,${(a as { data: string }).data}` } })),
+  ];
 }

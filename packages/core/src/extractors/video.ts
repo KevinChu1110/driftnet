@@ -5,6 +5,7 @@ import { isIP } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { estimateTokens } from "../digest.ts";
+import type { Attachment, MediaSupport } from "../llm/types.ts";
 import type { Digest } from "../types.ts";
 import { isPublicAddress } from "./net.ts";
 
@@ -16,6 +17,10 @@ import { isPublicAddress } from "./net.ts";
  *   1. captions    yt-dlp, no download: subtitles, auto-captions, title, description
  *   2. on-screen   low-quality download (<= 60 MB, first 3 min), a frame every 2 s, OCR
  *   3. speech      only if still thin: 16 kHz audio -> whisper
+ *   4. watch/vision  only if STILL thin and the reader turned it on: the video (DRIFTNET_VIDEO=watch) or up to 8
+ *                  distinct frames (DRIFTNET_VIDEO_FRAMES=vision) go to the reader's own model inside the one
+ *                  summary request; nothing is sent anywhere else, and nothing here makes a model call.
+ *   5. queue       nothing usable at all: the item gets a "needs-transcript" hint for an agent with video tools
  *
  * Shared links are untrusted, so the tools run like the CLI model providers do:
  * no shell (argument arrays), a private temp directory that is always deleted,
@@ -24,13 +29,20 @@ import { isPublicAddress } from "./net.ts";
  * private/local hosts refused before a URL reaches yt-dlp.
  */
 
-/** off: never; captions: only what yt-dlp reports (no download, no OCR, no speech model: light on a battery); auto: everything installed. */
-export type VideoMode = "off" | "captions" | "auto";
+/**
+ * off: never; captions: only what yt-dlp reports (no download, no OCR, no speech model: light on a battery);
+ * auto: every local tool installed; watch: auto, then a video-capable model watches what is still thin (opt-in, sends the video or its URL to the configured Gemini/Vertex model).
+ */
+export type VideoMode = "off" | "captions" | "auto" | "watch";
 
 export const videoMode = (env: NodeJS.ProcessEnv = process.env): VideoMode => {
   const v = env.DRIFTNET_VIDEO?.trim().toLowerCase();
-  return v === "off" || v === "captions" ? v : "auto";
+  return v === "off" || v === "captions" || v === "watch" ? v : "auto";
 };
+
+/** DRIFTNET_VIDEO_FRAMES=vision: attach up to 8 frames to the summary request (opt-in; the model must accept images). */
+export const framesMode = (env: NodeJS.ProcessEnv = process.env): "off" | "vision" =>
+  env.DRIFTNET_VIDEO_FRAMES?.trim().toLowerCase() === "vision" ? "vision" : "off";
 
 // --- limits ------------------------------------------------------------------------------------
 
@@ -44,6 +56,16 @@ export const MAX_BYTES = 60 * 1024 * 1024;
 export const MAX_SECONDS = 180;
 export const MAX_FRAMES = 40;
 export const FRAME_EVERY_SECONDS = 2;
+/** Frames shown to a vision model, per item. */
+export const MAX_VISION_FRAMES = 8;
+export const VISION_WIDTH = 768;
+/** A frame this far (mean absolute difference, 0-255, on an 8x8 gray thumbnail) from every kept one counts as new. */
+export const FRAME_DIFF = 10;
+/** Frames darker than this on average (fades, black intros) are never sent. */
+export const FRAME_MIN_BRIGHTNESS = 6;
+const MAX_FRAME_BYTES = 300_000;
+/** Gemini takes at most 20 MB per request, base64 included (x1.33): a clip beyond this is not inlined. */
+export const MAX_INLINE_VIDEO_BYTES = 14 * 1024 * 1024;
 export const TIMEOUTS = { captions: 60_000, download: 90_000, frames: 30_000, ocr: 90_000, audio: 30_000, speech: 180_000 } as const;
 
 // --- which items -------------------------------------------------------------------------------
@@ -296,6 +318,8 @@ export interface VideoDeps {
   tmpRoot?: string;
   /** Host name -> addresses. Tests answer from a fake. */
   resolveHost?: (host: string) => Promise<string[]>;
+  /** What the configured summary model accepts (Summarizer.media). Absent = text only: watch and vision never run. */
+  media?: MediaSupport;
 }
 
 export class VideoRefused extends Error {}
@@ -320,22 +344,70 @@ export async function assertPublicVideoUrl(url: string, deps: Pick<VideoDeps, "e
 
 export interface VideoReading {
   sections: Section[];
-  /** Which steps produced text: "captions", "ocr", "speech". */
+  /** Which steps produced something: "captions", "ocr", "speech", "watch", "vision". */
   steps: string[];
   title?: string;
+  /** Frames or the video itself, for the one summary request. */
+  attachments: Attachment[];
+  /** yt-dlp was started for this link (so an empty result means "could not read it", not "no tools"). */
+  ran: boolean;
+}
+
+/** https://www.youtube.com/watch?v=ID for any YouTube link shape (watch, shorts, live, youtu.be), else undefined. */
+export function youtubeWatchUrl(url: string): string | undefined {
+  if (!URL.canParse(url)) return undefined;
+  const u = new URL(url);
+  const host = u.hostname.toLowerCase();
+  let id: string | null | undefined;
+  if (host === "youtu.be") id = u.pathname.slice(1).split("/")[0];
+  else if (hostIs(host, "youtube.com")) {
+    id = /^\/(?:shorts|live)\/([^/]+)/.exec(u.pathname)?.[1] ?? (u.pathname === "/watch" ? u.searchParams.get("v") : undefined);
+  }
+  return id && /^[\w-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : undefined;
+}
+
+/**
+ * Which of the 8x8 gray thumbnails (64 bytes each, in order) are worth showing a model: not near-black, and not
+ * within FRAME_DIFF of one already kept; at most `max`, spread evenly over what is left.
+ */
+export function pickDistinctFrames(thumbs: Uint8Array, max = MAX_VISION_FRAMES): number[] {
+  const SIZE = 64;
+  const n = Math.floor(thumbs.length / SIZE);
+  const tile = (i: number) => thumbs.subarray(i * SIZE, (i + 1) * SIZE);
+  const kept: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = tile(i);
+    if (t.reduce((a, b) => a + b, 0) / SIZE < FRAME_MIN_BRIGHTNESS) continue;
+    const distinct = kept.every((k) => {
+      const o = tile(k);
+      let d = 0;
+      for (let j = 0; j < SIZE; j++) d += Math.abs(t[j]! - o[j]!);
+      return d / SIZE >= FRAME_DIFF;
+    });
+    if (distinct) kept.push(i);
+  }
+  return kept.length <= max ? kept : Array.from({ length: max }, (_, k) => kept[Math.floor((k * kept.length) / max)]!);
 }
 
 /** Exact languages plus each video's own auto-caption language; never the machine-translated "zh-Hans-en" kind (slow, and YouTube answers 429). */
 const SUB_LANGS = "en,.*-orig,zh-Hant,zh-Hans,zh-TW,zh-CN,zh,ja,ko,es,fr,de,pt,id,th,vi";
 const FILTER_SCALE = `fps=1/${FRAME_EVERY_SECONDS},scale='min(960,iw)':-2`;
+const VISION_SCALE = `fps=1/${FRAME_EVERY_SECONDS},scale='min(${VISION_WIDTH},iw)':-2`;
+const THUMB_SCALE = `fps=1/${FRAME_EVERY_SECONDS},scale=8:8:flags=area,format=gray`;
+const INLINE_MIME: Record<string, string> = { mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime" };
 
 /** Runs the steps for one video inside `dir`. Exposed for tests; use `enrichFromVideo` in the pipeline. */
-export async function readVideo(url: string, page: string, dir: string, deps: Required<Pick<VideoDeps, "spawn" | "tools" | "env">>): Promise<VideoReading> {
+export async function readVideo(url: string, page: string, dir: string, deps: Required<Pick<VideoDeps, "spawn" | "tools" | "env">> & Pick<VideoDeps, "media">): Promise<VideoReading> {
   const { spawn, tools } = deps;
   const env = scrubbedEnv(deps.env);
-  const reading: VideoReading = { sections: [], steps: [] };
+  const reading: VideoReading = { sections: [], steps: [], attachments: [], ran: false };
   const ytdlp = tools.ytdlp;
   if (!ytdlp) return reading;
+  reading.ran = true;
+  const media = deps.media ?? {};
+  const ytUrl = videoMode(deps.env) === "watch" && media.videoUrl ? youtubeWatchUrl(url) : undefined;
+  const wantWatch = videoMode(deps.env) === "watch" && (!!ytUrl || !!media.videoInline);
+  const wantVision = framesMode(deps.env) === "vision" && !!media.images && !!tools.ffmpeg;
   const ffArgs = tools.ffmpeg ? ["--ffmpeg-location", tools.ffmpeg] : [];
   const have = () => estimateTokens(substance(page)) + reading.sections.reduce((n, s) => n + estimateTokens(s.text), 0);
   const base = ["--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--socket-timeout", "15", "--retries", "1"];
@@ -368,16 +440,20 @@ export async function readVideo(url: string, page: string, dir: string, deps: Re
       reading.steps.push("captions");
     }
   }
-  if (have() >= ENOUGH_TOKENS || !tools.ffmpeg || videoMode(deps.env) === "captions") return reading;
-  if (!tools.tesseract && !tools.whisper) return reading;
+  if (have() >= ENOUGH_TOKENS || videoMode(deps.env) === "captions") return reading;
+  const localTools = !!tools.tesseract || !!tools.whisper;
+  const inlineWatch = wantWatch && !ytUrl;
+  // A downloaded file is only needed by OCR, speech, frames, or an inline (non-YouTube) watch.
+  if (!tools.ffmpeg || !(localTools || wantVision || inlineWatch)) return withWatch(reading, ytUrl, undefined, wantWatch, wantVision, have);
 
   // 2. the video itself, lowest quality that is still legible (>= 360p when offered), capped in size and length.
   await spawn(ytdlp, [
     ...base, ...ffArgs, "-f", "worst[height>=360]/worst", "--max-filesize", String(MAX_BYTES),
     "--download-sections", `*0-${MAX_SECONDS}`, "-o", join(dir, "video.%(ext)s"), "--", url,
   ], { cwd: dir, env, timeoutMs: TIMEOUTS.download });
-  const video = readdirSync(dir).map((f) => join(dir, f)).find((f) => /\/video\.[^/]+$/.test(f) && !/\.(part|ytdl|json)$/.test(f));
-  if (!video || statSync(video).size > MAX_BYTES) return reading;
+  const found = readdirSync(dir).map((f) => join(dir, f)).find((f) => /\/video\.[^/]+$/.test(f) && !/\.(part|ytdl|json)$/.test(f));
+  const video = found && statSync(found).size <= MAX_BYTES ? found : undefined;
+  if (!video) return withWatch(reading, ytUrl, undefined, wantWatch, wantVision, have);
 
   if (tools.tesseract) {
     const ocr = await onScreenText(video, dir, deps, env, () => have());
@@ -386,15 +462,72 @@ export async function readVideo(url: string, page: string, dir: string, deps: Re
       reading.steps.push("ocr");
     }
   }
-  if (have() >= ENOUGH_TOKENS || !tools.whisper) return reading;
-
   // 3. speech, only when everything cheaper left the item thin.
-  const speech = await transcribe(video, dir, deps, env);
-  if (speech) {
-    reading.sections.push({ label: "speech", text: speech });
-    reading.steps.push("speech");
+  if (have() < ENOUGH_TOKENS && tools.whisper) {
+    const speech = await transcribe(video, dir, deps, env);
+    if (speech) {
+      reading.sections.push({ label: "speech", text: speech });
+      reading.steps.push("speech");
+    }
+  }
+  return withWatch(reading, ytUrl, video, wantWatch, wantVision, have, async () => visionFrames(video, dir, deps, env));
+}
+
+/** 4. Still thin after every local step: let the model see it. Watch beats frames; frames are the fallback. Never reached when `have()` is enough. */
+async function withWatch(
+  reading: VideoReading, ytUrl: string | undefined, video: string | undefined, wantWatch: boolean, wantVision: boolean,
+  have: () => number, frames?: () => Promise<Attachment[]>,
+): Promise<VideoReading> {
+  if (have() >= ENOUGH_TOKENS) return reading;
+  if (wantWatch) {
+    if (ytUrl) {
+      reading.attachments.push({ type: "video_url", mime: "video/mp4", url: ytUrl });
+    } else if (video) {
+      const mime = INLINE_MIME[video.split(".").pop()!.toLowerCase()];
+      if (mime && statSync(video).size <= MAX_INLINE_VIDEO_BYTES) {
+        reading.attachments.push({ type: "video_inline", mime, data: readFileSync(video).toString("base64") });
+      }
+    }
+    if (reading.attachments.length) {
+      reading.steps.push("watch");
+      return reading;
+    }
+  }
+  if (wantVision && frames) {
+    const shots = await frames();
+    if (shots.length) {
+      reading.attachments.push(...shots);
+      reading.steps.push("vision");
+    }
   }
   return reading;
+}
+
+/** One ffmpeg run: JPEG candidates (<= 768 px wide) plus 8x8 gray thumbnails; distinct, non-black ones, at most 8. */
+async function visionFrames(video: string, dir: string, ctx: Ctx, env: NodeJS.ProcessEnv): Promise<Attachment[]> {
+  const out = join(dir, "vframes");
+  mkdirSync(out);
+  const thumbs = join(dir, "thumbs.raw");
+  await ctx.spawn(ctx.tools.ffmpeg!, [
+    "-nostdin", "-v", "error", "-t", String(MAX_SECONDS), "-i", video,
+    "-vf", VISION_SCALE, "-q:v", "6", "-frames:v", String(MAX_FRAMES), join(out, "v%03d.jpg"),
+    "-vf", THUMB_SCALE, "-frames:v", String(MAX_FRAMES), "-f", "rawvideo", thumbs,
+  ], { cwd: dir, env, timeoutMs: TIMEOUTS.frames });
+  const files = readdirSync(out).filter((f) => f.endsWith(".jpg")).sort().slice(0, MAX_FRAMES);
+  let picks: number[];
+  try {
+    picks = pickDistinctFrames(readFileSync(thumbs)).filter((i) => i < files.length);
+  } catch {
+    // No thumbnails: spread evenly instead of sending nothing.
+    picks = files.length <= MAX_VISION_FRAMES ? files.map((_, i) => i) : Array.from({ length: MAX_VISION_FRAMES }, (_, k) => Math.floor((k * files.length) / MAX_VISION_FRAMES));
+  }
+  const shots: Attachment[] = [];
+  for (const i of picks.slice(0, MAX_VISION_FRAMES)) {
+    const path = join(out, files[i]!);
+    if (statSync(path).size > MAX_FRAME_BYTES) continue;
+    shots.push({ type: "image", mime: "image/jpeg", data: readFileSync(path).toString("base64") });
+  }
+  return shots;
 }
 
 let langCache = new Map<string, string>();
@@ -473,8 +606,12 @@ async function transcribe(video: string, dir: string, ctx: Ctx, env: NodeJS.Proc
 
 export interface VideoEnrichment {
   digest: Digest;
-  /** Item flags to add: "video-read" plus one per step that produced text ("video-captions", "video-ocr", "video-speech"). */
+  /** Item flags to add: "video-read" plus one per step that produced something ("video-captions", "video-ocr", "video-speech", "video-watch", "video-vision"), or "needs-transcript". */
   flags: string[];
+  /** Frames or the video, to attach to the one summary request. */
+  attachments: Attachment[];
+  /** Every step ran and found nothing: leave the item for an agent with video tools (flag "needs-transcript"). */
+  needsTranscript: boolean;
 }
 
 /**
@@ -484,7 +621,7 @@ export interface VideoEnrichment {
  */
 export async function enrichFromVideo(digest: Digest, deps: VideoDeps = {}): Promise<VideoEnrichment> {
   const env = deps.env ?? process.env;
-  const none = { digest, flags: [] as string[] };
+  const none: VideoEnrichment = { digest, flags: [], attachments: [], needsTranscript: false };
   if (!wantsVideo(digest, env)) return none;
   const tools = deps.tools ?? videoTools(env);
   if (!tools.ytdlp) return none;
@@ -498,15 +635,19 @@ export async function enrichFromVideo(digest: Digest, deps: VideoDeps = {}): Pro
   return gate.run(async () => {
     const dir = mkdtempSync(join(deps.tmpRoot ?? tmpdir(), "driftnet-video-"));
     try {
-      const reading = await readVideo(digest.url, digest.text, dir, { spawn, tools, env });
+      const reading = await readVideo(digest.url, digest.text, dir, { spawn, tools, env, ...(deps.media ? { media: deps.media } : {}) });
       const extra = composeSections(reading.sections);
-      if (!extra) return none;
-      const text = digest.text.trim() ? `${digest.text.trim()}\n\n${extra}` : extra;
+      if (!extra && !reading.attachments.length) {
+        return reading.ran ? { ...none, flags: ["needs-transcript"], needsTranscript: true } : none;
+      }
+      const text = !extra ? digest.text : digest.text.trim() ? `${digest.text.trim()}\n\n${extra}` : extra;
       // A page that only knew its own address gets the video's title.
       const untitled = !digest.title || digest.title === digest.url || (URL.canParse(digest.url) && digest.title === new URL(digest.url).hostname);
       return {
         digest: { ...digest, text, title: untitled && reading.title ? reading.title : digest.title },
         flags: reading.steps.length ? ["video-read", ...reading.steps.map((s) => `video-${s}`)] : [],
+        attachments: reading.attachments,
+        needsTranscript: false,
       };
     } catch (err) {
       console.warn(`[driftnet] video read failed for ${digest.url}: ${(err as Error).message}`);

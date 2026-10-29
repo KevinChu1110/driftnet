@@ -1,4 +1,4 @@
-import { profileLine, readerProfile, summaryDepth, type Driftnet } from "@driftnet/core";
+import { profileLine, readerProfile, summaryDepth, type Driftnet, type Item } from "@driftnet/core";
 
 const DEPTH_BRIEF = {
   brief: "Keep it short: one_liner plus 2 highlights, demo in one sentence, no use_cases.",
@@ -37,4 +37,17 @@ export function agentBrief(dn: Driftnet, leased: number, env: NodeJS.ProcessEnv 
     ...(rules ? [`The reader's own rules: ${rules}`] : []),
     ...(profile ? [profile] : []),
   ].join("\n");
+}
+
+/** One leased item as an agent sees it. `hint` is set only when driftnet already tried the video and found nothing to read. */
+export function leaseRow(dn: Driftnet, i: Item) {
+  return {
+    id: i.id,
+    url: i.url,
+    title: i.title,
+    kind: i.kind,
+    category_guess: i.category,
+    ...(i.flags.includes("needs-transcript") ? { hint: "video: needs a transcript" } : {}),
+    shared_with: dn.store.notes(i.id),
+  };
 }

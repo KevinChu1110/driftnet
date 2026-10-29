@@ -1,6 +1,6 @@
 import { createSign } from "node:crypto";
 import type { z } from "zod";
-import { generateContentBody, parseGenerateContent } from "./gemini.ts";
+import { GEMINI_MEDIA, generateContentBody, parseGenerateContent } from "./gemini.ts";
 import { failFromResponse, safeSegment } from "./shared.ts";
 import type { LlmProvider, StructuredRequest } from "./types.ts";
 
@@ -55,6 +55,7 @@ export function parseServiceAccount(json: string): ServiceAccount {
  */
 export class VertexProvider implements LlmProvider {
   readonly label: string;
+  readonly media = GEMINI_MEDIA;
   private readonly project: string;
   private readonly host: string;
   private token: { value: string; expiresAt: number } | undefined;

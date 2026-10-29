@@ -228,14 +228,14 @@ test("the temp dir is deleted after success, on a timeout, on a crash and when n
   assert.equal(dirs.length, 1);
   assert.equal(existsSync(dirs[0]!), false);
   const none = await run(digest(), {});
-  assert.deepEqual(none.flags, []);
+  assert.deepEqual(none.flags, ["needs-transcript"], "yt-dlp ran and found nothing: left for an agent");
   assert.deepEqual(left(none.tmpRoot), []);
 });
 
 test("a timed-out download stops the pipeline: nothing downstream runs on a half file", async () => {
   const r = await run(digest(), { info: { title: "t" }, video: true, ocr: ["a b c"], timeoutOn: "download" });
   assert.ok(!r.calls.some((c) => c.bin.endsWith("ffmpeg") || c.bin.endsWith("tesseract") || c.bin.endsWith("whisper")));
-  assert.deepEqual(r.flags, []);
+  assert.deepEqual(r.flags, ["needs-transcript"]);
 });
 
 test("private and local video links are refused before yt-dlp sees them", async () => {

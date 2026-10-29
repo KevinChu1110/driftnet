@@ -46,3 +46,18 @@ test("brief: an MCP session gets the profile with its first lease that has items
     delete process.env.DRIFTNET_PROFILE;
   }
 });
+
+test("lease rows: a video driftnet could not read carries one short hint; ordinary rows have none", async () => {
+  const dn = boot();
+  const add = (url: string, flags: string[]) => dn.store.upsert({ url, aliases: [], title: "t", judgement, summary: null, flags, source: "s" });
+  add("https://brief.test/video", ["needs-transcript"]);
+  add("https://brief.test/plain", []);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await createMcpServer(dn, "t").connect(a);
+  const client = new Client({ name: "t", version: "0" });
+  await client.connect(b);
+  const text = ((await client.callTool({ name: "driftnet_lease_items", arguments: { limit: 5 } })) as { content: { text: string }[] }).content[0]!.text;
+  const rows = JSON.parse(text.slice(text.indexOf("[\n"))) as { url: string; hint?: string }[];
+  assert.equal(rows.find((r) => r.url.endsWith("/video"))!.hint, "video: needs a transcript");
+  assert.equal(rows.find((r) => r.url.endsWith("/plain"))!.hint, undefined);
+});

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { BlockedUrl, HistoryError, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
-import { agentBrief } from "../brief.ts";
+import { agentBrief, leaseRow } from "../brief.ts";
 import { actorOf, isAdmin, token } from "../access.ts";
 import { loadMedia, MediaError } from "../media.ts";
 import { BadRequest, type Route } from "../route.ts";
@@ -259,7 +259,7 @@ export const routes: Route[] = [
         categories: Object.keys(dn.categories),
         folders: dn.categories,
         ...(env.DRIFTNET_SUMMARY_RULES?.trim() ? { rules: env.DRIFTNET_SUMMARY_RULES.trim() } : {}),
-        items: items.map((i) => ({ id: i.id, url: i.url, title: i.title, kind: i.kind, category_guess: i.category, shared_with: dn.store.notes(i.id) })),
+        items: items.map((i) => leaseRow(dn, i)),
       });
     },
   },

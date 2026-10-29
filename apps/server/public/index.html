@@ -729,7 +729,7 @@
       kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
       kind1: { repo: "Repo", product: "Product", video: "Video", article: "Article", post: "Post", other: "Other" },
       worth: { skip: "skip", low: "low", normal: "worth a look", "must-see": "must-see" },
-      flags: { injection: "prompt injection", "hidden-chars": "hidden characters", "low-reputation": "low-reputation source", "video-read": "read from video", "video-captions": "video captions", "video-ocr": "video on-screen text", "video-speech": "video speech" },
+      flags: { injection: "prompt injection", "hidden-chars": "hidden characters", "low-reputation": "low-reputation source", "video-read": "read from video", "video-captions": "video captions", "video-ocr": "video on-screen text", "video-speech": "video speech", "video-watch": "watched by the model", "video-vision": "frames seen by the model" },
       pending: "waiting for a summary", noModel: "no summary — no model set up", enrichedBy: (a) => `summary by ${a}`,
       favorite: "Add to favorites", unfavorite: "Remove from favorites", remove: "Move to trash", restore: "Restore",
       swipeFav: "Favorite", swipeUnfav: "Unfavorite", swipeTrash: "Remove", swipeRestore: "Restore",
@@ -893,6 +893,7 @@
           DRIFTNET_FFMPEG: ["ffmpeg path", "Only if ffmpeg is not on PATH."],
           DRIFTNET_TESSERACT: ["tesseract path", "Only if tesseract (on-screen text) is not on PATH."],
           DRIFTNET_WHISPER: ["whisper path", "Only if whisper or whisper-cli (speech) is not on PATH."],
+          DRIFTNET_VIDEO_FRAMES: ["Show frames to the model", "Off by default. When on, and a reel or short is still thin after the local tools, up to 8 distinct frames are attached to the same summary request, so they go to the model you configured and nowhere else. The model must accept pictures (Ollama: a vision model)."],
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["Allow a local webhook", "Needed when the receiver is on your own network (n8n on a LAN). Only that exact address is allowed."],
         },
         choices: {
@@ -910,7 +911,8 @@
           DRIFTNET_EMBED: { "": "Automatic (default): on when a local model is found", auto: "Automatic: on when a local model is found", off: "Off" },
           DRIFTNET_EMBED_PROVIDER: { "": "Automatic (local Ollama only)", ollama: "Ollama (on this computer)", openai: "OpenAI", gemini: "Gemini" },
           DRIFTNET_UPDATE_CHECK: { "": "Off (default)", 1: "On", 0: "Off" },
-          DRIFTNET_VIDEO: { "": "Automatic (default)", auto: "Automatic: use the tools found", captions: "Captions only (light on battery: no download, OCR or speech)", off: "Off" },
+          DRIFTNET_VIDEO: { "": "Automatic (default)", auto: "Automatic: use the tools found", captions: "Captions only (light on battery: no download, OCR or speech)", watch: "Also let Gemini/Vertex watch it (sends the video or its YouTube link to that model)", off: "Off" },
+          DRIFTNET_VIDEO_FRAMES: { "": "Off (default)", off: "Off", vision: "Attach up to 8 frames to the summary (needs a vision model)" },
         },
       },
     },
@@ -922,7 +924,7 @@
       pageMore: (n) => `再顯示 ${n} 張`, emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
       worth: { skip: "略過", low: "次要", normal: "值得看", "must-see": "必看" },
-      flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源", "video-read": "已從影片讀取", "video-captions": "影片字幕", "video-ocr": "影片畫面文字", "video-speech": "影片語音" },
+      flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源", "video-read": "已從影片讀取", "video-captions": "影片字幕", "video-ocr": "影片畫面文字", "video-speech": "影片語音", "video-watch": "模型已看過影片", "video-vision": "模型已看過畫面" },
       pending: "等待摘要", noModel: "沒有摘要（未設定模型）", enrichedBy: (a) => `由 ${a} 整理`,
       favorite: "加入最愛", unfavorite: "移出最愛", remove: "移到垃圾桶", restore: "還原",
       swipeFav: "加入最愛", swipeUnfav: "移出最愛", swipeTrash: "移到垃圾桶", swipeRestore: "還原",
@@ -1086,6 +1088,7 @@
           DRIFTNET_FFMPEG: ["ffmpeg 路徑", "只有 ffmpeg 不在 PATH 時才需要。"],
           DRIFTNET_TESSERACT: ["tesseract 路徑", "只有 tesseract（讀畫面文字）不在 PATH 時才需要。"],
           DRIFTNET_WHISPER: ["whisper 路徑", "只有 whisper 或 whisper-cli（語音轉文字）不在 PATH 時才需要。"],
+          DRIFTNET_VIDEO_FRAMES: ["把畫面交給模型看", "預設關閉。開啟後，reel 或 short 在本機工具讀完後仍然太少時，最多 8 張不重複的畫面會附在同一次摘要請求裡，只送給你設定的模型。模型必須看得懂圖片（Ollama：要用視覺模型）。"],
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["允許本機 Webhook", "接收端在你自己的區域網路時需要（例如內網的 n8n）。只放行你填的那個位址。"],
         },
         choices: {
@@ -1103,7 +1106,8 @@
           DRIFTNET_EMBED: { "": "自動（預設）：找到本機模型就開", auto: "自動：找到本機模型就開", off: "關閉" },
           DRIFTNET_EMBED_PROVIDER: { "": "自動（只找本機 Ollama）", ollama: "Ollama（在這台電腦上）", openai: "OpenAI", gemini: "Gemini" },
           DRIFTNET_UPDATE_CHECK: { "": "關閉（預設）", 1: "開啟", 0: "關閉" },
-          DRIFTNET_VIDEO: { "": "自動（預設）", auto: "自動：有找到工具就用", captions: "只抓字幕（省電：不下載影片、不跑文字辨識和語音模型）", off: "關閉" },
+          DRIFTNET_VIDEO: { "": "自動（預設）", auto: "自動：有找到工具就用", captions: "只抓字幕（省電：不下載影片、不跑文字辨識和語音模型）", watch: "再讓 Gemini/Vertex 直接看影片（會把影片或 YouTube 連結送給該模型）", off: "關閉" },
+          DRIFTNET_VIDEO_FRAMES: { "": "關閉（預設）", off: "關閉", vision: "把最多 8 張畫面附在摘要請求裡（需要視覺模型）" },
         },
       },
     },
@@ -1120,7 +1124,7 @@
   // Warnings (injection, hidden characters, low reputation) keep ⚠; "read from video" is good news, not a warning.
   function flagLines(i, t) {
     const flags = i.flags ?? [];
-    const warn = flags.filter((f) => !f.startsWith("video-"));
+    const warn = flags.filter((f) => !f.startsWith("video-") && f !== "needs-transcript");
     const steps = flags.filter((f) => f.startsWith("video-") && f !== "video-read");
     return (warn.length ? `<div class="flag">⚠ ${esc(warn.map((f) => t.flags[f] ?? f).join(", "))}</div>` : "")
       + (flags.includes("video-read") ? `<div class="vflag">🎬 ${esc(t.flags["video-read"])}${steps.length ? ` · ${esc(steps.map((f) => t.flags[f] ?? f).join(", "))}` : ""}</div>` : "");

@@ -1,15 +1,25 @@
 import type { z } from "zod";
 import { failFromResponse, jsonSchemaOf } from "./shared.ts";
-import { IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./types.ts";
+import { IncompleteOutput, parseStructured, type Attachment, type LlmProvider, type MediaSupport, type StructuredRequest } from "./types.ts";
 
 /** Used when DRIFTNET_LLM_MODEL is empty. An alias that always points at the current Flash model, so nothing here goes stale. */
 export const GEMINI_DEFAULT_MODEL = "gemini-flash-latest";
 
-/** The generateContent request body, shared by the Gemini API and Vertex AI. */
+/** Gemini and Vertex take pictures, a public video URL and small inline clips. */
+export const GEMINI_MEDIA: MediaSupport = { images: true, videoUrl: true, videoInline: true };
+
+/** One attachment as a generateContent part. */
+function attachmentPart(a: Attachment): Record<string, unknown> {
+  return a.type === "video_url"
+    ? { file_data: { mime_type: a.mime, file_uri: a.url } }
+    : { inline_data: { mime_type: a.mime, data: a.data } };
+}
+
+/** The generateContent request body, shared by the Gemini API and Vertex AI. Attachments go before the text, as Google recommends for video. */
 export function generateContentBody<T extends z.ZodType>(req: StructuredRequest<T>): Record<string, unknown> {
   return {
     systemInstruction: { parts: [{ text: req.system }] },
-    contents: [{ role: "user", parts: [{ text: req.user }] }],
+    contents: [{ role: "user", parts: [...(req.attachments ?? []).map(attachmentPart), { text: req.user }] }],
     generationConfig: {
       maxOutputTokens: req.maxTokens,
       responseMimeType: "application/json",
@@ -49,6 +59,7 @@ const HOST = "https://generativelanguage.googleapis.com/v1beta";
  */
 export class GeminiProvider implements LlmProvider {
   readonly label: string;
+  readonly media = GEMINI_MEDIA;
   private readonly model: string;
 
   constructor(private readonly opts: GeminiOptions) {

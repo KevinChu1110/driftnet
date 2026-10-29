@@ -8,8 +8,29 @@ import type { z } from "zod";
 export interface LlmProvider {
   /** For logs and the startup line, e.g. "openai:gpt-5-mini". */
   readonly label: string;
+  /** What this provider can be shown besides text. Absent = text only: attachments are never built for it. */
+  readonly media?: MediaSupport;
   complete<T extends z.ZodType>(req: StructuredRequest<T>): Promise<z.infer<T>>;
 }
+
+/** What a provider accepts in the same request as the text. */
+export interface MediaSupport {
+  /** Still pictures (video frames). */
+  images?: boolean;
+  /** A public video URL the provider fetches itself (Gemini and YouTube). */
+  videoUrl?: boolean;
+  /** Video bytes inside the request (small clips only). */
+  videoInline?: boolean;
+}
+
+/**
+ * Something the model is shown next to the text, in the SAME request (never a request of its own).
+ * Providers that cannot use a kind ignore it; `media` says which they can.
+ */
+export type Attachment =
+  | { type: "image"; mime: string; /** base64 */ data: string }
+  | { type: "video_url"; mime: string; url: string }
+  | { type: "video_inline"; mime: string; /** base64 */ data: string };
 
 export interface StructuredRequest<T extends z.ZodType> {
   system: string;
@@ -18,6 +39,8 @@ export interface StructuredRequest<T extends z.ZodType> {
   /** Short name for the schema, required by some APIs. */
   schemaName: string;
   maxTokens: number;
+  /** Optional frames or video; see LlmProvider.media. */
+  attachments?: Attachment[];
 }
 
 /**

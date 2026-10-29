@@ -177,6 +177,15 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 
 **Reels 與 Shorts。** 全部都是選配：下面這些工具一個都沒裝，driftnet 也照樣讀貼文的標題和說明。很多分享的 reels 只用講的報工具名稱。當 Instagram、Facebook、Threads、TikTok、YouTube Shorts 或 X 的連結是影片，而頁面文字幾乎沒內容時，driftnet 會用你機器上已有的工具讀影片本身，由便宜到貴，文字夠了就停：（1）用 `yt-dlp` 取字幕、標題和說明，不下載影片；（2）以低畫質下載影片（最多 60 MB、前 3 分鐘），每 2 秒取一張畫面，用 `tesseract` 辨識（有裝的話支援英文與中文）；（3）還是太少才把音訊交給 `whisper`（也可用 whisper.cpp 的 `whisper-cli`，需設定 `DRIFTNET_WHISPER_MODEL`）。讀到的內容會加上 `[captions]`、`[on-screen text]`、`[speech]` 標籤附在文字後面（最多 6,000 字元），並和頁面文字一樣先過防護；卡片會標示「已從影片讀取」。沒裝的工具就跳過。用筆電電池時可設 `DRIFTNET_VIDEO=captions`，做完第 1 步就停（不下載影片、不跑文字辨識和語音模型）；`off` 則全部關閉。工具不經過 shell、在一定會刪除的私有暫存資料夾裡執行、環境變數中拿掉 driftnet 的機密、每個步驟都有時間上限、拒絕私有或本機位址的連結，而且一次只處理一支影片。
 
+另外兩個步驟**預設關閉**，要自己打開，因為它們會把東西送給你的模型。兩者都只在前面的步驟做完、內容仍然太少時才執行，而且都附在*同一次*摘要請求裡（不會一張畫面一次請求，也不會另外呼叫）：（4）`DRIFTNET_VIDEO=watch` 讓支援影片的模型直接看影片。摘要供應商是 `gemini` 或 `vertex` 時，YouTube 連結直接以連結送出（不下載），其他網站的 reel 則只有在下載的片段不超過 14 MB 時才內嵌送出（Gemini 的請求上限是含編碼共 20 MB）；其他供應商不能看影片，driftnet 會改走畫面。`DRIFTNET_VIDEO_FRAMES=vision` 在你的摘要模型看得懂圖片時，附上最多 8 張不重複的畫面（大約每 2 秒一張，相近與全黑的畫面會剔除，寬度最多 768 px，JPEG）：OpenAI 相容端點（包含 Ollama 的視覺模型）、Claude、Gemini、Vertex 都可以。畫面和影片只會送給你設定的那個模型。如果模型其實只吃文字，該項目會去掉畫面重試一次。（5）如果什麼都讀不到（沒有字幕、沒有畫面文字、沒有語音、也沒有可看的內容），driftnet 不會只憑標題亂猜：卡片維持待處理，在 agent 佇列裡帶一行提示 `video: needs a transcript`，讓有自己影片工具的 agent 補寫。
+
+| 目的 | 可以試的模型（影片／圖片與大小限制請看各模型的 model card） | 設定 |
+|---|---|---|
+| 看 YouTube 影片 | Gemini Flash（`gemini` 或 `vertex`） | `DRIFTNET_VIDEO=watch` |
+| 只用字幕或逐字稿 | 任何小型、便宜的模型 | 預設 |
+| 畫面，完全在本機 | Ollama 上的視覺模型，例如 Qwen-VL 或 Gemma 視覺版，透過 `DRIFTNET_LLM_PROVIDER=openai` 加 `DRIFTNET_LLM_BASE_URL=http://localhost:11434/v1` | `DRIFTNET_VIDEO_FRAMES=vision` |
+| 畫面，雲端 | Claude 或 Gemini | `DRIFTNET_VIDEO_FRAMES=vision` |
+
 <details>
 <summary><b>八個步驟的完整說明</b></summary>
 
@@ -624,7 +633,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_UPDATE_CHECK` | 關閉 | 設 `1` 才會每天向 `registry.npmjs.org` 查一次最新版本號，有新版就在網頁標題列顯示小提示「driftnet x.y.z 已發布」（`driftnet status` 也會顯示）。不會傳送任何與你有關的資料。預設關閉，設 `1` 才開啟 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
-| `DRIFTNET_VIDEO` | `auto` | `auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`；`captions` 只讀字幕和說明（省電）；`off` 完全不讀影片（見「Reels 與 Shorts」） |
+| `DRIFTNET_VIDEO` | `auto` | `auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`；`captions` 只讀字幕和說明（省電）；`watch` 在 `auto` 之後，仍太少時讓 Gemini／Vertex 直接看影片（會把影片或 YouTube 連結送給該模型）；`off` 完全不讀影片（見「Reels 與 Shorts」） |
+| `DRIFTNET_VIDEO_FRAMES` | `off` | `vision` 在內容仍太少時，把最多 8 張不重複的畫面附在同一次摘要請求裡（只送給你設定的模型，模型必須看得懂圖片，例如 Ollama 的視覺模型） |
 | `DRIFTNET_YTDLP`、`DRIFTNET_FFMPEG`、`DRIFTNET_TESSERACT`、`DRIFTNET_WHISPER` | 從 `PATH` 找 | 不在 `PATH` 的工具的完整路徑（`whisper` 也可指向 `whisper-cli`；whisper.cpp 還需要 `DRIFTNET_WHISPER_MODEL`，指向模型檔） |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 外掛（擷取器、供應商、判斷器；`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、管理 agent 金鑰、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |

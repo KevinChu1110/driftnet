@@ -9,6 +9,7 @@ type Effort = (typeof EFFORTS)[number];
 /** Claude via the official SDK, with structured outputs and a cacheable system prompt. */
 export class AnthropicProvider implements LlmProvider {
   readonly label: string;
+  readonly media = { images: true };
   private readonly client: Anthropic;
   private readonly effort: Effort;
 
@@ -28,7 +29,7 @@ export class AnthropicProvider implements LlmProvider {
       model: this.model,
       max_tokens: req.maxTokens,
       system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: req.user }],
+      messages: [{ role: "user", content: userContent(req) }],
       output_config: { effort: this.effort, format: zodOutputFormat(req.schema as any) },
     });
     // Structured output is only guaranteed for a normal finish.
@@ -36,4 +37,14 @@ export class AnthropicProvider implements LlmProvider {
     if (!response.parsed_output) throw new IncompleteOutput("output did not match the schema");
     return response.parsed_output as z.infer<T>;
   }
+}
+
+/** Plain text, or `image` blocks (before the text) when frames are attached. Other attachment kinds are ignored. */
+export function userContent(req: StructuredRequest<z.ZodType>): string | Anthropic.ContentBlockParam[] {
+  const images = (req.attachments ?? []).filter((a) => a.type === "image");
+  if (!images.length) return req.user;
+  return [
+    ...images.map((a) => ({ type: "image" as const, source: { type: "base64" as const, media_type: a.mime as "image/jpeg", data: (a as { data: string }).data } })),
+    { type: "text" as const, text: req.user },
+  ];
 }

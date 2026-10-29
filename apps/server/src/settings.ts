@@ -55,7 +55,7 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_HEALTH", group: "rules", choices: ["", "off", "weekly"] },
   { key: "DRIFTNET_REPLY_STYLE", group: "chat", choices: ["", "rich", "text"] },
   // Video understanding (captions, on-screen text, speech) with local tools; see README "Reels and shorts".
-  { key: "DRIFTNET_VIDEO", group: "rules", choices: ["", "auto", "captions", "off"] },
+  { key: "DRIFTNET_VIDEO", group: "rules", choices: ["", "auto", "captions", "watch", "off"] },
   { key: "DRIFTNET_YTDLP", group: "rules", max: 500 },
   { key: "DRIFTNET_FFMPEG", group: "rules", max: 500 },
   { key: "DRIFTNET_TESSERACT", group: "rules", max: 500 },
@@ -77,6 +77,8 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_EMBED_BASE_URL", group: "model" },
   { key: "DRIFTNET_EMBED_API_KEY", group: "model", secret: true },
   { key: "DRIFTNET_EMBED_FLOOR", group: "model", max: 5 },
+  // Video frames shown to the summary model (opt-in; the model must accept pictures). DRIFTNET_VIDEO=watch is above.
+  { key: "DRIFTNET_VIDEO_FRAMES", group: "rules", choices: ["", "off", "vision"] },
 ];
 
 /**
