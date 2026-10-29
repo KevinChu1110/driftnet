@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+  .head { position: absolute; left: 64px; top: 44px; }
+  .opt { position: absolute; left: 64px; top: 210px; width: 560px; height: 420px; overflow: hidden; } .opt img { width: 560px; display: block; }
+  .facts { position: absolute; left: 690px; top: 210px; width: 526px; color: #fff; font-size: 22px; }
+  .facts div { margin-bottom: 22px; padding-left: 40px; position: relative; } .facts div::before { content: "✓"; position: absolute; left: 0; color: #7fe3c8; font-weight: 700; }
+</style></head><body class="bg"><div class="shot">
+  <div class="head"><h1 id="t"></h1><div class="sub" id="s"></div></div>
+  <div class="card opt"><img id="opt"></div>
+  <div class="facts" id="facts"></div>
+</div><script>
+  const L = location.hash.slice(1) || "en";
+  const D = { en: ["Your server. Your data.", "driftnet runs on your computer; the extension just hands it the page.",
+      ["Sends only to the server address you set", "No account, no analytics, no tracking", "Reads a tab only when you click", "Optional token for a remote server (https)"]],
+    "zh-TW": ["你的伺服器，你的資料。", "driftnet 跑在你自己的電腦上，擴充只負責把頁面交給它。",
+      ["只送到你設定的伺服器位址", "不用註冊、沒有分析、沒有追蹤", "只在你按下時才讀取分頁", "遠端伺服器可加 token（需 https）"]] }[L];
+  t.textContent = D[0]; s.textContent = D[1];
+  facts.innerHTML = D[2].map((f) => `<div>${f}</div>`).join("");
+  opt.src = `img/options-${L}.png`;
+</script></body></html>

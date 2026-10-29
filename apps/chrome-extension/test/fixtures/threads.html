@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Threads</title><meta property="og:title" content="@devtools_daily on Threads"></head>
+<body><div role="banner">Home Search Activity</div>
+<div role="main">
+  <div data-pressable-container="true">
+    <a href="/@devtools_daily">devtools_daily</a>
+    <span dir="auto">Found a tiny local-first catalogue for links. Repo: <a href="https://l.threads.net/?u=https%3A%2F%2Fgithub.com%2Fkevinchu1110%2Fdriftnet%3Futm_source%3Dthreads&amp;e=x">github.com/kevinchu1110/driftnet</a></span>
+    <div data-pressable-container="true" id="quote">
+      <a href="/@quoted_author">quoted_author</a>
+      <span dir="auto">QUOTED: sqlite is all you need for a personal knowledge base</span>
+    </div>
+    <div role="button" id="viewreplies">View replies</div>
+  </div>
+  <div id="replies"></div>
+</div>
+<script>
+  viewreplies.onclick = () => {
+    viewreplies.remove();
+    replies.innerHTML = '<div data-pressable-container="true"><a href="/@reader_one">reader_one</a><span dir="auto">Docs are here: <a href="https://example.org/docs">example.org/docs</a></span></div>'
+      + '<div data-pressable-container="true"><a href="/@reader_two">reader_two</a><span dir="auto">Does it need a model? REPLY-TWO</span></div>';
+  };
+</script></body></html>

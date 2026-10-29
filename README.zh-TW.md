@@ -178,7 +178,7 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 | | 設定 | 筆電上能用？ | 關機期間的訊息 |
 |---|---|---|---|
-| **Chrome 擴充** | 載入 `apps/chrome-extension` | ✅ | — |
+| **Chrome 擴充** | 載入 `apps/chrome-extension`，或 `pnpm build:extension` 產生的 zip | ✅ | — |
 | Telegram | `TELEGRAM_BOT_TOKEN`；群組要先用 `/setprivacy` 關閉隱私模式 | ✅ | 啟動時補上（24 小時內） |
 | Discord | `DISCORD_BOT_TOKEN`；開啟 Message Content intent | ✅ | 逐頻道補讀，不回覆 |
 | Slack | `SLACK_APP_TOKEN`（Socket Mode）＋ `SLACK_BOT_TOKEN` | ✅ | 漏掉 |
@@ -295,8 +295,23 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 - **在連結上按右鍵**：送出那個連結，加上它所在那則貼文的文字。
 - **選取文字後按右鍵**：只送選取的內容。
 
-安裝：`chrome://extensions` → 開發人員模式 → **載入未封裝項目** → 選 `apps/chrome-extension`。預設連
-`http://localhost:8787`；用遠端伺服器的話，到擴充的設定填網址和 token。只有你按下時才讀取該分頁，內容只送到你自己的伺服器。
+**在 Threads、X、Instagram 讀什麼。** 只在你按下時、只讀畫面上有的，不會另外去抓；網站改版讀不懂時，
+會退回上面的通用讀法。
+
+| 網站 | 擷取內容 |
+|---|---|
+| **Threads** | 貼文與作者、引用／轉發的貼文、最多 20 則回覆（會按開「查看回覆」，最多 3 秒），以及其中去掉轉址的連結 |
+| **X / Twitter** | 把 `t.co` 短網址換成真正目標的推文（取自連結本身的 title，不會另外抓）、引用推文、卡片連結，以及作者自己串的討論串（作者後面的推文；別人的回覆不收） |
+| **Instagram**（`/p/`、`/reel/`） | 說明（展開「更多」）、作者、前 20 則留言和其中的連結。個人簡介連結和限時動態連結貼紙不在貼文頁上，所以略過；「連結在留言」找得到 |
+
+**安裝**
+
+- **Chrome 線上應用程式商店**：即將上架。
+- **用 zip**（[建置產物](https://github.com/KevinChu1110/driftnet/actions/workflows/extension.yml)，或 `pnpm build:extension` → `dist/driftnet-extension-<版本>.zip`）：解壓縮，開 `chrome://extensions` → 開發人員模式 → **載入未封裝項目** → 選解壓縮後的資料夾。
+- **用原始碼**：同上，選 `apps/chrome-extension`。
+
+預設連 `http://localhost:8787`；用遠端伺服器的話，到擴充的設定填網址和 token。只有你按下時才讀取該分頁，內容只送到你自己的伺服器。
+見[隱私權政策](apps/chrome-extension/store/PRIVACY.md)。
 
 ## 模型
 
@@ -570,7 +585,6 @@ pnpm demo -- --many --private --password demo-pass-123 --read-key demo-share-key
 
 - [ ] **影片。** 先用字幕和本機 OCR 讀畫面上的字，再用本機語音轉文字；很多 reels 只用講的報工具名稱。
 - [ ] **豐富回覆。** LINE Flex、Slack Block Kit、Discord embed、用表情符號投票。
-- [ ] **擴充打磨。** Threads／X／Instagram 專屬擷取、上架 Chrome 線上應用程式商店。
 - [ ] **更多轉接。** 原生 Gemini、Bedrock、Vertex，以及更多判斷器。
 
 ## 支持
