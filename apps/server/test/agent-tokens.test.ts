@@ -103,10 +103,10 @@ test("a read token's MCP session has only the reading tools; a write token's has
   const write = await connect({ readOnly: false });
   const names = async (c: Client) => (await c.listTools()).tools.map((t) => t.name);
   const readTools = await names(read);
-  assert.deepEqual(readTools.sort(), ["driftnet_get_item", "driftnet_list_folders", "driftnet_list_recent", "driftnet_search"]);
+  assert.deepEqual(readTools.sort(), ["driftnet_get_item", "driftnet_list_folders", "driftnet_search_items"]);
   assert.ok((await names(write)).length > readTools.length);
-  assert.ok((await names(write)).includes("driftnet_move_item"));
-  const denied = await read.callTool({ name: "driftnet_move_item", arguments: { id: 1, folder: "other" } }).catch(() => ({ isError: true }));
+  assert.ok((await names(write)).includes("driftnet_move_items"));
+  const denied = await read.callTool({ name: "driftnet_move_items", arguments: { ids: [1], folder: "other" } }).catch(() => ({ isError: true }));
   assert.equal(denied.isError, true, "a read session cannot call a write tool");
   await read.close();
   await write.close();
@@ -119,9 +119,9 @@ test("who leased or moved is recorded: the token's id, or admin", async () => {
   const row = () => (store as unknown as { db: { prepare(s: string): { get(...a: unknown[]): Record<string, string | null> } } }).db
     .prepare("SELECT claimed_actor, moved_by FROM items WHERE id = ?").get(item.id)!;
   const client = await connect({ actor: `agent:${w.id}` });
-  await client.callTool({ name: "driftnet_lease_pending", arguments: { limit: 10 } });
+  await client.callTool({ name: "driftnet_lease_items", arguments: { limit: 10 } });
   assert.equal(row().claimed_actor, `agent:${w.id}`);
-  await client.callTool({ name: "driftnet_move_item", arguments: { id: item.id, folder: "other" } });
+  await client.callTool({ name: "driftnet_move_items", arguments: { ids: [item.id], folder: "other" } });
   assert.equal(row().moved_by, `agent:${w.id}`);
   store.moveItem(item.id, "other", "admin");
   assert.equal(row().moved_by, "admin");
