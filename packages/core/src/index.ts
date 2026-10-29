@@ -40,6 +40,8 @@ export interface Driftnet {
   readonly categories: Record<string, string>;
   /** A folder's display name: the reader's name, or the built-in label in `locale`. */
   folderLabel(id: string, locale?: Locale): string;
+  /** Like folderLabel, but reads the folder list once: use it when labelling many items. */
+  folderLabeler(locale?: Locale): (id: string) => string;
   readonly engines: { judge: string; summarizer: string };
   /** The configured model, or undefined when none is (AI features then say so). */
   readonly llm: LlmProvider | undefined;
@@ -56,6 +58,10 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   store.seedFolders(loadCategories(env));
   const folderLabel = (id: string, locale: Locale = resolveLocale(env)): string =>
     store.folders().find((f) => f.id === id)?.name ?? categoryLabel(id, locale);
+  const folderLabeler = (locale: Locale = resolveLocale(env)) => {
+    const names = new Map(store.folders().map((f) => [f.id, f.name]));
+    return (id: string): string => names.get(id) ?? categoryLabel(id, locale);
+  };
   const choices = () => store.folderChoices((f) => f.name ?? categoryLabel(f.id, "en"));
 
   let built = buildEngines(env);
@@ -68,6 +74,10 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   pipeline.configure(built.engines);
   // Read per event, so ⚙ Settings can set the webhook without a restart. Fire and forget.
   pipeline.onItem = (item, event) => { if (env.DRIFTNET_WEBHOOK_URL) void sendWebhook(store, item, event, env); };
+  store.onTrash = (id, trashed) => {
+    const item = store.get(id);
+    if (item && env.DRIFTNET_WEBHOOK_URL) void sendWebhook(store, item, trashed ? "item.trashed" : "item.restored", env);
+  };
   return {
     pipeline,
     store,
@@ -75,6 +85,7 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
       return choices();
     },
     folderLabel,
+    folderLabeler,
     get engines() {
       return built.labels;
     },

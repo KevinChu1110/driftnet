@@ -15,9 +15,10 @@ export interface ExportData {
 
 export function collect(dn: Driftnet, locale: Locale): ExportData {
   const folders = new Map(dn.store.folders().map((f) => [f.id, f]));
+  const labelOf = dn.folderLabeler(locale);
   const path = (id: string): string[] => {
     const f = folders.get(id);
-    const label = dn.folderLabel(id, locale);
+    const label = labelOf(id);
     return f?.parent ? [...path(f.parent), label] : [label];
   };
   const items = dn.store.exportable();
@@ -63,7 +64,8 @@ export function toMarkdown(d: ExportData, title = "driftnet"): string {
 }
 
 /** File names that work on macOS, Windows and Linux. */
-const safe = (s: string) => s.replace(/[\\/:*?"<>|#^[\]\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "untitled";
+// Leading dots go too: ".." must never become a path segment (zip-slip), and dot-files hide in a vault.
+const safe = (s: string) => s.replace(/[\\/:*?"<>|#^[\]\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().replace(/^[.\s]+/, "").slice(0, 80).trim() || "untitled";
 
 function yaml(fields: Record<string, string | number | boolean | string[] | undefined>): string {
   const q = (v: string) => JSON.stringify(v); // a JSON string is a valid YAML scalar

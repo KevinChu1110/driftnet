@@ -53,7 +53,10 @@ test("delivers with a signature; allowed local host only with ALLOW_LOCAL", asyn
     assert.equal(await sendWebhook(store, item, "item.added", { ...env, DRIFTNET_WEBHOOK_ALLOW_LOCAL: "1" }), true);
     assert.equal(rx.calls.length, 1);
     const [call] = rx.calls;
-    assert.equal(call!.headers["x-driftnet-signature"], signBody(call!.body, "s3cret"));
+    const ts = call!.headers["x-driftnet-timestamp"] as string;
+    assert.match(ts, /^\d{10}$/);
+    assert.ok(call!.headers["x-driftnet-delivery"]);
+    assert.equal(call!.headers["x-driftnet-signature"], signBody(call!.body, "s3cret", ts));
     assert.equal(JSON.parse(call!.body).item.name, "Alpha");
     rx.calls.length = 0;
     await sendWebhook(store, item, "item.updated", { DRIFTNET_WEBHOOK_URL: rx.url, DRIFTNET_WEBHOOK_ALLOW_LOCAL: "1" });
@@ -92,4 +95,48 @@ test("a failing receiver is retried once and never throws; non-http is refused",
   assert.equal(await sendWebhook(store, item, "item.added", { DRIFTNET_WEBHOOK_URL: "http://127.0.0.1:1/x", DRIFTNET_WEBHOOK_ALLOW_LOCAL: "1" }), false);
   assert.equal(await sendWebhook(store, item, "item.added", { DRIFTNET_WEBHOOK_URL: "ftp://example.com/x" }), false);
   assert.equal(await sendWebhook(store, item, "item.added", {}), false);
+});
+
+test("a redirect is a failure, never followed", async () => {
+  const { store, item } = seed();
+  const target = await receiver();
+  const redirector = createServer((_req, res) => res.writeHead(302, { location: target.url }).end());
+  await new Promise<void>((r) => redirector.listen(0, "127.0.0.1", r));
+  try {
+    const { port } = redirector.address() as { port: number };
+    const env = { DRIFTNET_WEBHOOK_URL: `http://127.0.0.1:${port}/x`, DRIFTNET_WEBHOOK_ALLOW_LOCAL: "1" };
+    assert.equal(await sendWebhook(store, item, "item.added", env), false);
+    assert.equal(target.calls.length, 0);
+  } finally {
+    redirector.close();
+    target.close();
+  }
+});
+
+test("the retry keeps the delivery id, waits and re-signs", async () => {
+  const { store, item } = seed();
+  const rx = await receiver();
+  try {
+    rx.setStatus(500);
+    const t0 = Date.now();
+    await sendWebhook(store, item, "item.added", { DRIFTNET_WEBHOOK_URL: rx.url, DRIFTNET_WEBHOOK_ALLOW_LOCAL: "1", DRIFTNET_WEBHOOK_SECRET: "k" });
+    assert.ok(Date.now() - t0 >= 900, "about a second between attempts");
+    assert.equal(rx.calls[0]!.headers["x-driftnet-delivery"], rx.calls[1]!.headers["x-driftnet-delivery"]);
+  } finally {
+    rx.close();
+  }
+});
+
+test("trash and restore events are sent for a trashed item", async () => {
+  const { store, item } = seed();
+  const rx = await receiver();
+  try {
+    const env = { DRIFTNET_WEBHOOK_URL: rx.url, DRIFTNET_WEBHOOK_ALLOW_LOCAL: "1" };
+    store.setTrashed(item.id, true);
+    assert.equal(await sendWebhook(store, store.get(item.id)!, "item.trashed", env), true);
+    assert.equal(await sendWebhook(store, store.get(item.id)!, "item.updated", env), false, "other events stay quiet while trashed");
+    assert.equal(JSON.parse(rx.calls[0]!.body).event, "item.trashed");
+  } finally {
+    rx.close();
+  }
 });

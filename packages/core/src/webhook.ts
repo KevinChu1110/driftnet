@@ -1,11 +1,11 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { BlockedUrl, safeFetch } from "./extractors/net.ts";
 import { categoryLabel, resolveLocale } from "./i18n.ts";
 import { cardLink } from "./render.ts";
 import type { Store } from "./store.ts";
 import type { Item } from "./types.ts";
 
-export type WebhookEvent = "item.added" | "item.updated";
+export type WebhookEvent = "item.added" | "item.updated" | "item.trashed" | "item.restored";
 
 /** What leaves the machine: the card as a reader would describe it, nothing internal. */
 export function webhookPayload(store: Store, item: Item, event: WebhookEvent, env: NodeJS.ProcessEnv = process.env) {
@@ -34,31 +34,47 @@ export function webhookPayload(store: Store, item: Item, event: WebhookEvent, en
   };
 }
 
-/** Skipped, trashed and injection-flagged items never leave. */
-export function shouldNotify(item: Item): boolean {
-  return !item.trashedAt && item.worth !== "skip" && !item.flags.includes("injection");
+/** Skipped, trashed and injection-flagged items never leave (an item.trashed event is the one way to learn a card went to the trash). */
+export function shouldNotify(item: Item, event?: WebhookEvent): boolean {
+  return (event === "item.trashed" || !item.trashedAt) && item.worth !== "skip" && !item.flags.includes("injection");
 }
 
-export const signBody = (body: string, secret: string) => `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+/**
+ * Signature format: `sha256=` + hex HMAC-SHA256, keyed with DRIFTNET_WEBHOOK_SECRET, of `${timestamp}.${body}`,
+ * where `timestamp` is the x-driftnet-timestamp header (unix seconds) and `body` the raw request body.
+ * Receivers should recompute it and reject timestamps that are too old.
+ */
+export const signBody = (body: string, secret: string, timestamp: string | number) =>
+  `sha256=${createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")}`;
+
+const RETRY_DELAY_MS = 1000;
 
 /**
- * POST the event to DRIFTNET_WEBHOOK_URL: 5 s timeout, one retry, never throws
+ * POST the event to DRIFTNET_WEBHOOK_URL: 5 s timeout, one retry after 1 s, no redirects, never throws
  * (resolves to whether it was delivered). Private addresses are refused unless
  * DRIFTNET_WEBHOOK_ALLOW_LOCAL=1, and then only for the host the user typed.
  */
 export async function sendWebhook(store: Store, item: Item, event: WebhookEvent, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
   const target = env.DRIFTNET_WEBHOOK_URL?.trim();
-  if (!target || !shouldNotify(item)) return false;
+  if (!target || !shouldNotify(item, event)) return false;
   try {
     const url = new URL(target);
     if (url.protocol !== "http:" && url.protocol !== "https:") throw new BlockedUrl("webhook must be http(s)");
     const body = JSON.stringify(webhookPayload(store, item, event, env));
     const secret = env.DRIFTNET_WEBHOOK_SECRET;
-    const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "driftnet", ...(secret ? { "x-driftnet-signature": signBody(body, secret) } : {}) };
+    const delivery = randomUUID();
     const allow = env.DRIFTNET_WEBHOOK_ALLOW_LOCAL === "1" ? url.hostname : undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      // Fresh timestamp (and signature) per attempt; the delivery id stays, so receivers can de-duplicate.
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const headers: Record<string, string> = {
+        "content-type": "application/json", "user-agent": "driftnet",
+        "x-driftnet-timestamp": timestamp, "x-driftnet-delivery": delivery,
+        ...(secret ? { "x-driftnet-signature": signBody(body, secret, timestamp) } : {}),
+      };
       try {
-        const res = await safeFetch(target, { method: "POST", headers, body, signal: AbortSignal.timeout(5000) }, allow);
+        const res = await safeFetch(target, { method: "POST", headers, body, redirect: "manual", signal: AbortSignal.timeout(5000) }, allow);
         await res.body?.cancel();
         if (res.ok) return true;
         if (res.status < 500) break;

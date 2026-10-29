@@ -176,16 +176,20 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS items_category ON items(category);
       CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
+      CREATE INDEX IF NOT EXISTS aliases_item ON aliases(item_id);
       CREATE INDEX IF NOT EXISTS items_source ON items(source);
     `);
     // Columns added after the first release.
     const cols = new Set((this.db.prepare("PRAGMA table_info(items)").all() as { name: string }[]).map((c) => c.name));
     // Links recorded before found_in existed live in share notes; recover them once.
-    this.db.exec(`
-      INSERT OR IGNORE INTO found_in (parent_id, child_id)
-      SELECT p.id, s.item_id FROM shares s
-      JOIN items p ON p.url = substr(s.note, CASE WHEN s.note LIKE 'Mentioned in %' THEN 14 ELSE 13 END)
-      WHERE (s.note LIKE 'Mentioned in %' OR s.note LIKE 'Linked from %') AND p.id <> s.item_id`);
+    if (this.getState("found_in_recovered") !== "1") {
+      this.db.exec(`
+        INSERT OR IGNORE INTO found_in (parent_id, child_id)
+        SELECT p.id, s.item_id FROM shares s
+        JOIN items p ON p.url = substr(s.note, CASE WHEN s.note LIKE 'Mentioned in %' THEN 14 ELSE 13 END)
+        WHERE (s.note LIKE 'Mentioned in %' OR s.note LIKE 'Linked from %') AND p.id <> s.item_id`);
+      this.setState("found_in_recovered", "1");
+    }
     for (const [name, type] of [
       ["claimed_at", "TEXT"], ["claimed_by", "TEXT"], ["enriched_by", "TEXT"],
       ["trashed_at", "TEXT"], ["favorite", "INTEGER NOT NULL DEFAULT 0"],
@@ -213,9 +217,8 @@ export class Store {
 
   /** Looks up by canonical URL or any URL that previously resolved to the same item. */
   findByUrl(url: string): Item | null {
-    const row = this.db
-      .prepare("SELECT i.* FROM items i LEFT JOIN aliases a ON a.item_id = i.id WHERE i.url = ? OR a.url = ? LIMIT 1")
-      .get(url, url) as ItemRow | undefined;
+    const row = (this.db.prepare("SELECT * FROM items WHERE url = ?").get(url)
+      ?? this.db.prepare("SELECT i.* FROM aliases a JOIN items i ON i.id = a.item_id WHERE a.url = ?").get(url)) as ItemRow | undefined;
     return row ? toItem(row) : null;
   }
 
@@ -259,17 +262,25 @@ export class Store {
     title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[];
   }): Item | null {
     const j = input.judgement;
+    // No new summary (no model, it failed, source distrusted): the old summary and what came with it stay; only metadata moves.
+    const keep = !input.summary && this.get(id)?.summary ? 1 : 0;
     const row = this.db
       .prepare(
-        `UPDATE items SET title = ?, kind = ?, category = CASE WHEN user_placed = 1 THEN category ELSE ? END,
-           worth = ?, is_ai_tool = ?, summary = ?, judge_engine = ?, flags = ?, source = ?, suggestions = ?, media = COALESCE(?, media),
-           enriched_by = NULL, claimed_at = NULL, claimed_by = NULL, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
+        `UPDATE items SET title = CASE WHEN ? THEN title ELSE ? END, kind = ?,
+           category = CASE WHEN user_placed = 1 OR ? THEN category ELSE ? END,
+           worth = CASE WHEN ? THEN worth ELSE ? END, is_ai_tool = CASE WHEN ? THEN is_ai_tool ELSE ? END,
+           summary = COALESCE(?, summary), judge_engine = CASE WHEN ? THEN judge_engine ELSE ? END,
+           flags = ?, source = ?, suggestions = CASE WHEN ? THEN suggestions ELSE ? END, media = COALESCE(?, media),
+           enriched_by = CASE WHEN ? THEN enriched_by ELSE NULL END,
+           claimed_at = CASE WHEN ? THEN claimed_at ELSE NULL END, claimed_by = CASE WHEN ? THEN claimed_by ELSE NULL END,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
          WHERE id = ? RETURNING *`,
       )
       .get(
-        input.title, j.kind, j.category, j.worth, j.isAiTool, input.summary ? JSON.stringify(input.summary) : null,
-        j.engine, input.flags.join(","), input.source, input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
-        input.media?.length ? JSON.stringify(input.media) : null, id,
+        keep, input.title, j.kind, keep, j.category, keep, j.worth, keep, j.isAiTool,
+        input.summary ? JSON.stringify(input.summary) : null, keep, j.engine,
+        input.flags.join(","), input.source, keep, input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
+        input.media?.length ? JSON.stringify(input.media) : null, keep, keep, keep, id,
       ) as unknown as ItemRow | undefined;
     return row ? toItem(row) : null;
   }
@@ -310,16 +321,11 @@ export class Store {
    * untouched tree); this only does it, in one transaction.
    */
   replaceFolders(seed: Record<string, string>): void {
-    this.db.exec("BEGIN");
-    try {
+    this.transaction(() => {
       this.db.exec("DELETE FROM folders");
       this.seedFolders(seed);
-      this.db.exec("COMMIT");
-    } catch (err) {
-      this.db.exec("ROLLBACK");
-      throw err;
-    }
-    this.setState("folder_uses", "{}");
+      this.setState("folder_uses", "{}");
+    });
   }
 
   folders(): Folder[] {
@@ -368,7 +374,7 @@ export class Store {
 
   createFolder(input: { name: string; description?: string; parent?: string | null }): Folder {
     const name = input.name.trim().slice(0, 60);
-    if (!name) throw new FolderError("a folder needs a name");
+    if (!name || /^\.+$/.test(name)) throw new FolderError("a folder needs a name");
     const parent = input.parent || null;
     if (parent && !this.folderExists(parent)) throw new FolderError(`no folder ${parent}`);
     // Two folders with the same name side by side can't be told apart (in the tree, or by the classifier).
@@ -392,7 +398,7 @@ export class Store {
       if (!this.folderExists(patch.parent)) throw new FolderError(`no folder ${patch.parent}`);
       if (this.descendants(id).includes(patch.parent)) throw new FolderError("a folder can't go inside itself");
     }
-    if (patch.name !== undefined && !patch.name.trim()) throw new FolderError("a folder needs a name");
+    if (patch.name !== undefined && (!patch.name.trim() || /^\.+$/.test(patch.name.trim()))) throw new FolderError("a folder needs a name");
     this.db
       .prepare(
         `UPDATE folders SET
@@ -412,17 +418,12 @@ export class Store {
     if (id === "other") throw new FolderError("“other” catches everything unsorted and can't be deleted");
     const row = this.db.prepare("SELECT parent_id AS parent FROM folders WHERE id = ?").get(id) as { parent: string | null } | undefined;
     if (!row) throw new FolderError(`no folder ${id}`);
-    this.db.exec("BEGIN");
-    try {
+    this.transaction(() => {
       this.db.prepare("UPDATE items SET category = ? WHERE category = ?").run(row.parent ?? "other", id);
       this.db.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ?").run(row.parent, id);
       this.db.prepare("DELETE FROM folders WHERE id = ?").run(id);
-      this.db.exec("COMMIT");
       if (this.folderUses()[id]) this.bumpFolderUse(id, -Infinity);
-    } catch (err) {
-      this.db.exec("ROLLBACK");
-      throw err;
-    }
+    });
   }
 
   /** The reader put this item here; classification won't touch it again. */
@@ -655,12 +656,20 @@ export class Store {
 
   /** Soft delete: hidden everywhere, restorable from the trash. Returns false if there is no such item. */
   setTrashed(id: number, trashed: boolean): boolean {
-    return (
-      this.db
-        .prepare("UPDATE items SET trashed_at = CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ','now') ELSE NULL END WHERE id = ?")
-        .run(trashed ? 1 : 0, id).changes > 0
-    );
+    const changed = this.db
+      .prepare("UPDATE items SET trashed_at = CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ','now') ELSE NULL END WHERE id = ? AND (trashed_at IS NOT NULL) <> ?")
+      .run(trashed ? 1 : 0, id, trashed ? 1 : 0).changes > 0;
+    if (changed) {
+      // Announced after the (possibly enclosing) transaction has settled; a rolled-back change is not announced.
+      setImmediate(() => {
+        try { if (!!this.get(id)?.trashedAt === trashed) this.onTrash?.(id, trashed); } catch { /* a hook must not break the store */ }
+      });
+    }
+    return changed || this.db.prepare("SELECT 1 FROM items WHERE id = ?").get(id) !== undefined;
   }
+
+  /** Called (never awaited) after an item went to the trash or came back. */
+  onTrash?: (id: number, trashed: boolean) => void;
 
   setFavorite(id: number, favorite: boolean): boolean {
     return this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(favorite ? 1 : 0, id).changes > 0;
@@ -859,12 +868,20 @@ export class Store {
     if (query.clean !== false) {
       where.push("flags NOT LIKE '%injection%'", `${Store.NET_VOTES} > -2`);
     }
-    if (query.q) {
-      // The reader's note and what people said in chat are searchable too.
-      where.push(`(title LIKE ? OR summary LIKE ? OR url LIKE ? OR note LIKE ?
-                   OR EXISTS (SELECT 1 FROM shares s WHERE s.item_id = items.id AND s.note LIKE ?))`);
-      const like = `%${query.q}%`;
-      args.push(like, like, like, like, like);
+    const terms = (query.q ?? "").slice(0, 200).split(/\s+/).filter(Boolean).slice(0, 8);
+    for (const term of terms) {
+      // The reader's note and what people said in chat are searchable too. Summary fields are read
+      // one by one: matching the raw JSON would make "tags" or "name" hit every item.
+      const f = (path: string) => `json_extract(summary, '$.${path}')`;
+      const like = (col: string) => `${col} LIKE ? ESCAPE '\\'`;
+      where.push(`(${[
+        like("title"), like("url"), like("note"),
+        `EXISTS (SELECT 1 FROM shares s WHERE s.item_id = items.id AND ${like("s.note")})`,
+        ...["name", "oneLiner", "demo", "why"].map((k) => like(f(k))),
+        ...["highlights", "tags", "useCases"].map((k) => `EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(summary) THEN summary ELSE '{}' END, '$.${k}') e WHERE ${like("e.value")})`),
+      ].join(" OR ")})`);
+      const pat = `%${term.replace(/[\\%_]/g, "\\$&")}%`;
+      args.push(...Array<string>(11).fill(pat));
     }
     // The trash lists what was removed last first; elsewhere the best comes first.
     const order = query.view === "trash" ? "trashed_at DESC"
