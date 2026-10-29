@@ -43,6 +43,7 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_TOKEN", group: "access", secret: true, min: 8, max: 200 },
   { key: "DRIFTNET_READ_KEY", group: "access", min: 16, max: 200 },
   { key: "DRIFTNET_ACCESS", group: "access", choices: ["", "public", "private"] },
+  { key: "DRIFTNET_HEALTH", group: "rules", choices: ["", "off", "weekly"] },
 ];
 
 export class SettingsError extends Error {}

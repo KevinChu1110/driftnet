@@ -4,7 +4,7 @@ import { safeFetch } from "./extractors/net.ts";
 import { normalizeMedia } from "./media.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
-import type { Store } from "./store.ts";
+import type { RepoFacts, Store } from "./store.ts";
 import { enrichSchema, normalizeSummary, type Summarizer } from "./summarize.ts";
 import type { Digest, IngestResult, Item, Judgement, PageContent, ShareContext, Suggestion, Summary } from "./types.ts";
 import { keywordSuggestions } from "./suggest.ts";
@@ -164,7 +164,7 @@ export class Pipeline {
     const item = store.upsert({
       url: digest.url, aliases: [url], title: summary?.name ?? digest.title, judgement: a.judgement, summary,
       flags: a.flags, source: a.source, suggestions: a.suggestions,
-      media: normalizeMedia(digest.media),
+      media: normalizeMedia(digest.media), repo: repoFacts(digest),
     });
     store.recordShare(item.id, ctx);
     // Stored without a model counts too (an agent's later summary is announced as item.updated by enrich()).
@@ -257,7 +257,7 @@ export class Pipeline {
       const item = store.refreshItem(id, {
         title: a.summary?.name ?? a.digest.title, judgement: a.judgement, summary: a.summary,
         flags: a.flags, source: a.source, suggestions: a.suggestions,
-        media: normalizeMedia(a.digest.media),
+        media: normalizeMedia(a.digest.media), repo: repoFacts(a.digest),
       });
       // The cooldown starts once a refresh worked: a failed one (page down, model error) can be retried at once.
       this.lastRefresh.set(id, Date.now());
@@ -445,4 +445,16 @@ function heuristicJudgement(digest: Digest, blocked: boolean): Judgement {
     engine: "heuristic",
     confidence: 0,
   };
+}
+
+/** Stars, last push and archived state a repo extractor put in meta; undefined for anything else. */
+function repoFacts(digest: Digest): RepoFacts | undefined {
+  if (digest.kind !== "repo") return undefined;
+  const { stars, pushedAt, archived } = digest.meta;
+  const facts: RepoFacts = {
+    ...(typeof stars === "number" ? { stars } : {}),
+    ...(typeof pushedAt === "string" && pushedAt ? { pushedAt } : {}),
+    ...(archived === "yes" ? { archived: true } : {}),
+  };
+  return Object.keys(facts).length ? facts : undefined;
 }

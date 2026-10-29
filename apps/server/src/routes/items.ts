@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
 import { agentBrief } from "../brief.ts";
 import { actorOf, token } from "../access.ts";
@@ -20,6 +20,7 @@ export const routes: Route[] = [
     handler: ({ url, send, app: { dn } }) => {
       const p = url.searchParams;
       const minWorth = p.get("minWorth");
+      const healthFilter = (p.get("health") ?? "").split(",").filter((h): h is Health => (HEALTH as readonly string[]).includes(h));
       const counted: { total?: number } = {};
       const list = dn.store.list({
         ...(p.get("q") ? { q: p.get("q")! } : {}),
@@ -28,6 +29,7 @@ export const routes: Route[] = [
         ...(minWorth && (WORTH as readonly string[]).includes(minWorth) ? { minWorth: minWorth as Worth } : {}),
         ...(p.get("since") ? { since: p.get("since")! } : {}),
         ...(p.get("view") === "favorites" || p.get("view") === "trash" || p.get("view") === "inbox" ? { view: p.get("view") as "favorites" | "trash" | "inbox" } : {}),
+        ...(healthFilter.length ? { health: healthFilter } : {}),
         ...(["best", "newest", "shared"].includes(p.get("sort") ?? "") ? { sort: p.get("sort") as "best" | "newest" | "shared" } : {}),
         clean: p.get("all") !== "1",
         limit: Number(p.get("limit") ?? 200),
@@ -116,6 +118,16 @@ export const routes: Route[] = [
         console.warn(`[driftnet] media refresh ${id} failed:`, (err as Error).message);
         return send(502, { error: (err as Error).message });
       }
+    },
+  },
+  // Check one card's link now (dead / archived / stale / moved / ok); the weekly job does the same in batches.
+  {
+    method: "POST", pattern: /^\/api\/items\/(\d+)\/health$/, example: "/api/items/1/health", access: "write",
+    handler: async ({ m, send, app: { dn } }) => {
+      const item = dn.store.get(Number(m[1]));
+      if (!item) return send(404, { error: "not found" });
+      const checked = await healthFor(dn.store).check(item);
+      return checked ? send(200, publicItem(checked)) : send(404, { error: "not found" });
     },
   },
   {

@@ -173,6 +173,10 @@ without running one: on real links, a Chinese article went from 831 to 404 token
 
 </details>
 
+## Link health
+
+Links rot and repos get archived. Set `DRIFTNET_HEALTH=weekly` (recommended; it is off by default because it makes network requests) and driftnet re-checks each card about once a week, a few at a time. GitHub repos go through the API (stars, archived, last push; set `GITHUB_TOKEN` for a higher limit, and it pauses on a rate limit); other links get a quiet `HEAD` through the same private-address guard. A card is marked `dead` (404 / gone, or a name that no longer resolves), `archived`, `stale` (no push for 18 months) or `moved` (repo renamed); server errors and timeouts change nothing and are retried. Marked cards show a badge, appear under **Needs review** on the page and in `driftnet_search_items` with `view=needs_review`, and the card's check button (or `POST /api/items/:id/health`) tests one link right now.
+
 ## Ways in
 
 | | Set up | On a laptop? | Sent while it was off |
@@ -471,6 +475,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `GITHUB_TOKEN` | — | GitHub API limit from 60 to 5,000 requests per hour |
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
 | `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
+| `DRIFTNET_HEALTH` | `off` | `weekly` re-checks links about once a week and marks dead, archived and stale cards (see Link health). Off by default: it makes network requests |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of extractor plugins (`.js` / `.mjs`), see [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | Admin password: writes, settings, agent tokens, MCP with every tool, the agent queue. Settable on the page |
 | `DRIFTNET_READ_KEY` | — | Read-only share key (header or `?key=`): reading and the read-only MCP tools |
@@ -496,7 +501,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
-`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
 

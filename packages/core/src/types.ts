@@ -1,6 +1,10 @@
 /** What kind of thing a link points to, after following it. */
 export type Kind = "repo" | "product" | "video" | "article" | "post" | "other";
 
+/** What the periodic link check found; null/absent = never checked. */
+export const HEALTH = ["ok", "dead", "archived", "stale", "moved"] as const;
+export type Health = (typeof HEALTH)[number];
+
 /** How much the item is worth a human's attention. Ordered low → high. */
 export const WORTH = ["skip", "low", "normal", "must-see"] as const;
 export type Worth = (typeof WORTH)[number];
@@ -94,6 +98,13 @@ export interface Item {
   placed?: boolean;
   /** Up to 6 pictures, best first (original URLs; see publicMedia for what the API exposes). */
   media?: MediaRef[];
+  /** Link health from the last check (null: not checked yet). */
+  health?: Health | null;
+  healthCheckedAt?: string | null;
+  /** GitHub stars, for repos (null: unknown). */
+  stars?: number | null;
+  /** When the repo last saw a push (ISO date or timestamp). */
+  pushedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

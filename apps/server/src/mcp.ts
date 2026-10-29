@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BlockedUrl, canonicalize, cardLink, FolderError, ItemError, suggestionsFor, WORTH, type Driftnet, type Item } from "@driftnet/core";
+import { BlockedUrl, canonicalize, cardLink, FolderError, ItemError, suggestionsFor, WORTH, type Driftnet, type Health, type Item } from "@driftnet/core";
 import { shareBase } from "./access.ts";
 import { saveUndo, undoById } from "./bulk.ts";
 import { planForAgent } from "./plan.ts";
@@ -49,11 +49,11 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "Call it before choosing a tool for a task, since someone may already have vetted one; once you have an id and need the whole card, use driftnet_get_item instead. " +
         "query is matched word by word (every word must appear) against names, summaries, tags, URLs, the reader's notes and the chat text a link was shared with, so 'pdf markdown' finds 'Convert PDF to Markdown'; omit it to browse. " +
         "days switches the order to newest first, which is how to ask what's new. view=trash is how to find an id to restore with driftnet_update_item; view=inbox adds each item's suggested folders. folder also covers its sub-folders. " +
-        "Results come best first (must-see, then newest) and never include down-voted or prompt-injection-flagged items. There is no paging: when limit cuts results off, narrow with query, folder, kind or days.",
+        "Dead, archived or stale links are marked in health. Results come best first (must-see, then newest) and never include down-voted or prompt-injection-flagged items. There is no paging: when limit cuts results off, narrow with query, folder, kind or days.",
       inputSchema: {
         query: z.string().max(200).optional().describe("Free text, 1–200 chars, e.g. 'pdf to markdown' or a tool name; omit to list without filtering"),
         days: z.number().int().min(1).max(90).optional().describe("Only items added in the last N days, 1–90, newest first; omit for any time"),
-        view: z.enum(["all", "inbox", "favorites", "trash"]).optional().describe("all (default), inbox, favorites or trash"),
+        view: z.enum(["all", "inbox", "favorites", "trash", "needs_review"]).optional().describe("all (default), inbox, favorites, trash, or needs_review (dead, archived or stale links)"),
         folder: folderId("Folder id from driftnet_list_folders, e.g. 'coding'; includes its sub-folders. Omit for every folder").optional(),
         kind: z.enum(["repo", "product", "video", "article", "post", "other"]).optional().describe("Only this kind of link, e.g. 'repo'; omit for all kinds"),
         min_worth: z.enum(WORTH).optional().describe("Rating floor, skip < low < normal < must-see; default 'normal'"),
@@ -65,7 +65,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     async ({ query, days, view, folder, kind, min_worth, limit }) => {
       if (folder && !dn.categories[folder]) return unknownFolder(folder);
       return itemsResult(dn, dn.store.list({
-        ...(view && view !== "all" ? { view } : {}),
+        ...(view === "needs_review" ? { health: ["dead", "archived", "stale"] as Health[] } : view && view !== "all" ? { view } : {}),
         ...(days ? { since: new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 19) + "Z", sort: "newest" as const } : {}),
         ...(query ? { q: query } : {}),
         ...(folder ? { category: folder } : {}),
@@ -466,6 +466,8 @@ const ITEM = z.object({
   added: z.string(),
   page_url: z.string().nullable(),
   in_inbox: z.boolean(),
+  health: z.string().nullable(),
+  stars: z.number().nullable(),
   suggested_folders: z.array(z.object({ folder: z.string(), score: z.number() })),
 });
 const ITEMS_OUTPUT = { notice: z.string(), items: z.array(ITEM) };
@@ -487,6 +489,8 @@ function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
     added: i.createdAt.slice(0, 10),
     page_url: pageUrl(i.id),
     in_inbox: !i.placed,
+    health: i.health ?? null,
+    stars: i.stars ?? null,
     suggested_folders: suggestionsFor(i, choices),
   };
 }
