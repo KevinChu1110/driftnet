@@ -15,10 +15,11 @@ import { handleSlack, startSlackSocket } from "./adapters/slack.ts";
 import { startTelegram } from "./adapters/telegram.ts";
 import { startDiscord } from "./adapters/discord.ts";
 import { createMcpServer } from "./mcp.ts";
+import { agentBrief } from "./brief.ts";
 import { collect, toMarkdown, toVault, zip } from "./export.ts";
 import { Settings, SettingsError } from "./settings.ts";
 import { loadMedia, MediaError } from "./media.ts";
-import { actorOf, canRead, foreignOrigin, isAdmin, isLocal, isPassword, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
+import { actorOf, canRead, clientIp, foreignOrigin, hostAllowed, isAdmin, isLocal, isPassword, isPrivate, isTrustedLocal, newKey, readKey, role, strength, token, Tunnel } from "./access.ts";
 import { atomFeed, llmsTxt, openApi } from "./feeds.ts";
 
 const env = process.env;
@@ -46,6 +47,12 @@ const HOST = env.DRIFTNET_HOST ?? "127.0.0.1";
 if (isPrivate(env) && !token(env)) {
   console.error("DRIFTNET_ACCESS=private needs DRIFTNET_TOKEN to be set");
   process.exit(1);
+}
+if (!/^(127\.0\.0\.1|localhost|::1|\[::1\])$/.test(HOST) && !token(env)) {
+  console.warn(
+    `⚠️  DRIFTNET_HOST=${HOST} is reachable from other machines and no admin password is set: anyone who can reach port ${PORT} can read and change your catalogue.\n` +
+      `   Set DRIFTNET_TOKEN=<a long password> in ${driftnetHome(env)}/.env (or in the environment), or keep DRIFTNET_HOST on 127.0.0.1.`,
+  );
 }
 const indexHtml = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
 /** Icons are public even in private mode: the browser asks for them before any token. */
@@ -130,7 +137,6 @@ async function readBody(req: IncomingMessage, limit = 1_000_000): Promise<string
  * the same address waits 15 minutes.
  */
 const misses = new Map<string, { n: number; since: number }>();
-const clientIp = (req: IncomingMessage) => ((req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() || req.socket.remoteAddress || "?");
 const triedCredentials = (req: IncomingMessage) => !!req.headers.authorization || /[?&]key=/.test(req.url ?? "");
 function throttled(req: IncomingMessage): boolean {
   const m = misses.get(clientIp(req));
@@ -144,6 +150,12 @@ function miss(req: IncomingMessage) {
   const m = misses.get(ip) ?? { n: 0, since: Date.now() };
   m.n++;
   misses.set(ip, m);
+  if (misses.size > 1000) {
+    const now = Date.now();
+    for (const [k, v] of misses) if (now - v.since > 15 * 60_000) misses.delete(k);
+    // Still too many live addresses: drop the oldest, so a flood can't grow memory without bound.
+    for (const k of misses.keys()) { if (misses.size <= 10_000) break; misses.delete(k); }
+  }
 }
 
 /** An ingest result as served: pictures become proxy paths, also for the repos found inside. */
@@ -151,11 +163,18 @@ function pubResult(r: IngestResult): unknown {
   return { ...r, item: publicItem(r.item), ...(r.related ? { related: r.related.map(pubResult) } : {}) };
 }
 
-function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8") {
+const PAGE_HEADERS = {
+  "content-security-policy": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
+};
+
+function send(res: ServerResponse, status: number, body: unknown, type = "application/json; charset=utf-8", headers: Record<string, string> = {}) {
   const req = res.req;
   if ((status === 401 || status === 403) && req && triedCredentials(req)) miss(req);
   // No CORS headers: the page is same-origin, and agents, the extension and chat platforms aren't browsers' pages.
-  res.writeHead(status, { "content-type": type });
+  res.writeHead(status, { "content-type": type, ...headers });
   res.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 
@@ -163,8 +182,9 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
   try {
+    if (!hostAllowed(req, env)) return send(res, 421, { error: "unknown host; set DRIFTNET_ALLOWED_HOSTS to use this address, or set an admin password" });
     // The page itself holds no data; in private mode it asks for the token.
-    if (req.method === "GET" && path === "/") return send(res, 200, indexHtml, "text/html; charset=utf-8");
+    if (req.method === "GET" && path === "/") return send(res, 200, indexHtml, "text/html; charset=utf-8", PAGE_HEADERS);
     const asset = req.method === "GET" ? STATIC[path] : undefined;
     if (asset) {
       res.writeHead(200, { "content-type": asset[1], "cache-control": "public, max-age=86400" });
@@ -495,8 +515,10 @@ const server = createServer(async (req, res) => {
       if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
       const id = Number(itemMatch[1]);
       if (!dn.store.get(id)) return send(res, 404, { error: "not found" });
-      const body = await readJson<{ vote: "up" | "down"; reason?: string; voter?: string }>(req);
-      dn.store.vote(id, body.vote === "up" ? 1 : -1, body.voter ?? "http", body.reason);
+      const body = await readJson<{ vote?: unknown; reason?: unknown }>(req);
+      if (body.vote !== "up" && body.vote !== "down") throw new BadRequest('vote must be "up" or "down"');
+      const reason = typeof body.reason === "string" ? body.reason.slice(0, 300) : undefined;
+      dn.store.vote(id, body.vote === "up" ? 1 : -1, actorOf(req, env, dn.store) ?? "admin", reason);
       return send(res, 200, { ok: true });
     }
 
@@ -541,6 +563,7 @@ const server = createServer(async (req, res) => {
       const items = dn.store.claimPending(agent, Number(body.limit ?? 5), 30, actorOf(req, env, dn.store));
       return send(res, 200, {
         pending: dn.store.pendingCount(),
+        brief: agentBrief(dn, items.length),
         language: env.DRIFTNET_LANGUAGE || "English",
         categories: Object.keys(dn.categories),
         folders: dn.categories,
@@ -595,7 +618,7 @@ const server = createServer(async (req, res) => {
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code !== "EADDRINUSE") throw err;
-  console.error(`Port ${PORT} is already in use. Is driftnet already running? (pnpm service:status) Or set PORT in ${driftnetHome(env)}/.env.`);
+  console.error(`Port ${PORT} is already in use. Is driftnet already running? Open http://localhost:${PORT}, or set PORT in ${driftnetHome(env)}/.env.`);
   process.exit(1);
 });
 
