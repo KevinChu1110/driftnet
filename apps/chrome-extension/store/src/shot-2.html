@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+  .head { position: absolute; left: 64px; top: 44px; }
+  .row { position: absolute; left: 64px; right: 64px; top: 200px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .card { padding: 22px 24px; height: 420px; overflow: hidden; }
+  .card h2 { margin: 0 0 4px; font-size: 24px; } .card .what { color: #5b6b7d; font-size: 14px; margin-bottom: 14px; }
+  .card ul { margin: 0; padding-left: 20px; font-size: 16px; } .card li { margin: 6px 0; }
+  .payload { margin-top: 16px; background: #0f1b2d; color: #cfe0ff; border-radius: 10px; padding: 14px 16px; white-space: pre-wrap; word-break: break-all; }
+  .payload b { color: #7fe3c8; font-weight: 600; }
+</style></head><body class="bg"><div class="shot">
+  <div class="head"><h1 id="t"></h1><div class="sub" id="s"></div></div>
+  <div class="row" id="row"></div>
+</div><script>
+  const L = location.hash.slice(1) || "en";
+  const D = {
+    en: { t: "Reads each site the way you do.", s: "Only the tab you click. Nothing is fetched on the side.",
+      cards: [
+        ["Threads", "The post, its author, links, replies", ["Post text and author", "Quoted and reposted posts", "First 20 replies, expanded", "Links inside, redirects removed"], "Post by @devtools_daily:\nFound a tiny local-first catalogue…\n\nReplies:\n@reader_one: Docs are here: example.org/docs\n\nlinks: <b>github.com/…/driftnet</b>"],
+        ["X / Twitter", "The tweet, with real links", ["t.co links shown as their real targets", "Quoted tweet and card link", "The author's own thread", "Other people's replies left out"], "Tweet by @devdaily:\nShipped a thing today. Code:\n<b>https://github.com/…/driftnet</b>\nQuoted tweet: the best tools are boring\nCard link: <b>https://example.com/launch-post</b>"],
+        ["Instagram", "Caption and first comments", ["\"more\" expanded in the caption", "Author and first 20 comments", "\"Link in comments\" found", "Redirect links decoded"], "Post by chef_amy:\nPasta night. Recipe and tools below…\n\nComments:\nfan_1 Link here:\n<b>https://example.com/pasta-recipe</b>"],
+      ] },
+    "zh-TW": { t: "跟你用眼睛看的一樣。", s: "只讀你按下的那個分頁，不會偷偷抓別的。",
+      cards: [
+        ["Threads", "貼文、作者、連結、回覆", ["貼文內文與作者", "引用與轉發的貼文", "展開前 20 則回覆", "貼文裡的連結（去掉轉址）"], "Post by @devtools_daily:\n找到一個很小的本機連結清單…\n\nReplies:\n@reader_one: 文件在這 example.org/docs\n\nlinks: <b>github.com/…/driftnet</b>"],
+        ["X / Twitter", "推文與真正的連結", ["t.co 短網址還原成真正目標", "引用推文與卡片連結", "作者自己串的討論串", "不收別人的回覆"], "Tweet by @devdaily:\n今天上線了。程式碼：\n<b>https://github.com/…/driftnet</b>\nQuoted tweet: 最好的工具都很樸實\nCard link: <b>https://example.com/launch-post</b>"],
+        ["Instagram", "說明與前幾則留言", ["展開說明的「更多」", "作者與前 20 則留言", "找出「連結在留言」", "轉址連結還原"], "Post by chef_amy:\n今晚吃義大利麵。食譜在下面…\n\nComments:\nfan_1 連結在這：\n<b>https://example.com/pasta-recipe</b>"],
+      ] },
+  }[L];
+  t.textContent = D.t; s.textContent = D.s;
+  row.innerHTML = D.cards.map(([n, w, items, p]) => `<div class="card"><h2>${n}</h2><div class="what">${w}</div><ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul><div class="payload mono">${p}</div></div>`).join("");
+</script></body></html>

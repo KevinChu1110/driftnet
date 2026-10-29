@@ -8,7 +8,7 @@
 // Branded Chrome ignores --load-extension (Chrome 137+); use Chrome for Testing or Chromium.
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -82,6 +82,20 @@ const page = createServer((_req, res) => {
 </script></body></html>`);
 });
 const pagePort = await listen(page);
+
+// ── Saved snippets of Threads / X / Instagram (test/fixtures) ────────────────
+const fixtures = createServer((req, res) => {
+  const name = (req.url ?? "").replace(/^\/|\.html.*$/g, "");
+  try {
+    const html = readFileSync(join(EXT, "test/fixtures", `${name}.html`), "utf8");
+    res.setHeader("content-type", "text/html; charset=utf-8");
+    res.end(html);
+  } catch {
+    res.statusCode = 404;
+    res.end("");
+  }
+});
+const fixturePort = await listen(fixtures);
 
 // ── Chrome with the extension ───────────────────────────────────────────────
 const profile = mkdtempSync(join(tmpdir(), "driftnet-e2e-"));
@@ -208,6 +222,54 @@ try {
   await shoot(popup, "popup.png", 360, 268);
   await shoot(postSession, "post.png", 1100, 620);
 
+  // 4b. Site-specific capture on saved snippets. The fixtures live on 127.0.0.1, so the
+  // site is named explicitly (the second argument exists for exactly this).
+  const capture = async (name, site) => {
+    const tab = await open(`http://127.0.0.1:${fixturePort}/${name}.html`);
+    await sleep(400);
+    const id = await evaluate(options, `chrome.tabs.query({ url: "http://127.0.0.1:${fixturePort}/${name}.html" }).then((t) => t[0].id)`);
+    void tab;
+    return evaluate(options, `(async () => {
+      const { collectPage } = await import(chrome.runtime.getURL("collect.js"));
+      const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: ${id} }, func: collectPage, args: [null, ${JSON.stringify(site)}] });
+      return result;
+    })()`);
+  };
+
+  const th = await capture("threads", "threads");
+  assert.match(th.text, /Post by @devtools_daily/);
+  assert.match(th.text, /QUOTED: sqlite/, "quoted post read");
+  assert.match(th.text, /Docs are here/, "replies expanded and read");
+  assert.match(th.text, /REPLY-TWO/);
+  assert.deepEqual(th.links.sort(), ["https://example.org/docs", "https://github.com/kevinchu1110/driftnet?utm_source=threads"].sort());
+  assert.doesNotMatch(th.text, /Activity/, "page chrome left out");
+  console.log("✓ threads: post, quote, replies, decoded links");
+
+  const x = await capture("x", "x");
+  assert.match(x.text, /Tweet by @devdaily/);
+  assert.match(x.text, /https:\/\/github\.com\/kevinchu1110\/driftnet\?ref=x/, "t.co expanded in the text");
+  assert.match(x.text, /🚀/, "emoji image alt kept");
+  assert.match(x.text, /Quoted tweet: QUOTED-TWEET/);
+  assert.match(x.text, /Card link: https:\/\/example\.com\/launch-post/);
+  assert.match(x.text, /SELF-THREAD: details at https:\/\/example\.org\/details/, "self-thread included");
+  assert.doesNotMatch(x.text, /STRANGER-REPLY/, "other people's replies left out");
+  assert.ok(!x.links.some((l) => l.includes("t.co/")), "no t.co links");
+  assert.deepEqual(x.links.sort(), ["https://example.com/launch-post", "https://example.org/details", "https://github.com/kevinchu1110/driftnet?ref=x"]);
+  console.log("✓ x: t.co expanded, quote, card, self-thread");
+
+  const ig = await capture("instagram", "instagram");
+  assert.match(ig.text, /Post by chef_amy/);
+  assert.match(ig.text, /EXPANDED-CAPTION/, "caption expanded");
+  assert.match(ig.text, /COMMENT-TWO/);
+  assert.deepEqual(ig.links, ["https://example.com/pasta-recipe?igsh=abc"]);
+  console.log("✓ instagram: caption, author, comments, link in comments");
+
+  // A page whose markup the site reader doesn't recognise degrades to the generic reader.
+  const broken = await capture("broken", "x");
+  assert.match(broken.text, /readable sentence/);
+  assert.deepEqual(broken.links, ["https://example.net/page"]);
+  console.log("✓ unknown markup falls back to the generic reader");
+
   // 5. A page the extension may not read reports it instead of failing silently.
   const blank = await evaluate(options, `chrome.tabs.create({ url: "chrome://version", active: false }).then((t) => t.id)`);
   const popup2 = await open(`chrome-extension://${extId}/popup.html?tab=${blank}`);
@@ -222,6 +284,7 @@ try {
   chrome.kill();
   api.close();
   page.close();
+  fixtures.close();
   await sleep(300);
   rmSync(profile, { recursive: true, force: true });
   process.exit(failed ? 1 : 0);

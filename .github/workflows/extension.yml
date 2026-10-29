@@ -1,0 +1,28 @@
+name: Extension package
+
+# Builds the Chrome Web Store zip and attaches it to the run, so the maintainer can
+# download it and upload to the store. Nothing is published from here.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["apps/chrome-extension/**", "scripts/build-extension.mjs"]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: driftnet-extension
+          path: dist/driftnet-extension-*.zip

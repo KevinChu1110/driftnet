@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><style>
+  .head { position: absolute; left: 64px; top: 44px; }
+  .win { position: absolute; left: 64px; top: 190px; width: 1152px; height: 560px; border-radius: 12px 12px 0 0; overflow: hidden; background: #dee1e6; box-shadow: 0 22px 60px rgba(5,20,60,.45); }
+  .tabs { height: 32px; padding: 6px 0 0 70px; } .tab { background: #fff; width: 210px; border-radius: 8px 8px 0 0; padding: 6px 14px; font-size: 13px; }
+  .dots { position: absolute; top: 11px; left: 14px; display: flex; gap: 7px; } .dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .bar { background: #fff; height: 38px; display: flex; gap: 10px; align-items: center; padding: 0 12px; border-bottom: 1px solid #dadce0; font-size: 13px; color: #5f6368; }
+  .url { flex: 1; background: #f1f3f4; padding: 6px 14px; border-radius: 16px; }
+  .ext { width: 26px; height: 26px; border-radius: 50%; background: #e8f0fe; display: grid; place-items: center; } .ext img { width: 16px; }
+  .page { height: 490px; overflow: hidden; background: #f0f2f5; } .page img { width: 1152px; display: block; }
+  .popup { position: absolute; right: 24px; top: 74px; width: 340px; border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 8px 28px rgba(0,0,0,.3), 0 0 0 1px rgba(0,0,0,.08); } .popup img { width: 340px; display: block; }
+</style></head><body class="bg"><div class="shot">
+  <div class="head"><h1 id="t"></h1><div class="sub" id="s"></div></div>
+  <div class="win"><div class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+    <div class="tabs"><div class="tab">AI Tools Daily</div></div>
+    <div class="bar"><span>←</span><span>→</span><span>↻</span><div class="url">social.example/posts/1d4ZiYhANT</div><div class="ext"><img src="img/32.png"></div></div>
+    <div class="page"><img id="post"></div>
+    <div class="popup"><img id="popup"></div></div>
+</div><script>
+  const L = location.hash.slice(1) || "en";
+  const S = { en: ["One click. Into your own catalogue.", "The caption expanded, the link hidden in the comments found and cleaned."],
+              "zh-TW": ["按一下，就收進你自己的清單。", "說明自動展開，藏在留言裡的連結也幫你找出來、清乾淨。"] }[L];
+  t.textContent = S[0]; s.textContent = S[1];
+  post.src = `img/post-${L}.png`; popup.src = `img/popup-${L}.png`;
+</script></body></html>

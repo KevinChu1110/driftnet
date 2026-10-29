@@ -191,7 +191,7 @@ Links rot and repos get archived. Set `DRIFTNET_HEALTH=weekly` (recommended; it 
 
 | | Set up | On a laptop? | Sent while it was off |
 |---|---|---|---|
-| **Chrome extension** | Load `apps/chrome-extension` | ✅ | — |
+| **Chrome extension** | Load `apps/chrome-extension`, or the zip from `pnpm build:extension` | ✅ | — |
 | Telegram | `TELEGRAM_BOT_TOKEN`; privacy mode off for groups (`/setprivacy`) | ✅ | caught up on start (24 h) |
 | Discord | `DISCORD_BOT_TOKEN`; Message Content intent on | ✅ | read back per channel, quietly |
 | Slack | `SLACK_APP_TOKEN` (Socket Mode) + `SLACK_BOT_TOKEN` (+ `reactions:read` and the `reaction_added` event for voting) | ✅ | missed |
@@ -350,9 +350,24 @@ comments, and a reel's "link in the comments" turned into its GitHub repo.
 - **Right-click a link**: send it with the text of the post around it.
 - **Right-click a selection**: send just that.
 
-Install: `chrome://extensions` → Developer mode → **Load unpacked** → `apps/chrome-extension`. It
-talks to `http://localhost:8787`; for a remote server, set the URL and token in its settings. It
-reads a tab only when you click, and sends only to your own server.
+**What it reads on Threads, X and Instagram.** Only on your click, only what is on screen, never a
+fetch on the side; if a site's markup changes it falls back to the generic reader above.
+
+| Site | Captured |
+|---|---|
+| **Threads** | The post and its author, quoted / reposted posts, up to 20 replies (it opens "View replies", 3 s at most), and the links in them with redirects removed |
+| **X / Twitter** | The tweet with `t.co` links shown as their real targets (from the link's own title, never fetched), the quoted tweet, the card link, and the author's own thread (their later tweets; other people's replies are left out) |
+| **Instagram** (`/p/`, `/reel/`) | The caption ("more" expanded), the author, the first 20 comments and the links in them. Links in bio and Story link stickers are not on the page, so they are skipped; a "link in comments" is found |
+
+**Install**
+
+- **Chrome Web Store**: coming soon.
+- **From the zip** (a [release build](https://github.com/KevinChu1110/driftnet/actions/workflows/extension.yml), or `pnpm build:extension` → `dist/driftnet-extension-<version>.zip`): unzip it, open `chrome://extensions`, turn on Developer mode, **Load unpacked**, pick the unzipped folder.
+- **From the source**: the same, picking `apps/chrome-extension`.
+
+It talks to `http://localhost:8787`; for a remote server, set the URL and token in its settings. It
+reads a tab only when you click, and sends only to your own server. See the
+[privacy policy](apps/chrome-extension/store/PRIVACY.md).
 
 ## Models
 
@@ -645,7 +660,6 @@ platform (`handleChatText()`), browser capture (`collect.js`), or a bot language
 
 **Good first issues**, found by running driftnet on links people actually share:
 
-- [ ] **Extension polish.** Threads / X / Instagram capture, a Chrome Web Store build.
 - [ ] **More adapters.** Native Gemini, Bedrock, Vertex; more judges.
 
 ## Support

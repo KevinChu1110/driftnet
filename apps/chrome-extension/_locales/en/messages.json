@@ -3,7 +3,7 @@
     "message": "driftnet"
   },
   "description": {
-    "message": "Send the post you're looking at — text, comments and links you can see while logged in — to your driftnet catalogue."
+    "message": "Send the post you're looking at (text, comments, links, even behind a login) to your own driftnet. Reads Threads, X and Instagram."
   },
   "actionTitle": {
     "message": "Send this page to driftnet"

@@ -3,7 +3,7 @@
     "message": "driftnet"
   },
   "description": {
-    "message": "把你正在看的貼文（登入後才看得到的內文、留言和連結）送進你的 driftnet 清單。"
+    "message": "把你正在看的貼文（內文、留言、連結，登入後才看得到的也行）送進你自己的 driftnet。支援 Threads、X、Instagram。"
   },
   "actionTitle": {
     "message": "把這頁送到 driftnet"
