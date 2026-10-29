@@ -454,7 +454,7 @@ try {
     await waitFor(s, `!document.getElementById("move-dlg").open && document.getElementById("toast").classList.contains("show")`, "moved toast");
     assert.equal((await api(`/api/items/${id}`)).category, "other");
     await evaluate(s, `document.getElementById("toast-undo").click()`);
-    await sleep(400);
+    for (let i = 0; i < 20 && (await api(`/api/items/${id}`)).category === "other"; i++) await sleep(200);
     assert.notEqual((await api(`/api/items/${id}`)).category, "other", "undo puts it back");
     console.log("✓ phone: 📁 picker moves a card, undo moves it back");
   }
