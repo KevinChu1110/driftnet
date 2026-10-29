@@ -130,3 +130,16 @@ export function startDiscord(dn: Driftnet, token: string): () => void {
   void client.login(token);
   return () => void client.destroy();
 }
+
+/** Post a message to a channel over REST with the bot token (a scheduled digest); no gateway needed. Throws on refusal. */
+export async function sendDiscordMessage(token: string, channelId: string, text: string): Promise<void> {
+  const res = await fetch(`https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`, {
+    method: "POST",
+    headers: { authorization: `Bot ${token}`, "content-type": "application/json" },
+    // flags 4: no link embeds. No @-mentions from card text.
+    body: JSON.stringify({ content: text.slice(0, 2000), flags: 4, allowed_mentions: { parse: [] } }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+  await res.body?.cancel();
+}

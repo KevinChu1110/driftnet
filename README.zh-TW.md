@@ -183,6 +183,11 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 **在聊天室裡**，沒有連結的訊息一律忽略。每個連結只回一行：它是什麼，以及在網頁上的哪裡看。想在聊天室直接看摘要，
 或完全不回？設 `DRIFTNET_REPLY=full` 或 `off`。用 `👍12` 或 `👎12 原因` 投票（也可用 `+#12`／`-#12`；含連結的訊息一定不會被當成投票）。
+**每週摘要。** 設 `DRIFTNET_DIGEST=weekly`（或 `daily`）和 `DRIFTNET_DIGEST_TO`（也可在 ⚙ 設定 → 一般 設定），driftnet 會在指定時間貼一則簡短訊息：
+新增幾張卡片、收件匣還有幾張待整理、最好的五張新卡片（依價值、再依分享次數）、以及被分享 2 次以上的項目。沒有新內容就不發。時間用**伺服器的本地時間**
+（要改就設 `TZ`）。排定時間 driftnet 剛好沒開的話，下次啟動會補發一則，不會多發。內文連結一律是公開網址（`DRIFTNET_PUBLIC_URL`），
+不會帶唯讀分享金鑰，因為訊息會貼進群組。用 `POST /api/digest/send {"dryRun": true}` 試看看。Webhook 也會收到 `digest.sent` 事件。
+
 聊天機器人的 token 在 driftnet 啟動時讀取：寫進 `~/.driftnet/.env` 後，把 driftnet 關掉再重新啟動。
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
@@ -427,7 +432,11 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Jev 信心低於此值時改由模型分類 |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | 頁面大綱的 token 預算 |
 | `DRIFTNET_FOLDERS` | `ai` | 新資料庫的起始資料夾樣板：`ai`（AI 與程式）、`research`（論文、文章、資料集……）或 `everyday`（料理、旅行、理財……）。清單還是空的時候，網頁上也能選 |
-| `DRIFTNET_WEBHOOK_URL` | — | 卡片有變動就以 JSON POST 到這裡（`item.added`／`item.updated`／`item.trashed`／`item.restored`），逾時 5 秒、1 秒後重試一次、不跟隨轉址 |
+| `DRIFTNET_DIGEST` | `off` | 定時把摘要貼進你的聊天室：`off`、`daily` 或 `weekly`（見[每週摘要](#接法)） |
+| `DRIFTNET_DIGEST_AT` | `09:00` | 每天的時間，`HH:MM`，用伺服器的本地時間（會遵守 `TZ` 變數） |
+| `DRIFTNET_DIGEST_DAY` | `mon` | `weekly` 的星期幾：`mon`…`sun` |
+| `DRIFTNET_DIGEST_TO` | — | 送到哪裡，以逗號分隔：`telegram:<聊天室 id>`、`discord:<頻道 id>`、`slack:<頻道 id>`、`line:<使用者、群組或聊天室 id>`；使用已設定的機器人 token |
+| `DRIFTNET_WEBHOOK_URL` | — | 卡片有變動就以 JSON POST 到這裡（`item.added`／`item.updated`／`item.trashed`／`item.restored`，另有 `digest.sent`），逾時 5 秒、1 秒後重試一次、不跟隨轉址 |
 | `DRIFTNET_WEBHOOK_SECRET` | — | 為每次推送簽章：`X-Driftnet-Signature: sha256=<"<X-Driftnet-Timestamp>.<內容>" 的 hmac>`。拒收太舊的時間戳記即可防重送；重試時 `X-Driftnet-Delivery` 不變 |
 | `DRIFTNET_WEBHOOK_ALLOW_LOCAL` | — | 設 `1` 允許 Webhook 打到內網位址（例如區網裡的 n8n），只限你填的那台主機 |
 | `DRIFTNET_CATEGORIES` | 內建 | 起始資料夾的 JSON 檔：`{ "id": "說明" }`，只在新資料庫用一次，之後直接在網頁上改 |
@@ -457,7 +466,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
-`POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
+`POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）·
 `GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 

@@ -96,3 +96,17 @@ export function startSlackSocket(dn: Driftnet, appToken: string, botToken: strin
     ws?.close();
   };
 }
+
+/** Post a message to a channel (a scheduled digest); throws when Slack refuses it. */
+export async function sendSlackMessage(botToken: string, channel: string, text: string): Promise<void> {
+  // Slack's control characters, so a card name can't become a mention or a link.
+  const safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const res = await fetch(api("chat.postMessage"), {
+    method: "POST",
+    headers: { authorization: `Bearer ${botToken}`, "content-type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ channel, text: safe, unfurl_links: false, unfurl_media: false }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  if (!res.ok || !body.ok) throw new Error(body.error ?? `Slack answered ${res.status}`);
+}

@@ -77,3 +77,15 @@ export function startTelegram(dn: Driftnet, token: string): () => void {
   console.log("[telegram] polling");
   return () => { running = false; };
 }
+
+/** Post a plain message to a chat (a scheduled digest); throws when Telegram refuses it. */
+export async function sendTelegramMessage(token: string, chatId: string, text: string): Promise<void> {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, link_preview_options: { is_disabled: true } }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string };
+  if (!res.ok || !body.ok) throw new Error(body.description ?? `Telegram answered ${res.status}`);
+}

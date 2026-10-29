@@ -5,6 +5,7 @@ import { startTelegram } from "./adapters/telegram.ts";
 import { startDiscord } from "./adapters/discord.ts";
 import { isPrivate, token, Tunnel } from "./access.ts";
 import { createApp } from "./app.ts";
+import { startDigestScheduler } from "./digest.ts";
 import { Settings } from "./settings.ts";
 
 const env = process.env;
@@ -57,6 +58,9 @@ server.listen(PORT, HOST, () => {
   if (env.LINE_CHANNEL_SECRET) console.log("[line] webhook at /webhooks/line");
   if (env.SLACK_APP_TOKEN && env.SLACK_BOT_TOKEN) startSlackSocket(dn, env.SLACK_APP_TOKEN, env.SLACK_BOT_TOKEN);
   else if (env.SLACK_SIGNING_SECRET) console.log("[slack] webhook at /webhooks/slack");
+  // Reads its settings every tick, so turning the digest on in ⚙ Settings needs no restart.
+  const stopDigest = startDigestScheduler(dn, env);
+  process.on("exit", stopDigest);
 });
 
 function openBrowser(url: string): void {

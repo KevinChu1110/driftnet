@@ -1,6 +1,7 @@
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { driftnetHome } from "@driftnet/core";
+import { DAYS, parseTargets, validTime } from "./digest.ts";
 
 /**
  * What the settings page may change. Everything here takes effect without a
@@ -11,7 +12,7 @@ import { driftnetHome } from "@driftnet/core";
  */
 export interface Setting {
   key: string;
-  group: "model" | "language" | "chat" | "rules" | "access" | "webhook";
+  group: "model" | "language" | "chat" | "rules" | "access" | "webhook" | "digest";
   secret?: boolean;
   choices?: readonly string[];
   multiline?: boolean;
@@ -39,6 +40,11 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_WEBHOOK_URL", group: "webhook", secret: true },
   { key: "DRIFTNET_WEBHOOK_SECRET", group: "webhook", secret: true, max: 200 },
   { key: "DRIFTNET_WEBHOOK_ALLOW_LOCAL", group: "webhook", choices: ["", "1"] },
+  // Scheduled digest: times are the server's local time (TZ is respected). Read every minute, so no restart.
+  { key: "DRIFTNET_DIGEST", group: "digest", choices: ["", "off", "daily", "weekly"] },
+  { key: "DRIFTNET_DIGEST_AT", group: "digest", max: 5 },
+  { key: "DRIFTNET_DIGEST_DAY", group: "digest", choices: ["", ...DAYS] },
+  { key: "DRIFTNET_DIGEST_TO", group: "digest", max: 500 },
   // Access: the page shows these in their own panel (password strength, share key, public URL).
   { key: "DRIFTNET_TOKEN", group: "access", secret: true, min: 8, max: 200 },
   { key: "DRIFTNET_READ_KEY", group: "access", min: 16, max: 200 },
@@ -101,6 +107,11 @@ export class Settings {
         if (s.key === "DRIFTNET_TOKEN" && /\s/.test(value)) throw new SettingsError("the password can't contain spaces");
         if (value.includes("`")) throw new SettingsError(`${key} can't contain a backtick`);
         if (!s.multiline && /[\r\n]/.test(value)) throw new SettingsError(`${key} must be one line`);
+        if (key === "DRIFTNET_DIGEST_AT" && !validTime(value)) throw new SettingsError(`${key} must be a time like 09:00`);
+        if (key === "DRIFTNET_DIGEST_TO") {
+          const { invalid } = parseTargets(value);
+          if (invalid.length) throw new SettingsError(`${key}: not a valid target: ${invalid.join(", ")} (use telegram:<chat id>, discord:<channel id>, slack:<channel id>, line:<id>)`);
+        }
         if (/URL$/.test(key) && !/^https?:\/\/\S+$/.test(value)) throw new SettingsError(`${key} must be an http(s) URL`);
       }
       next.set(key, value);
