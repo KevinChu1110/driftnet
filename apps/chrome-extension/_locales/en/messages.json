@@ -81,5 +81,11 @@
   },
   "worth_must_see": {
     "message": "★ must-see"
+  },
+  "httpsRequired": {
+    "message": "Only localhost may use http. Use an https:// address for any other server."
+  },
+  "tokenRejected": {
+    "message": "Server rejected the token (HTTP 401) — check it."
   }
 }

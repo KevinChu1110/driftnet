@@ -3,6 +3,7 @@ import type { Driftnet } from "@driftnet/core";
 import { handleChatText } from "./handle.ts";
 
 const LAST = "discord:last:";
+const MAX_CATCH_UP = 1000; // per channel
 
 /** The parts of a Discord message driftnet uses, so catch-up can be tested without a gateway. */
 export interface ChatMessage {
@@ -12,6 +13,8 @@ export interface ChatMessage {
   authorId: string;
   fromBot: boolean;
   createdAt: number;
+  /** Where a forwarded message's text lives (messageSnapshots). */
+  forwardedContent?: string[];
 }
 
 /**
@@ -28,14 +31,21 @@ export function channelFilter(env: NodeJS.ProcessEnv = process.env): (channelId:
 /** Handle one message and remember it as the channel's latest. Returns the reply text, if any. */
 export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage, allowed = channelFilter()): Promise<string | null> {
   if (!allowed(msg.channelId)) return null;
-  dn.store.setState(LAST + msg.channelId, msg.id);
-  if (msg.fromBot || !msg.content) return null;
-  try {
-    return await handleChatText(dn, msg.content, { platform: "discord", chatId: msg.channelId, userId: msg.authorId });
-  } catch (err) {
-    console.warn("[discord]", (err as Error).message);
-    return null;
+  let reply: string | null = null;
+  if (!msg.fromBot) {
+    // Forwarded messages arrive with empty content; the text is in the snapshot.
+    const text = msg.content || (msg.forwardedContent ?? []).filter(Boolean).join("\n");
+    if (text) {
+      try {
+        reply = await handleChatText(dn, text, { platform: "discord", chatId: msg.channelId, userId: msg.authorId });
+      } catch (err) {
+        console.warn("[discord]", (err as Error).message);
+        return null; // not remembered as handled: the next catch-up retries it
+      }
+    }
   }
+  dn.store.setState(LAST + msg.channelId, msg.id);
+  return reply;
 }
 
 /**
@@ -54,11 +64,19 @@ export async function catchUp(
     const channelId = key.slice(LAST.length);
     if (!allowed(channelId)) continue;
     try {
-      const missed = (await fetchAfter(channelId, after)).sort((a, b) => a.createdAt - b.createdAt);
-      if (missed.length) console.log(`[discord] catching up ${missed.length} message(s) in ${channelId}`);
-      for (const msg of missed) {
-        await handleDiscordMessage(dn, msg);
-        handled++;
+      // The API returns at most 100 per call: keep paging until a short batch.
+      let cursor = after;
+      let total = 0;
+      for (;;) {
+        const batch = (await fetchAfter(channelId, cursor)).sort((a, b) => a.createdAt - b.createdAt);
+        if (batch.length && total === 0) console.log(`[discord] catching up in ${channelId}`);
+        for (const msg of batch) {
+          await handleDiscordMessage(dn, msg);
+          handled++;
+          total++;
+        }
+        if (batch.length < 100 || total >= MAX_CATCH_UP) break;
+        cursor = batch[batch.length - 1]!.id;
       }
     } catch (err) {
       // One deleted channel or missing permission must not stop the others.
@@ -75,6 +93,10 @@ const toChatMessage = (m: Message): ChatMessage => ({
   authorId: m.author.id,
   fromBot: m.author.bot,
   createdAt: m.createdTimestamp,
+  forwardedContent: [...(((m as any).messageSnapshots?.values?.() ?? []) as Iterable<any>)].flatMap((snap) => [
+    snap.content,
+    ...(snap.embeds ?? []).map((e: any) => e.url),
+  ]),
 });
 
 /**
@@ -87,7 +109,10 @@ export function startDiscord(dn: Driftnet, token: string): () => void {
   });
 
   client.on(Events.MessageCreate, async (msg) => {
-    const reply = await handleDiscordMessage(dn, toChatMessage(msg));
+    const reply = await handleDiscordMessage(dn, toChatMessage(msg)).catch((err) => {
+      console.warn("[discord]", (err as Error).message);
+      return null;
+    });
     if (reply) {
       await msg
         .reply({ content: reply.slice(0, 2000), flags: ["SuppressEmbeds"], allowedMentions: { parse: [] } })

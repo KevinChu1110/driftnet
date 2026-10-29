@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "__MSG_name__",
   "description": "__MSG_description__",
-  "version": "0.1.0",
+  "version": "0.7.0",
+  "homepage_url": "https://github.com/KevinChu1110/driftnet",
   "default_locale": "en",
   "minimum_chrome_version": "116",
   "action": {

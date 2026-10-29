@@ -51,8 +51,8 @@ test("DRIFTNET_REPLY=full puts the summary and voting help in the chat; off stay
 
 test("votes in every spelling are recorded, once per person", async () => {
   assert.match((await handleChatText(dn, "👎1 spam", ctx))!, /👎 #1/);
-  assert.match((await handleChatText(dn, "+1", ctx))!, /👍 #1/); // same voter changes their mind
-  assert.match((await handleChatText(dn, "-1", { ...ctx, userId: "u2" }))!, /👎 #1/);
+  assert.match((await handleChatText(dn, "+#1", ctx))!, /👍 #1/); // same voter changes their mind
+  assert.match((await handleChatText(dn, "-#1 wrong tool", { ...ctx, userId: "u2" }))!, /👎 #1/);
   assert.equal((await handleChatText(dn, "👍99", ctx))!, "No item #99.");
   const rep = dn.store.reputation(dn.store.get(1)!.source);
   assert.deepEqual([rep.up, rep.down], [1, 1]);
@@ -63,4 +63,12 @@ test("a link to a private address gets no reply and is not stored", async () => 
   const reply = await handleChatText(dn, "http://127.0.0.1:8650/admin", ctx);
   assert.ok(!reply);
   assert.equal(dn.store.stats().items, before);
+});
+
+test("only explicit votes count; chatter and anything with a link is not a vote", async () => {
+  for (const t of ["+1 for this", "-3 degrees", "+12", "-12 spam", "👍 nice"]) assert.equal(await handleChatText(dn, t, ctx), null, t);
+  const reply = await handleChatText(dn, "-3 degrees https://chat.test/degrees", ctx);
+  assert.ok(reply, "the link is ingested, not treated as a vote");
+  assert.ok(dn.store.findByUrl("https://chat.test/degrees"));
+  assert.match((await handleChatText(dn, "👍 #1", ctx))!, /👍 #1/);
 });

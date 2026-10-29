@@ -23,11 +23,14 @@ export async function handleLine(
     if (ev.type !== "message" || ev.message?.type !== "text") continue;
     const src = ev.source ?? {};
     // Reply tokens expire in ~1 minute; summarising takes a few seconds, which is fine.
-    handleChatText(dn, ev.message.text, {
-      platform: "line",
-      chatId: src.groupId ?? src.roomId ?? src.userId ?? "",
-      userId: src.userId,
-    })
+    Promise.resolve()
+      .then(() =>
+        handleChatText(dn, ev.message.text, {
+          platform: "line",
+          chatId: src.groupId ?? src.roomId ?? src.userId ?? "",
+          userId: src.userId,
+        }),
+      )
       .then(async (reply) => {
         if (!reply) return;
         await fetch("https://api.line.me/v2/bot/message/reply", {
