@@ -757,7 +757,7 @@
         plugins: "Plugins", pluginsNone: (dir) => `No plugins. Put .js files in ${dir} — see examples/plugins in the repo.`,
         status: (e) => `Now: sorting by ${({ jev: "Jev", llm: "the model", heuristic: "built-in rules" })[e.judge] ?? e.judge}, summaries: ${e.summarizer === "off" ? "off" : e.summarizer}`, keep: "set — leave empty to keep", unset: "not set",
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
-        savedServer: "Saved — already in effect", chat: "Chat replies", webhook: "Outgoing webhook", feed: "Feed (RSS)", genCopied: "New password generated and copied — press Save to keep it",
+        savedServer: "Saved — already in effect", chat: "Chat replies", webhook: "Outgoing webhook", digest: "Scheduled digest", feed: "Feed (RSS)", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
         accessStatus: (pw, key, url) => `Password: ${pw === "✓" ? "set" : "not set"} · Share key: ${key === "✓" ? "made" : "none"} · Public URL: ${url === "—" ? "off" : url}`,
         access: "Access & connections",
@@ -809,6 +809,10 @@
           DRIFTNET_BLOCK_DOMAINS: ["Never catalogue these domains", "Comma or space separated, e.g. example.com, spam.io"],
           DRIFTNET_WEBHOOK_URL: ["Webhook URL", "driftnet POSTs each new or updated card here (n8n, Zapier, Slack workflows…). Treated as a secret."],
           DRIFTNET_WEBHOOK_SECRET: ["Webhook signing secret", "Optional. Adds X-Driftnet-Signature: sha256=<HMAC of the body>."],
+          DRIFTNET_DIGEST: ["Digest", "A short summary of new cards, posted into your chats."],
+          DRIFTNET_DIGEST_AT: ["Digest time", "HH:MM in the server's local time zone, e.g. 09:00 (default)."],
+          DRIFTNET_DIGEST_DAY: ["Digest day (weekly)", ""],
+          DRIFTNET_DIGEST_TO: ["Digest targets", "Comma separated: telegram:<chat id>, discord:<channel id>, slack:<channel id>, line:<user, group or room id>. Uses the bot tokens already set."],
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["Allow a local webhook", "Needed when the receiver is on your own network (n8n on a LAN). Only that exact address is allowed."],
         },
         choices: {
@@ -818,6 +822,8 @@
           DRIFTNET_SUMMARY_DEPTH: { "": "Standard (default)", brief: "Brief: one line, 2 highlights, what you see", standard: "Standard", detailed: "Detailed: more highlights, use cases, how to try it" },
           DRIFTNET_LOCALE: { "": "Same as the summaries", en: "English", "zh-TW": "繁體中文" },
           DRIFTNET_REPLY: { "": "One line + link (default)", link: "One line + link", full: "Full summary", off: "Don't reply" },
+          DRIFTNET_DIGEST: { "": "Off (default)", off: "Off", daily: "Every day", weekly: "Every week" },
+          DRIFTNET_DIGEST_DAY: { "": "Monday (default)", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "No (public addresses only)", 1: "Yes" },
         },
       },
@@ -891,7 +897,7 @@
         plugins: "外掛", pluginsNone: (dir) => `沒有外掛。把 .js 檔放進 ${dir}，範例在 repo 的 examples/plugins。`,
         status: (e) => `目前：分類用 ${({ jev: "Jev", llm: "模型", heuristic: "內建規則" })[e.judge] ?? e.judge}，摘要用 ${e.summarizer === "off" ? "（未開啟）" : e.summarizer}`, keep: "已設定，留空就不變", unset: "未設定",
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
-        savedServer: "已儲存，馬上生效", chat: "聊天室回覆", webhook: "對外 Webhook", feed: "訂閱源（RSS）", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
+        savedServer: "已儲存，馬上生效", chat: "聊天室回覆", webhook: "對外 Webhook", digest: "定時摘要", feed: "訂閱源（RSS）", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
         tabGeneral: "一般", tabAccess: "存取", tabAi: "AI",
         accessStatus: (pw, key, url) => `密碼：${pw === "✓" ? "已設定" : "未設定"} · 分享碼：${key === "✓" ? "已產生" : "沒有"} · 公開網址：${url === "—" ? "關閉" : url}`,
         access: "存取與連線",
@@ -943,6 +949,10 @@
           DRIFTNET_BLOCK_DOMAINS: ["不要收錄的網域", "用逗號或空白分隔，例如 example.com, spam.io"],
           DRIFTNET_WEBHOOK_URL: ["Webhook 網址", "每張新增或更新的卡片都會 POST 到這裡（n8n、Zapier、Slack 工作流程…）。視為機密。"],
           DRIFTNET_WEBHOOK_SECRET: ["Webhook 簽章密鑰", "選填。會加上 X-Driftnet-Signature: sha256=<內容的 HMAC>。"],
+          DRIFTNET_DIGEST: ["定時摘要", "把新卡片整理成一則短訊息，貼進你的聊天室。"],
+          DRIFTNET_DIGEST_AT: ["摘要時間", "伺服器所在時區的 HH:MM，例如 09:00（預設）。"],
+          DRIFTNET_DIGEST_DAY: ["摘要星期（每週）", ""],
+          DRIFTNET_DIGEST_TO: ["摘要送到哪裡", "以逗號分隔：telegram:<聊天室 id>、discord:<頻道 id>、slack:<頻道 id>、line:<使用者、群組或聊天室 id>。使用已設定的機器人金鑰。"],
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["允許本機 Webhook", "接收端在你自己的區域網路時需要（例如內網的 n8n）。只放行你填的那個位址。"],
         },
         choices: {
@@ -952,6 +962,8 @@
           DRIFTNET_SUMMARY_DEPTH: { "": "標準（預設）", brief: "簡短：一句話、2 個重點、看得到什麼", standard: "標準", detailed: "詳細：更多重點、使用情境、怎麼試用" },
           DRIFTNET_LOCALE: { "": "跟摘要一樣", en: "English", "zh-TW": "繁體中文" },
           DRIFTNET_REPLY: { "": "一行＋連結（預設）", link: "一行＋連結", full: "完整摘要", off: "不回覆" },
+          DRIFTNET_DIGEST: { "": "關閉（預設）", off: "關閉", daily: "每天", weekly: "每週" },
+          DRIFTNET_DIGEST_DAY: { "": "週一（預設）", mon: "週一", tue: "週二", wed: "週三", thu: "週四", fri: "週五", sat: "週六", sun: "週日" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "否（只允許公開位址）", 1: "是" },
         },
       },
@@ -1521,7 +1533,7 @@
       const yes = (b) => (b ? "✓" : "—");
       const accessStatus = `<p class="set-status">${esc(st.accessStatus(yes(a.passwordSet), yes(a.readKey), a.tunnel.running ? a.tunnel.url : "—"))}</p>`;
       server = {
-        general: group("language") + group("chat") + group("webhook"),
+        general: group("language") + group("chat") + group("digest") + group("webhook"),
         access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) + pairPanel(serverSettings.access) : ""),
         ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,

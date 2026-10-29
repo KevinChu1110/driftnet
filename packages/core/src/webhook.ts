@@ -6,6 +6,8 @@ import type { Store } from "./store.ts";
 import type { Item } from "./types.ts";
 
 export type WebhookEvent = "item.added" | "item.updated" | "item.trashed" | "item.restored";
+/** Sent once per scheduled (or manual) digest run, with the digest and each target's result. */
+export type DigestWebhookEvent = "digest.sent";
 
 /** What leaves the machine: the card as a reader would describe it, nothing internal. */
 export function webhookPayload(store: Store, item: Item, event: WebhookEvent, env: NodeJS.ProcessEnv = process.env) {
@@ -55,12 +57,22 @@ const RETRY_DELAY_MS = 1000;
  * DRIFTNET_WEBHOOK_ALLOW_LOCAL=1, and then only for the host the user typed.
  */
 export async function sendWebhook(store: Store, item: Item, event: WebhookEvent, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
-  const target = env.DRIFTNET_WEBHOOK_URL?.trim();
-  if (!target || !shouldNotify(item, event)) return false;
+  if (!env.DRIFTNET_WEBHOOK_URL?.trim() || !shouldNotify(item, event)) return false;
+  return deliver(() => JSON.stringify(webhookPayload(store, item, event, env)), `#${item.id}`, env);
+}
+
+/** The `digest.sent` event: same delivery rules (signature, timeout, retry, private-address refusal) as card events. */
+export async function sendDigestWebhook(payload: Record<string, unknown>, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (!env.DRIFTNET_WEBHOOK_URL?.trim()) return false;
+  return deliver(() => JSON.stringify({ event: "digest.sent" satisfies DigestWebhookEvent, ...payload }), "digest", env);
+}
+
+async function deliver(makeBody: () => string, label: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+  const target = env.DRIFTNET_WEBHOOK_URL!.trim();
   try {
     const url = new URL(target);
     if (url.protocol !== "http:" && url.protocol !== "https:") throw new BlockedUrl("webhook must be http(s)");
-    const body = JSON.stringify(webhookPayload(store, item, event, env));
+    const body = makeBody();
     const secret = env.DRIFTNET_WEBHOOK_SECRET;
     const delivery = randomUUID();
     const allow = env.DRIFTNET_WEBHOOK_ALLOW_LOCAL === "1" ? url.hostname : undefined;
@@ -82,9 +94,9 @@ export async function sendWebhook(store: Store, item: Item, event: WebhookEvent,
         if (err instanceof BlockedUrl) throw err;
       }
     }
-    console.warn(`[driftnet] webhook for #${item.id} failed`);
+    console.warn(`[driftnet] webhook for ${label} failed`);
   } catch (err) {
-    console.warn(`[driftnet] webhook for #${item.id} not sent: ${(err as Error).message}`);
+    console.warn(`[driftnet] webhook for ${label} not sent: ${(err as Error).message}`);
   }
   return false;
 }

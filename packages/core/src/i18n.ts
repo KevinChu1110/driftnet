@@ -16,6 +16,14 @@ const MESSAGES = {
     noItem: (id: number) => `No item #${id}.`,
     votedUp: (id: number) => `👍 #${id}`,
     votedDown: (id: number) => `👎 #${id} — noted, similar items will be skipped sooner`,
+    digest: {
+      title: (period: "daily" | "weekly") => (period === "daily" ? "Today in driftnet" : "This week in driftnet"),
+      counts: (fresh: number, inbox: number) => `${fresh} new ${fresh === 1 ? "card" : "cards"} · ${inbox} waiting in the Inbox`,
+      top: "Top picks",
+      shared: "Most shared",
+      sharedTimes: (n: number) => `shared ${n}×`,
+      more: (n: number) => `+ ${n} more on the page`,
+    },
     locale: "en",
   },
   "zh-TW": {
@@ -31,6 +39,14 @@ const MESSAGES = {
     noItem: (id: number) => `找不到 #${id}。`,
     votedUp: (id: number) => `👍 #${id}`,
     votedDown: (id: number) => `👎 #${id} — 收到，之後類似的內容會更早被略過`,
+    digest: {
+      title: (period: "daily" | "weekly") => (period === "daily" ? "driftnet 今日" : "driftnet 本週"),
+      counts: (fresh: number, inbox: number) => `新增 ${fresh} 張卡片 · 收件匣還有 ${inbox} 張待整理`,
+      top: "精選",
+      shared: "最多人分享",
+      sharedTimes: (n: number) => `分享 ${n} 次`,
+      more: (n: number) => `＋ 網頁上還有 ${n} 張`,
+    },
     locale: "zh-TW",
   },
 } as const;

@@ -804,6 +804,13 @@ export class Store {
     return (this.db.prepare(sql).all(...joinArgs, ...args) as unknown as ItemRow[]).map(toItem);
   }
 
+  /** Items shared at least `min` times since `since` (counting share events, not the lifetime total), most first. */
+  sharedSince(since: string, min = 2, limit = 10): { id: number; shares: number }[] {
+    return this.db
+      .prepare("SELECT item_id AS id, COUNT(*) AS shares FROM shares WHERE at >= ? GROUP BY item_id HAVING COUNT(*) >= ? ORDER BY shares DESC, item_id LIMIT ?")
+      .all(since, min, limit) as { id: number; shares: number }[];
+  }
+
   /** Cards waiting in the Inbox: not filed by hand, not trashed. */
   inboxCount(): number {
     return (this.db.prepare(`SELECT COUNT(*) AS n FROM items WHERE user_placed = 0 AND trashed_at IS NULL AND flags NOT LIKE '%injection%' AND ${Store.NET_VOTES} > -2`).get() as { n: number }).n;

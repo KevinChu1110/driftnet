@@ -28,7 +28,7 @@ export { Summarizer, summaryDepth, DEPTHS, type Depth } from "./summarize.ts";
 export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
-export { sendWebhook, shouldNotify, webhookPayload, signBody } from "./webhook.ts";
+export { sendWebhook, sendDigestWebhook, shouldNotify, webhookPayload, signBody } from "./webhook.ts";
 export { renderLink, renderText } from "./render.ts";
 export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
 export type { Judge, JudgeResult } from "./judge/index.ts";

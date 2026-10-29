@@ -43,3 +43,15 @@ export async function handleLine(
   }
   return 200;
 }
+
+/** Push a message to a user, group or room id (a scheduled digest; there is no reply token). Throws on refusal. */
+export async function pushLineMessage(accessToken: string, to: string, text: string): Promise<void> {
+  const res = await fetch("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ to, messages: [{ type: "text", text: text.slice(0, 5000) }] }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`LINE answered ${res.status}`);
+  await res.body?.cancel();
+}

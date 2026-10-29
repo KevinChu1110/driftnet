@@ -5,6 +5,7 @@ import { mediaSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@dr
 import { canRead, clientIp, foreignOrigin, hostAllowed, isAdmin, isLocal, isPassword, isTrustedLocal, token, Tunnel } from "./access.ts";
 import { Settings } from "./settings.ts";
 import { BadRequest, readBody, readJson, type App, type Ctx, type Route } from "./route.ts";
+import { routes as digest } from "./routes/digest.ts";
 import { routes as folders } from "./routes/folders.ts";
 import { routes as items } from "./routes/items.ts";
 import { routes as notes } from "./routes/notes.ts";
@@ -17,7 +18,7 @@ import { routes as system } from "./routes/system.ts";
  * file and listing it here; `access` is required, so a route cannot be added
  * without saying who may call it.
  */
-export const routes: Route[] = [...system, ...folders, ...items, ...notes, ...settingsRoutes];
+export const routes: Route[] = [...system, ...folders, ...items, ...notes, ...digest, ...settingsRoutes];
 
 const asset = (file: string) => readFileSync(new URL(`../public/${file}`, import.meta.url));
 

@@ -188,6 +188,12 @@ without running one: on real links, a Chinese article went from 831 to 404 token
 **In a chat**, messages without a link are ignored. Each link gets one line back: what it is and
 where to read it on the web page. Want the summary in the chat instead, or no reply at all? Set
 `DRIFTNET_REPLY=full` or `off`. Vote with `👍12` or `👎12 reason` (`+#12` / `-#12` work too; a message with a link is never a vote).
+**Weekly digest.** Set `DRIFTNET_DIGEST=weekly` (or `daily`) and `DRIFTNET_DIGEST_TO` (or use ⚙ Settings → General) and driftnet posts one short
+message at the chosen time: how many cards are new, how many wait in the Inbox, the five best new cards (worth, then shares) and what was shared
+2+ times. Nothing new, nothing sent. Times are the **server's local time** (set `TZ` to change it). If driftnet was off at the scheduled time it
+sends one catch-up digest on the next start, never more. Links in it are your plain public URL (`DRIFTNET_PUBLIC_URL`), never the read-only share key,
+since the text lands in a group. Try it with `POST /api/digest/send {"dryRun": true}`. A webhook also gets a `digest.sent` event.
+
 Bot tokens are read when driftnet starts: put them in `~/.driftnet/.env`, then stop and start it again.
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet answering a Discord message with two links: one line per link, each pointing to its page" width="80%"></p>
@@ -496,7 +502,11 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
 | `DRIFTNET_FOLDERS` | `ai` | Starting folder template on a new database: `ai` (AI & coding), `research` (papers, articles, datasets…) or `everyday` (cooking, travel, money…). An empty catalogue also offers the choice on the page |
-| `DRIFTNET_WEBHOOK_URL` | — | POST each card change here as JSON (`item.added` / `item.updated` / `item.trashed` / `item.restored`), 5 s timeout, one retry after 1 s, redirects not followed |
+| `DRIFTNET_DIGEST` | `off` | Scheduled digest into your chats: `off`, `daily` or `weekly` ([Weekly digest](#ways-in)) |
+| `DRIFTNET_DIGEST_AT` | `09:00` | Time of day, `HH:MM`, in the server's local time (the `TZ` variable is respected) |
+| `DRIFTNET_DIGEST_DAY` | `mon` | Day of the week for `weekly`: `mon`…`sun` |
+| `DRIFTNET_DIGEST_TO` | — | Where it goes, comma separated: `telegram:<chat id>`, `discord:<channel id>`, `slack:<channel id>`, `line:<user, group or room id>`; uses the bot tokens already set |
+| `DRIFTNET_WEBHOOK_URL` | — | POST each card change here as JSON (`item.added` / `item.updated` / `item.trashed` / `item.restored`, plus `digest.sent`), 5 s timeout, one retry after 1 s, redirects not followed |
 | `DRIFTNET_WEBHOOK_SECRET` | — | Signs each delivery: `X-Driftnet-Signature: sha256=<hmac of "<X-Driftnet-Timestamp>.<body>">`. Reject old timestamps to stop replays; `X-Driftnet-Delivery` stays the same on the retry |
 | `DRIFTNET_WEBHOOK_ALLOW_LOCAL` | — | `1` allows a webhook on a private address (n8n on your LAN), for that exact host only |
 | `DRIFTNET_CATEGORIES` | built-in | JSON file of starting folders, `{ "id": "description" }`, used once on a new database; after that, edit folders on the page |
@@ -526,7 +536,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
-`POST /api/chat` · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
+`POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) ·
 `GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
