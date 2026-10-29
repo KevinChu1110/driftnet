@@ -478,7 +478,8 @@ const server = createServer(async (req, res) => {
         });
         return res.end(m.bytes);
       } catch (err) {
-        if (err instanceof MediaError || err instanceof BlockedUrl) return send(res, 502, { error: (err as Error).message });
+        if (err instanceof MediaError) return send(res, err.status, { error: err.message });
+        if (err instanceof BlockedUrl) return send(res, 502, { error: err.message });
         throw err;
       }
     }

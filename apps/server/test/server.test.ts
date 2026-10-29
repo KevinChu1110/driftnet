@@ -44,7 +44,7 @@ test("server: host guard (421), page security headers, and feedback validation",
     assert.equal(page.headers["x-frame-options"], "DENY");
 
     const h = { host: `localhost:${port}` };
-    const saved = JSON.parse((await call(port, "POST", "/api/ingest", h, { url: "https://example.com/feedback-test" })).body) as { item?: { id: number } }[];
+    const saved = JSON.parse((await call(port, "POST", "/api/ingest", h, { url: "https://example.com/feedback-test", page: { title: "Feedback test", text: "A page the extension already read, so nothing is fetched." } })).body) as { item?: { id: number } }[];
     const id = saved[0]?.item?.id;
     assert.ok(id, "ingest returned an item");
     {
