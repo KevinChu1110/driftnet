@@ -82,27 +82,48 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 
 ## 🚀 開始使用
 
-不需要伺服器，也不需要雲端帳號。需要 Node.js 22.13 以上。想先看看？**[線上試玩](https://kevinchu1110.github.io/driftnet/)** 直接在瀏覽器跑真正的網頁，免安裝。
+全部跑在你自己的電腦上：不用租伺服器，也不用註冊帳號。想先看看？
+**[線上試玩](https://kevinchu1110.github.io/driftnet/)** 直接在瀏覽器跑真正的網頁。
 
-### 讓 agent 幫你裝
+### 最簡單：交給你的 AI agent 安裝
 
-把這句話貼給 Claude Code、Cursor、Codex 或任何能執行指令的 agent：
+把下面這句複製給 Claude Code、Cursor、Codex，或任何能在你電腦上執行指令的 agent：
 
-> Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
-
-或自己來：先 `npx driftnet` 啟動，再 `npx driftnet init` 把這台機器上的 agent 都接起來。
-
-### 1. 一行指令
-
-```bash
-npx driftnet        # 自動打開 http://localhost:8787，⚙ 設定會帶你選模型
+```text
+Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
 ```
 
-不管從哪裡啟動，設定都在 `~/.driftnet/.env`，清單在 `~/.driftnet/driftnet.db`（用 `DRIFTNET_HOME` 可以一起搬走）。
+它會檢查 Node.js、啟動 driftnet、透過 MCP 把自己接上，完成後告訴你。
 
-### 2. 從原始碼跑
+### 或自己跑一行指令
 
-想改程式，或設成開機自動執行：
+需要 [Node.js](https://nodejs.org) 22.13 以上。在終端機輸入：
+
+```bash
+npx driftnet
+```
+
+瀏覽器會自動打開 **http://localhost:8787**：這是你自己電腦提供的 driftnet 網頁
+（*localhost* 就是「這台電腦」，別人看不到）。⚙ 設定會帶你選模型，也可以先跳過、不接模型直接用。
+想一次接好這台電腦上的 AI 工具（Claude Code、Claude Desktop、Cursor、Windsurf、Codex）：`npx driftnet init`。
+
+設定存在 `~/.driftnet/.env`，清單存在 `~/.driftnet/driftnet.db`。
+
+### 加入第一個連結
+
+任選一種：
+
+- **在網頁上：** 把連結貼進輸入框，按「收錄」。
+- **在終端機：** `npx driftnet add https://github.com/paperclipai/paperclip`
+- **在瀏覽器：** [Chrome 擴充](#chrome-擴充)會送出你正在看的頁面。
+- **在聊天室：** 接上 [Discord、Telegram、Slack 或 LINE 機器人](#接法)，直接把連結丟進去。
+
+5～30 秒內就會出現一張卡片：它是什麼、為什麼值得你看、放進了哪個資料夾。
+
+<details>
+<summary><b>其他跑法：從原始碼、Docker</b></summary>
+
+從原始碼跑，想改程式或設成開機自動執行：
 
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
@@ -111,9 +132,7 @@ pnpm start                                                 # http://localhost:87
 pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
 ```
 
-### 3. Docker
-
-只要裝 Docker：
+用 Docker：
 
 ```bash
 docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
@@ -121,15 +140,9 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 ```
 
 不加 `start` 時，容器就是 stdio 的 MCP 伺服器（`docker run -i --rm -v driftnet:/data driftnet`）。
+用 `DRIFTNET_HOME` 可以把設定和清單一起搬到別的地方。
 
-### 4. 送出第一個連結
-
-```bash
-curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
-  -d '{"text": "看這個 https://github.com/paperclipai/paperclip"}'
-```
-
-5～30 秒後會收到 JSON，內容就是聊天室會收到的回覆；卡片已經出現在網頁上。
+</details>
 
 <details>
 <summary><b>沒反應？</b></summary>

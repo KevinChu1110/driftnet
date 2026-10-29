@@ -84,27 +84,49 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 ## 🚀 Quick start
 
-No server, no cloud account. Needs Node.js 22.13+. Want a look first? **[Try the demo](https://kevinchu1110.github.io/driftnet/)** runs the real page in your browser, no install.
+Everything runs on your own computer: no server to rent, no account. Want a look first?
+**[Try the demo](https://kevinchu1110.github.io/driftnet/)** runs the real page in your browser.
 
-### Let your agent set it up
+### Easiest: let your AI agent install it
 
-Paste this to Claude Code, Cursor, Codex or any agent that can run commands:
+Copy this into Claude Code, Cursor, Codex or any agent that can run commands on your computer:
 
-> Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
-
-Or do it yourself: `npx driftnet` to start, then `npx driftnet init` to connect the agents on this machine.
-
-### 1. One command
-
-```bash
-npx driftnet        # opens http://localhost:8787 — ⚙ Settings walks you through picking a model
+```text
+Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
 ```
 
-Settings live in `~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`, wherever you start it from (`DRIFTNET_HOME` moves both).
+It checks Node.js, starts driftnet, connects itself over MCP and tells you when it is done.
 
-### 2. From source
+### Or run one command yourself
 
-To hack on it or run it as a login service:
+You need [Node.js](https://nodejs.org) 22.13 or newer. Then, in a terminal:
+
+```bash
+npx driftnet
+```
+
+Your browser opens **http://localhost:8787**: that is driftnet's page, served by your own computer
+(*localhost* means "this machine"; nobody else can see it). ⚙ Settings walks you through picking a
+model, or skip it and start without one. To connect the AI apps on this computer (Claude Code,
+Claude Desktop, Cursor, Windsurf, Codex) in one go: `npx driftnet init`.
+
+Your settings live in `~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`.
+
+### Add your first link
+
+Any of these works:
+
+- **On the page:** paste a link into the box and press Add.
+- **In a terminal:** `npx driftnet add https://github.com/paperclipai/paperclip`
+- **From the browser:** the [Chrome extension](#chrome-extension) sends the page you are looking at.
+- **From a chat:** connect a [Discord, Telegram, Slack or LINE bot](#ways-in) and drop links there.
+
+A card shows up within 5–30 seconds: what it is, why it might matter to you, and where it was filed.
+
+<details>
+<summary><b>Other ways to run it: from source, Docker</b></summary>
+
+From source, to hack on it or run it as a login service:
 
 ```bash
 git clone https://github.com/KevinChu1110/driftnet && cd driftnet
@@ -113,9 +135,7 @@ pnpm start                                                 # http://localhost:87
 pnpm service:install                                       # optional: start at login (macOS / Linux)
 ```
 
-### 3. Docker
-
-Nothing to install but Docker:
+With Docker:
 
 ```bash
 docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
@@ -123,15 +143,9 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 ```
 
 Without `start`, the container is the MCP server over stdio (`docker run -i --rm -v driftnet:/data driftnet`).
+`DRIFTNET_HOME` moves the settings and the catalogue somewhere else.
 
-### 4. Send a first link
-
-```bash
-curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
-  -d '{"text": "look at this https://github.com/paperclipai/paperclip"}'
-```
-
-You get the reply a chat would get, as JSON, after 5–30 seconds; the card is already on the page.
+</details>
 
 <details>
 <summary><b>Not working?</b></summary>
