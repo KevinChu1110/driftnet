@@ -590,12 +590,13 @@ Give each agent its own key instead of the admin password: **Settings → Access
 | `driftnet_save_link` | Catalogue a link |
 | `driftnet_lease_items` / `driftnet_enrich_item` | Work the queue, below |
 | `driftnet_get_item` | One card in full: summary, use cases, your note, what people said in chat, tools found inside |
-| `driftnet_update_item` | Star, write the note, vote (agent votes count toward reputation too), trash or restore a card |
+| `driftnet_update_item` | Star, write the note, replace the tags, vote (agent votes count toward reputation too), trash or restore a card |
 | `driftnet_list_folders` / `driftnet_move_items` | Read your folder tree, file items into it |
 | `driftnet_undo_move` | Put a batch move back, using the undo id `driftnet_move_items` returned |
 | `driftnet_refresh_item` | Fetch a card's page again and redo its summary (keeps the reader's note, favorite and chosen folder) |
 | `driftnet_suggest_folders` | Ask the model for a tidy-up plan for the folder tree (proposes only; the human applies it on the page) |
-| `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | Add, rename or re-describe, and delete folders (contents move up; the one tool marked destructive) |
+| `driftnet_create_folder` / `driftnet_update_folder` / `driftnet_delete_folder` | Add, rename or re-describe, and delete folders (contents move up) |
+| `driftnet_delete_item` | Permanently delete a card that is already in the trash (cannot be undone; history goes too). Not offered to read-only keys |
 
 </details>
 
@@ -711,7 +712,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack` (`?s=` signed link) · `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `PUT /api/items/:id/tags` · `DELETE /api/items/:id` (trashed only) · `DELETE /api/trash` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·
 `GET|PUT /api/settings` (this machine, or with the token) · `GET /api/backup` (`?secrets=1` plus the password again in `X-Driftnet-Confirm`) · `POST /api/backup/restore` (a zip body; both admin password only) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>

@@ -744,6 +744,68 @@ export class Store {
     return changed || this.db.prepare("SELECT 1 FROM items WHERE id = ?").get(id) !== undefined;
   }
 
+  /**
+   * Replace a card's tag list (the reader's or an agent's correction of the summary). At most 8 tags, each
+   * trimmed, lower-cased, 1-40 characters without control characters, duplicates dropped; [] clears them.
+   * Null when there is no such item. Needs a summary to hold the tags.
+   */
+  setTags(id: number, tags: string[], actor?: string): Item | null {
+    if (!Array.isArray(tags) || tags.length > 8) throw new ItemError("at most 8 tags");
+    const clean: string[] = [];
+    for (const raw of tags) {
+      const t = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+      if (!t || [...t].length > 40) throw new ItemError("each tag must be 1-40 characters");
+      if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(t)) throw new ItemError("tags cannot contain control characters");
+      if (guard(t).flags.length) throw new ItemError("tag rejected");
+      if (!clean.includes(t)) clean.push(t);
+    }
+    const out = this.transaction(() => {
+      const old = this.db.prepare("SELECT summary FROM items WHERE id = ?").get(id) as { summary: string | null } | undefined;
+      if (!old) return false;
+      let s: Record<string, unknown> | null = null;
+      try { const p = JSON.parse(old.summary ?? "null"); if (p && typeof p === "object" && !Array.isArray(p)) s = p as Record<string, unknown>; } catch { /* no usable summary */ }
+      if (!s) throw new ItemError("no summary yet");
+      const next = JSON.stringify({ ...s, tags: clean });
+      this.db.prepare("UPDATE items SET summary = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?").run(next, id);
+      this.log(id, actor, old, { summary: next });
+      this.reindex(id);
+      return true;
+    });
+    return out ? this.get(id) : null;
+  }
+
+  /**
+   * Delete a trashed card for good, with everything keyed by it, in one transaction. Only a card already in the
+   * trash qualifies. False when there is no such item. (Cached pictures are keyed by URL and age out on their own.)
+   */
+  purgeItem(id: number, _actor?: string): boolean {
+    return this.transaction(() => {
+      const row = this.db.prepare("SELECT trashed_at FROM items WHERE id = ?").get(id) as { trashed_at: string | null } | undefined;
+      if (!row) return false;
+      if (!row.trashed_at) throw new ItemError("move it to the trash first");
+      this.dropItem(id);
+      return true;
+    });
+  }
+
+  /** Delete every trashed card ({@link purgeItem} for each, all or nothing). Returns how many went. */
+  purgeTrash(): number {
+    return this.transaction(() => {
+      const ids = (this.db.prepare("SELECT id FROM items WHERE trashed_at IS NOT NULL").all() as { id: number }[]).map((r) => r.id);
+      for (const id of ids) this.dropItem(id);
+      return ids.length;
+    });
+  }
+
+  private dropItem(id: number): void {
+    for (const sql of [
+      "DELETE FROM aliases WHERE item_id = ?", "DELETE FROM shares WHERE item_id = ?", "DELETE FROM feedback WHERE item_id = ?",
+      "DELETE FROM found_in WHERE parent_id = ? OR child_id = ?", "DELETE FROM item_fts WHERE rowid = ?",
+      "DELETE FROM item_history WHERE item_id = ?", "DELETE FROM items WHERE id = ?",
+    ]) this.db.prepare(sql).run(...(sql.includes("OR") ? [id, id] : [id]));
+    this.vectors.remove(id);
+  }
+
   /** Called (never awaited) after an item went to the trash or came back. */
   onTrash?: (id: number, trashed: boolean) => void;
 

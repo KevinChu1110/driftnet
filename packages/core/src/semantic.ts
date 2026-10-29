@@ -147,7 +147,7 @@ export class Semantic {
       try {
         const vecs = await embedder.embed(work.map((w) => w.text), "document");
         if (gen !== this.generation) return;
-        work.forEach((w, i) => this.store.vectors.put(w.id, embedder.model, w.hash, vecs[i]!));
+        work.forEach((w, i) => { if (this.store.get(w.id)) this.store.vectors.put(w.id, embedder.model, w.hash, vecs[i]!); }); // a card purged mid-flight gets no vector
         this.failures = 0;
       } catch (e) {
         if (gen !== this.generation) return;

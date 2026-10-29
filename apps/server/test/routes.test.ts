@@ -15,7 +15,8 @@ after(() => { for (const s of servers) s.close(); });
 
 async function start(extra: Record<string, string> = {}) {
   const env: NodeJS.ProcessEnv = { DRIFTNET_HOME: mkdtempSync(join(tmpdir(), "driftnet-routes-")), DRIFTNET_JUDGE: "off", DRIFTNET_LOCALE: "en", DRIFTNET_TOKEN: PASSWORD, DRIFTNET_READ_KEY: READ_KEY, ...extra };
-  const server = createApp({ dn: createDriftnet(env), env, port: 0 });
+  const dn = createDriftnet(env);
+  const server = createApp({ dn, env, port: 0 });
   servers.push(server);
   await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
   const port = (server.address() as { port: number }).port;
@@ -34,7 +35,7 @@ async function start(extra: Record<string, string> = {}) {
       r.on("error", fail);
       r.end(body ? JSON.stringify(body) : undefined);
     });
-  return { call };
+  return { call, dn };
 }
 
 const methodOf = (r: Route) => (Array.isArray(r.method) ? r.method[0]! : r.method === "*" || r.method === "NON_GET" ? "POST" : r.method);
@@ -104,4 +105,28 @@ test("private mode: every read needs a key; the page, icons and pair/claim stay 
   assert.equal((await call("POST", "/mcp", {}, { jsonrpc: "2.0", id: 1, method: "ping" })).status, 401);
   assert.equal((await call("POST", "/api/pair/claim", {}, { code: "x".repeat(20) })).status, 404);
   assert.equal((await call("POST", "/api/ingest", { authorization: `Bearer ${READ_KEY}` }, { text: "hi" })).status, 401, "the read key cannot write");
+});
+
+test("tags and permanent delete over HTTP: validation, 409 outside the trash, 404 when gone", async () => {
+  const { call, dn } = await start();
+  const auth = { authorization: `Bearer ${PASSWORD}` };
+  const j = { isAiTool: 1, category: "other", kind: "repo" as const, worth: "normal" as const, engine: "jev" as const, confidence: 1 };
+  const it = dn.store.upsert({ url: "https://r.test/x", aliases: [], title: "x", judgement: j, summary: { name: "X", oneLiner: "o", highlights: [], useCases: [], tags: [] }, flags: [], source: "s" });
+  const bare = dn.store.upsert({ url: "https://r.test/y", aliases: [], title: "y", judgement: j, summary: null, flags: [], source: "s" });
+  assert.equal((await call("PUT", `/api/items/${it.id}/tags`, {}, { tags: ["a"] })).status, 401);
+  assert.equal((await call("DELETE", `/api/items/${it.id}`)).status, 401);
+  assert.equal((await call("PUT", `/api/items/${it.id}/tags`, auth, { tags: "a" })).status, 400);
+  assert.equal((await call("PUT", `/api/items/${it.id}/tags`, auth, { tags: ["x".repeat(41)] })).status, 422);
+  assert.equal((await call("PUT", `/api/items/${bare.id}/tags`, auth, { tags: ["a"] })).status, 422, "no summary yet");
+  assert.equal((await call("PUT", "/api/items/999/tags", auth, { tags: ["a"] })).status, 404);
+  const ok = await call("PUT", `/api/items/${it.id}/tags`, auth, { tags: ["Alpha"] });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(JSON.parse(ok.body).summary.tags, ["alpha"]);
+  assert.equal((await call("DELETE", `/api/items/${it.id}`, auth)).status, 409, "not in the trash");
+  await call("POST", `/api/items/${it.id}/trash`, auth);
+  assert.equal((await call("DELETE", `/api/items/${it.id}`, auth)).status, 200);
+  assert.equal((await call("GET", `/api/items/${it.id}`)).status, 404);
+  assert.equal((await call("DELETE", `/api/items/${it.id}`, auth)).status, 404);
+  await call("POST", `/api/items/${bare.id}/trash`, auth);
+  assert.deepEqual(JSON.parse((await call("DELETE", "/api/trash", auth)).body), { ok: true, removed: 1 });
 });

@@ -40,7 +40,7 @@ if a step fails; do not guess.
    (Claude Desktop goes through the mcp-remote bridge) and never prints the token.
 4. Restart the agent and verify with a search, as above.
 
-## Tools (14, via the `driftnet` MCP server)
+## Tools (15, via the `driftnet` MCP server)
 
 - driftnet_search_items: search the catalogue before choosing a tool; `days` for what is new.
 - driftnet_get_item: read one card in full (use cases, note, chat context, tools found inside).
@@ -48,7 +48,7 @@ if a step fails; do not guess.
 - driftnet_lease_items: take queued links nobody has summarised yet (leased for 30 minutes).
 - driftnet_enrich_item: return the summary for a leased link.
 - driftnet_refresh_item: fetch a card's page again and redo its summary and rating.
-- driftnet_update_item: vote an item up or down; star, note, trash or restore when the human asks.
+- driftnet_update_item: vote an item up or down; star, note, set tags, trash or restore when the human asks.
 - driftnet_list_folders: show the folder tree.
 - driftnet_move_items: file one or more items into a folder.
 - driftnet_undo_move: revert a move batch by its undo id (valid 24 hours).
@@ -56,6 +56,7 @@ if a step fails; do not guess.
 - driftnet_create_folder: create a folder.
 - driftnet_update_folder: change a folder's name, description or parent.
 - driftnet_delete_folder: delete a folder; its items move up to the parent.
+- driftnet_delete_item: permanently delete a trashed item (irreversible; confirm first).
 
 ## When to use it
 

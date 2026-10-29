@@ -60,9 +60,9 @@ test("the API search finds by meaning and reports the fused total; related comes
   assert.deepEqual(one.body.related, [{ id: sso.id, name: "SSO box" }]);
 });
 
-test("MCP keeps exactly 14 tools; search matches by meaning and get_item carries related {id, name}", async () => {
+test("MCP keeps exactly 15 tools; search matches by meaning and get_item carries related {id, name}", async () => {
   const client = await connect();
-  assert.equal((await client.listTools()).tools.length, 14);
+  assert.equal((await client.listTools()).tools.length, 15);
   const found = JSON.parse(text(await client.callTool({ name: "driftnet_search_items", arguments: { query: "login" } })).split("\n\n").slice(1).join("\n\n"));
   const names = (found.items ?? found).map((i: { name: string }) => i.name).sort();
   assert.deepEqual(names, ["OAuth kit", "SSO box"]);
@@ -77,7 +77,7 @@ test("with semantic search off, MCP and the API behave as before", async () => {
   assert.deepEqual(r.body, []);
   assert.equal(r.total, "0");
   const client = await connect();
-  assert.equal((await client.listTools()).tools.length, 14);
+  assert.equal((await client.listTools()).tools.length, 15);
   const got = JSON.parse(text(await client.callTool({ name: "driftnet_get_item", arguments: { id: oauth.id } })).split("\n\n").slice(1).join("\n\n"));
   assert.deepEqual(got.related, []);
 });

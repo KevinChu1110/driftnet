@@ -216,7 +216,7 @@ test("install doc: copies agree and name every MCP tool", () => {
   assert.equal(readFileSync(join(ROOT, "docs", "agents", "install.md"), "utf8"), txt, "docs/agents/install.md must equal docs/llms-install.txt");
   const mcp = readFileSync(join(ROOT, "apps", "server", "src", "mcp.ts"), "utf8");
   const tools = [...mcp.matchAll(/registerTool\(\s*"(driftnet_[a-z_]+)"/g)].map((m) => m[1]!);
-  assert.equal(tools.length, 14);
+  assert.equal(tools.length, 15);
   for (const name of tools) assert.ok(txt.includes(name), `install doc mentions ${name}`);
   assert.ok(txt.split("\n").length <= 120);
   assert.match(txt, /22\.13/);

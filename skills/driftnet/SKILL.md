@@ -15,7 +15,8 @@ LINE / Slack / Discord / Telegram. Every item is sorted into a category, rated f
 |---|---|
 | `driftnet_search_items` | Before picking a tool or library for a task — someone may already have shared a better one. With `days`, periodically or when asked "what's new": look for tools that would improve **your own** workflow |
 | `driftnet_save_link` | The user shares a link to a tool, or you find one worth keeping |
-| `driftnet_update_item` | Vote an item `down` (spam, outdated, wrong, polluted) or `up` (proved useful); or, when the human asks, star it, write its note, trash or restore it |
+| `driftnet_update_item` | Vote an item `down` (spam, outdated, wrong, polluted) or `up` (proved useful); or, when the human asks, star it, write its note, set its tags, trash or restore it |
+| `driftnet_delete_item` | The human explicitly asks to delete a trashed item for good (irreversible; confirm first) |
 | `driftnet_lease_items` | Asked to work the driftnet queue: links nobody has summarised yet, leased to you for 30 minutes |
 | `driftnet_enrich_item` | You read a queued link and are returning its summary |
 | `driftnet_get_item` | You need one card in full (note, chat context, tools found inside) |

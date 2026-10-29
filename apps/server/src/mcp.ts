@@ -233,11 +233,11 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
   server.registerTool(
     "driftnet_update_item",
     {
-      title: "Star, note, vote on or trash an item",
+      title: "Star, note, tag, vote on or trash an item",
       description:
-        "Change how the reader keeps one item: star it, write its note, vote on it, or move it to or from the trash. " +
+        "Change how the reader keeps one item: star it, write its note, set its tags, vote on it, or move it to or from the trash. Returns one line saying what changed, e.g. \"Item 42: starred, note saved.\" " +
         "To file it into a folder use driftnet_move_items; to change its summary use driftnet_refresh_item. Pass only the fields to change, at least one. " +
-        "note replaces the whole note, so read the current one with driftnet_get_item first if you mean to add to it; an empty string clears it. " +
+        "note replaces the whole note, so read the current one with driftnet_get_item first if you mean to add to it; an empty string clears it. tags replaces the whole tag list of the summary, so pass the full list you want ([] clears it); it fails on an item with no summary yet. " +
         "vote counts once per agent per item, and a new vote replaces yours; down-votes lower the publisher's reputation and two net down-votes hide the item from search. vote_reason is stored only together with a vote. " +
         "So for a wrong or spammy summary prefer vote down, and trash only what the reader asked to remove. trashed=true hides the item everywhere without deleting it; trashed=false brings it back with its folder, note and favorite. " +
         "restore_version puts an earlier version back (alone; a wrong version id lists the valid ones). Setting a value it already has changes nothing. Fails if the item does not exist.",
@@ -245,6 +245,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         id: itemId("Item id from driftnet_search_items (view 'trash' lists trashed ones)"),
         favorite: z.boolean().optional().describe("true to star, false to unstar"),
         note: z.string().max(5000).optional().describe("The whole new note, plain text up to 5000 chars; '' clears it"),
+        tags: z.array(z.string()).max(8).optional().describe("The whole new tag list, up to 8; [] clears it"),
         vote: z.enum(["up", "down"]).optional().describe("up: useful and accurate; down: spam, outdated, wrong or polluted"),
         vote_reason: z.string().max(300).optional().describe("Short reason for the vote, e.g. 'summary describes the wrong tool'"),
         trashed: z.boolean().optional().describe("true to move to the trash, false to restore from it"),
@@ -252,11 +253,11 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ id, favorite, note, vote, vote_reason, trashed, restore_version }) => {
+    async ({ id, favorite, note, tags, vote, vote_reason, trashed, restore_version }) => {
       const current = dn.store.get(id);
       if (!current) return fail(`No item ${id}.`);
       if (restore_version !== undefined) {
-        if (favorite !== undefined || note !== undefined || vote !== undefined || vote_reason !== undefined || trashed !== undefined) return fail("restore_version cannot be combined with other fields.");
+        if (favorite !== undefined || note !== undefined || tags !== undefined || vote !== undefined || vote_reason !== undefined || trashed !== undefined) return fail("restore_version cannot be combined with other fields.");
         try {
           const r = dn.store.restoreVersion(id, restore_version, `agent:${agentName}`);
           return done(`Item ${id}: restored version ${restore_version}${r.trashedAt ? " (still in the trash)" : ""}.`);
@@ -266,11 +267,15 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
           return fail(`${err.message}.${err.status === 404 && known ? ` Versions: ${known}.` : ""}`);
         }
       }
-      if (favorite === undefined && note === undefined && vote === undefined && trashed === undefined) return fail("Pass at least one of favorite, note, vote or trashed.");
+      if (favorite === undefined && note === undefined && tags === undefined && vote === undefined && trashed === undefined) return fail("Pass at least one of favorite, note, tags, vote or trashed.");
       const changed: string[] = [];
       if (trashed === false && current.trashedAt) { dn.store.setTrashed(id, false, `agent:${agentName}`); changed.push("restored"); }
       if (favorite !== undefined) { dn.store.setFavorite(id, favorite, `agent:${agentName}`); changed.push(favorite ? "starred" : "unstarred"); }
       if (note !== undefined) { dn.store.setNote(id, note, `agent:${agentName}`); changed.push(note.trim() ? "note saved" : "note cleared"); }
+      if (tags !== undefined) {
+        try { dn.store.setTags(id, tags, `agent:${agentName}`); } catch (err) { if (err instanceof ItemError) return fail(err.message); throw err; }
+        changed.push(tags.length ? "tags saved" : "tags cleared");
+      }
       if (vote) { dn.store.vote(id, vote === "up" ? 1 : -1, `agent:${agentName}`, vote_reason); changed.push(`voted ${vote}`); }
       if (trashed === true && !current.trashedAt) { dn.store.setTrashed(id, true, `agent:${agentName}`); changed.push("moved to the trash (restorable)"); }
       return done(changed.length ? `Item ${id}: ${changed.join(", ")}.` : `Item ${id}: nothing to change.`);
@@ -285,7 +290,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       title: "List folders",
       description:
         "List the reader's folder tree, which is also the set of categories driftnet sorts new links into. " +
-        "Call it before driftnet_move_items, driftnet_create_folder, driftnet_update_folder or a folder-filtered driftnet_search_items to get valid ids; ids stay the same when a folder is renamed. " +
+        "Call it before driftnet_move_items, driftnet_create_folder, driftnet_update_folder, driftnet_delete_folder or a folder-filtered driftnet_search_items to get valid ids; ids stay the same when a folder is renamed. Skip it when you already listed the folders in this session and nothing changed. " +
         "Takes no parameters and returns the whole tree as a flat list: follow parent to rebuild the nesting (null means top level). " +
         "items counts only the cards directly inside, not those in sub-folders; uses shows where the reader files most often, a good tiebreaker when two folders fit.",
       outputSchema: { folders: z.array(z.object({ id: z.string(), parent: z.string().nullable(), folder: z.string(), items: z.number(), uses: z.number() })) },
@@ -364,8 +369,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "Use it when the reader asks to reorganise in general; for one specific change call driftnet_create_folder, driftnet_update_folder or driftnet_move_items directly. " +
         "Takes no parameters: it always looks at the whole tree. " +
         "The plan has at most 50 operations (create a folder, rename or merge a built-in folder, move cards), each with a reason, and never touches cards the reader filed by hand or folders they made. " +
-        "It sends folder names and descriptions plus card names and tags (not summaries) to the model, costing one model call. " +
-        "Show the plan to the reader; they apply it on the web page (Folders → Suggest folders), where it can be undone. Fails when no model is configured or the answer is unusable.",
+        "It sends folder names and descriptions plus card names and tags (not summaries) to the model. " +
+        "Each call can return a different plan, and it takes a few seconds (one time-limited model call). Show the plan to the reader; they apply it on the web page (Folders → Suggest folders), where it can be undone. Fails when no model is configured or the answer is unusable.",
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -443,9 +448,9 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       description:
         "Delete one folder. Nothing inside is lost: its items and sub-folders move up to its parent, or to \"other\" at the top level. " +
         "Only do it when the reader asked; to empty a folder without deleting it move its items with driftnet_move_items, and to rename it use driftnet_update_folder. " +
-        "id must be an existing folder id from driftnet_list_folders, not the display name; \"other\" is the catch-all and can't be deleted. " +
+        "Ids are stable lowercase slugs (e.g. 'games', or a generated 'f-…' id for names without Latin letters) that don't change on rename; sub-folders keep their own ids when they move up; \"other\" is the catch-all and can't be deleted. " +
         "No tool can undo it, so confirm with the reader first. Fails if the folder does not exist.",
-      inputSchema: { id: folderId("Folder id from driftnet_list_folders, e.g. 'games'; not 'other'") },
+      inputSchema: { id: folderId("Folder id") },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ id }) => {
@@ -454,6 +459,27 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         return done(`Deleted folder ${id}; its contents moved up a level.`);
       } catch (err) {
         if (err instanceof FolderError) return fail(err.message);
+        throw err;
+      }
+    },
+  );
+
+  server.registerTool(
+    "driftnet_delete_item",
+    {
+      title: "Delete a trashed item for good",
+      description:
+        "Permanently delete one item that is already in the trash, with its shares, votes and version history. " +
+        "It cannot be undone and only works on trashed items; to hide something reversibly use driftnet_update_item with trashed=true. " +
+        "Confirm with the reader first. Fails if the item does not exist or is not in the trash.",
+      inputSchema: { id: itemId("Id of a trashed item (driftnet_search_items with view 'trash')") },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ id }) => {
+      try {
+        return dn.store.purgeItem(id, `agent:${agentName}`) ? done(`Item ${id} deleted permanently.`) : fail(`No item ${id}.`);
+      } catch (err) {
+        if (err instanceof ItemError) return fail(`Not deleted: ${err.message}.`);
         throw err;
       }
     },

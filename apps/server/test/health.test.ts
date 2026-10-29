@@ -67,12 +67,12 @@ test("the manual check marks a local address as unfetched and stores a check tim
   assert.ok(out.healthCheckedAt);
 });
 
-test("MCP: rows carry health and stars, view needs_review lists the marked ones, still 14 tools", async () => {
+test("MCP: rows carry health and stars, view needs_review lists the marked ones, still 15 tools", async () => {
   const [a, b] = InMemoryTransport.createLinkedPair();
   await createMcpServer(dn, "test").connect(a);
   const client = new Client({ name: "t", version: "0" });
   await client.connect(b);
-  assert.equal((await client.listTools()).tools.length, 14);
+  assert.equal((await client.listTools()).tools.length, 15);
   const review = await client.callTool({ name: "driftnet_search_items", arguments: { view: "needs_review", min_worth: "skip" } });
   const items = (review.structuredContent as { items: { id: number; health: string | null; stars: number | null }[] }).items;
   assert.deepEqual(items.map((i) => i.id).sort(), [dead.id, stale.id].sort());

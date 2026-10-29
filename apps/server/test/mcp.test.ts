@@ -157,9 +157,9 @@ test("the inbox filter and suggested folders show up for agents; suggest_folders
   await client.close();
 });
 
-test("driftnet_update_item can put an earlier version back, alone, and the tool list stays at 14", async () => {
+test("driftnet_update_item can put an earlier version back, alone, and the tool list stays at 15", async () => {
   const client = await connect();
-  assert.equal((await client.listTools()).tools.length, 14);
+  assert.equal((await client.listTools()).tools.length, 15);
   const it = dn.store.upsert({ url: "https://mcp.test/hist", aliases: [], title: "h", judgement, summary: null, flags: [], source: "s" });
   await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, note: "one" } });
   await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, note: "two" } });
@@ -175,4 +175,32 @@ test("driftnet_update_item can put an earlier version back, alone, and the tool 
   assert.equal(ok.isError, undefined);
   assert.equal(dn.store.get(it.id)!.note, "one");
   await client.close();
+});
+
+test("driftnet_update_item tags, and driftnet_delete_item only purges trashed items and is destructive", async () => {
+  const client = await connect();
+  const it = dn.store.upsert({ url: "https://mcp.test/tags", aliases: [], title: "t", judgement, summary: { name: "T", oneLiner: "x", highlights: [], useCases: [], tags: ["a"] }, flags: [], source: "s" });
+  assert.match(text(await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, tags: ["Alpha", "beta"] } })), /tags saved/);
+  assert.deepEqual(dn.store.get(it.id)!.summary!.tags, ["alpha", "beta"]);
+  assert.equal((await client.callTool({ name: "driftnet_update_item", arguments: { id: item.id, tags: ["x"] } })).isError, true, "no summary yet");
+  const tools = (await client.listTools()).tools;
+  assert.equal(tools.length, 15);
+  const del = tools.find((t) => t.name === "driftnet_delete_item")!;
+  assert.deepEqual(del.annotations, { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false });
+  const refused = await client.callTool({ name: "driftnet_delete_item", arguments: { id: it.id } });
+  assert.equal(refused.isError, true);
+  assert.match(text(refused), /trash first/);
+  assert.ok(dn.store.get(it.id));
+  await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, trashed: true } });
+  assert.match(text(await client.callTool({ name: "driftnet_delete_item", arguments: { id: it.id } })), /deleted permanently/);
+  assert.equal(dn.store.get(it.id), null);
+  assert.equal((await client.callTool({ name: "driftnet_delete_item", arguments: { id: it.id } })).isError, true);
+  await client.close();
+  // A read-only session never sees it.
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await createMcpServer(dn, "ro", { readOnly: true }).connect(a);
+  const ro = new Client({ name: "t", version: "0" });
+  await ro.connect(b);
+  assert.ok(!(await ro.listTools()).tools.some((t) => t.name === "driftnet_delete_item"));
+  await ro.close();
 });

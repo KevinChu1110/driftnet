@@ -43,6 +43,22 @@ export class VectorIndex {
     if (this.loaded && model === this.model) this.cachePut(id, vec);
   }
 
+  /** Forget one item's vector, in the database and in memory (swap-with-last keeps the matrix dense). */
+  remove(id: number): void {
+    this.db.prepare("DELETE FROM item_vec WHERE item_id = ?").run(id);
+    const p = this.pos.get(id);
+    if (p === undefined) return;
+    const last = this.ids.length - 1;
+    if (p !== last) {
+      const moved = this.ids[last]!;
+      this.mat.copyWithin(p * this.dim, last * this.dim, (last + 1) * this.dim);
+      this.ids[p] = moved;
+      this.pos.set(moved, p);
+    }
+    this.ids.pop();
+    this.pos.delete(id);
+  }
+
   /** How many items have a vector for the active model. */
   count(): number {
     if (!this.model) return 0;

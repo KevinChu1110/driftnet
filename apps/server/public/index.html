@@ -69,7 +69,7 @@
   @media (min-width: 721px) { .lock .short { display: none; } }
   /* Browsing with a read-only share key: nothing that edits is offered. */
   body.readonly .tools, body.readonly .link-btn[data-act="note"], body.readonly nav .more, body.readonly nav [data-new],
-  body.readonly .map-bar [data-map="new"], body.readonly #new-note, body.readonly .hint.swipe-hint { display: none !important; }
+  body.readonly .trash-bar, body.readonly .map-bar [data-map="new"], body.readonly #new-note, body.readonly .hint.swipe-hint { display: none !important; }
   .lang { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; min-height: 40px; }
 
   .layout { display: grid; grid-template-columns: 256px 1fr; max-width: 1200px; margin: 0 auto; }
@@ -119,6 +119,11 @@
   .btn { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
   .btn.danger { color: var(--danger); }
+  .trash-bar { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+  .tool.danger { color: var(--danger); }
+  .tool.danger.armed { width: auto; padding: 0 12px; background: var(--danger); color: var(--panel); font-size: 13px; }
+  .tag-edit { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag-edit input { flex: 1; min-width: 14ch; font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); }
   .btn.danger.armed { background: var(--danger); border-color: var(--danger); color: var(--panel); }
   .dlg-error { color: var(--danger); font-size: 13px; margin: 0 0 8px; }
   .dlg-error:empty { display: none; }
@@ -762,7 +767,8 @@
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
       noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
       emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "Download a backup (Markdown)", exportVault: "Download for Obsidian / Notion",
-      saved: "Saved", settings: "Settings", pickedUp: (n) => `Picked up “${n}” — tap the folder it goes into`, alreadyThere: "It's already in that folder",
+      saved: "Saved", tagsEdit: "Edit tags", tagsHelp: "Tags, separated by commas (up to 8)", purge: "Delete forever", purgeSure: "Click again to delete forever", purged: (n) => `“${n}” deleted for good`,
+      emptyTrashBtn: "Empty trash", emptyTrashSure: (n) => `Click again to delete ${n} for good`, trashEmptied: (n) => `${n} cards deleted for good`, settings: "Settings", pickedUp: (n) => `Picked up “${n}” — tap the folder it goes into`, alreadyThere: "It's already in that folder",
       readOnlyNudge: "You can only look here — tap Unlock at the top to change things", filterFolders: "Type to find a folder…", undoHint: "z undoes",
       tplTitle: "Start with folders for:", tplAi: "AI & coding", tplResearch: "Research", tplEveryday: "Everyday", tplSkip: "Keep the default", tplFailed: "Can't change the folders now: you already have cards or changed them.",
       addLink: "Add", addPlaceholder: "Paste a link to a tool, post or video…", added: "Saved — sorting it now",
@@ -957,7 +963,8 @@
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
       noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
       emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "下載備份（Markdown）", exportVault: "下載給 Obsidian／Notion",
-      saved: "已儲存", settings: "設定", pickedUp: (n) => `已拿起「${n}」，點要放進去的資料夾`, alreadyThere: "它已經在這個資料夾裡了",
+      saved: "已儲存", tagsEdit: "編輯標籤", tagsHelp: "標籤，用逗號分隔（最多 8 個）", purge: "永久刪除", purgeSure: "再按一次即永久刪除", purged: (n) => `已永久刪除「${n}」`,
+      emptyTrashBtn: "清空垃圾桶", emptyTrashSure: (n) => `再按一次，永久刪除這 ${n} 張`, trashEmptied: (n) => `已永久刪除 ${n} 張卡片`, settings: "設定", pickedUp: (n) => `已拿起「${n}」，點要放進去的資料夾`, alreadyThere: "它已經在這個資料夾裡了",
       readOnlyNudge: "目前只能看。要修改，請點上方的「解鎖」", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
       tplTitle: "從這些資料夾開始：", tplAi: "AI 與程式", tplResearch: "研究", tplEveryday: "日常生活", tplSkip: "維持預設", tplFailed: "現在不能換資料夾了：已經有卡片，或資料夾被你改過。",
       addLink: "收錄", addPlaceholder: "貼上工具、貼文或影片的連結…", added: "收到，正在整理",
@@ -2746,7 +2753,9 @@
       ${sec("hl", t.mdHighlights, s?.highlights?.length ? list(s.highlights) : "")}
       ${sec("uc", t.mdUse, s?.useCases?.length ? list(s.useCases) : "")}
       ${sec("try", t.mdTry, s?.tryIt ? `<div class="md-try"><pre><code>${esc(s.tryIt)}</code></pre><button class="btn" type="button" data-md="copy">${esc(t.mdCopy)}</button></div>` : "")}
-      ${sec("tags", t.mdTags, s?.tags?.length ? `<div class="md-tags tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</div>` : "")}
+      ${tagsFor === i.id && admin && s ? `<section class="md-sec tags"><h4>${esc(t.mdTags)}</h4><form class="tag-edit"><input id="md-tags-in" value="${esc((s.tags ?? []).join(", "))}" maxlength="400" aria-label="${esc(t.tagsHelp)}" placeholder="${esc(t.tagsHelp)}">
+        <button class="btn primary" type="submit">${esc(t.save)}</button><button class="btn" type="button" data-md="tags-cancel">${esc(t.cancel)}</button></form></section>`
+        : sec("tags", t.mdTags, s?.tags?.length ? `<div class="md-tags tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</div>` : "")}
       ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}" data-open="${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
       <div class="found" id="md-related" hidden></div>
       ${flagLines(i, t)}
@@ -2755,10 +2764,10 @@
     const busy = refreshing.has(i.id);
     const btn = (act, icon, label, extra = "") => `<button class="btn ${extra}" type="button" data-md="${act}">${ic(icon)} ${esc(label)}</button>`;
     $("md-actions").innerHTML = `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ic("link")} ${esc(t.openLink)}</a>` +
-      (admin ? (inTrash ? btn("restore", "undo", t.restore)
+      (admin ? (inTrash ? btn("restore", "undo", t.restore) + btn("purge", "trash", t.purge, "danger")
         : btn("favorite", "star", i.favorite ? t.unfavorite : t.favorite, i.favorite ? "on" : "") + btn("move", "move", t.moveTo) +
           `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refresh)}</button>` +
-          btn("health", "refresh", t.checkLink) + btn("note", "note", i.note ? t.editNote : t.addNote) + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
+          btn("health", "refresh", t.checkLink) + btn("note", "note", i.note ? t.editNote : t.addNote) + (s ? btn("tags", "note", t.tagsEdit) : "") + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
       btn("history", "undo", t.histBtn, histFor === i.id ? "on" : "") +
       (modalFrom === "map" ? btn("list", "list", t.showInList) : "");
     if (histFor === i.id) paintHistory(i);
@@ -2843,6 +2852,40 @@
       if (c) { c.focus({ preventScroll: true }); c.scrollIntoView({ block: "nearest" }); }
     }, 0);
   });
+  let tagsFor = null;
+  mdlDlg.addEventListener("submit", async (e) => {
+    if (!e.target.matches?.(".tag-edit")) return;
+    e.preventDefault();
+    const id = modalId, item = find(id);
+    if (!item) return;
+    const tags = $("md-tags-in").value.split(/[,，、\n]/).map((x) => x.trim().replace(/^#/, "")).filter(Boolean);
+    const saved = await mapWrite(`/api/items/${id}/tags`, "PUT", { tags });
+    if (!saved) return;
+    item.summary = saved.summary;
+    tagsFor = null;
+    repaintItem(id);
+    toast(T().saved);
+  });
+  /** Two-step button: the first click asks, a second click within 5 s goes ahead. */
+  function confirmClick(b, label, go) {
+    if (b.classList.contains("armed")) { clearTimeout(b._t); return go(); }
+    const keep = { html: b.innerHTML, label: b.getAttribute("aria-label") };
+    b.classList.add("armed", "danger"); b.textContent = label; b.setAttribute("aria-label", label);
+    b._t = setTimeout(() => {
+      if (!b.isConnected) return;
+      b.classList.remove("armed"); b.innerHTML = keep.html;
+      if (keep.label) b.setAttribute("aria-label", keep.label); else b.removeAttribute("aria-label");
+    }, 5000);
+  }
+  /** Delete one trashed card for good (the server refuses anything not in the trash). */
+  async function purgeCard(id, el) {
+    const item = find(id);
+    if (!(await mapWrite(`/api/items/${id}`, "DELETE"))) return;
+    if (el) { dismiss(el); }
+    forgetItem(id);
+    toast(T().purged(item ? nameOf(item) : `#${id}`));
+    refreshCounts();
+  }
   mdlDlg.addEventListener("click", async (e) => {
     if (e.target === mdlDlg) return mdlDlg.close();   // the backdrop
     const open = e.target.closest("a[data-open]");
@@ -2878,6 +2921,9 @@
     if (act1 === "refresh") return refreshItem(id);
     if (act1 === "health") return checkLink(id);
     if (act1 === "note") return openItemNote(id);
+    if (act1 === "tags") { tagsFor = id; paintModal(); return $("md-tags-in")?.focus(); }
+    if (act1 === "tags-cancel") { tagsFor = null; return paintModal(); }
+    if (act1 === "purge") return confirmClick(b, T().purgeSure, async () => { mdlDlg.close(); await purgeCard(id, el); });
     if (act1 === "favorite") {
       if (el) await run(el, "favorite");
       else { const on = !item.favorite; if (await act(id, on ? "favorite" : "unfavorite")) { item.favorite = on; refreshCounts(); if (mapShown()) drawMap(); } }
@@ -3441,7 +3487,7 @@
     const t = T();
     const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : state.view === "review" ? t.emptyReview : t.empty;
     $("list").innerHTML = items.length
-      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
+      ? (state.view === "trash" ? `<div class="trash-bar"><button class="btn danger" type="button" id="trash-empty">${ic("trash")} ${esc(t.emptyTrashBtn)}</button></div>` : "") + `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
       : `<div class="empty first"><span>${esc(empty)}</span>${state.view === "all" && !state.q && !state.category && role === "admin"
           ? `<form class="add" id="add-form"><input id="add-url" type="url" inputmode="url" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
              <button class="btn primary" type="submit">${ic("plus")} ${esc(t.addLink)}</button></form>
@@ -3449,6 +3495,12 @@
     watchMore();
     if (keep) scrollTo({ top: y });
     $("add-form")?.addEventListener("submit", addLink);
+    $("trash-empty")?.addEventListener("click", (e) => confirmClick(e.currentTarget, T().emptyTrashSure(pageTotal), async () => {
+      const r = await mapWrite("/api/trash", "DELETE");
+      if (!r) return;
+      toast(T().trashEmptied(r.removed));
+      load(); refreshCounts();
+    }));
     for (const b of $("list").querySelectorAll("[data-template]")) b.addEventListener("click", () => pickTemplate(b.dataset.template));
     $("list").querySelector("[data-connect-empty]")?.addEventListener("click", () => openConnect());
     for (const el of $("list").querySelectorAll(".swipe")) attachSwipe(el);
@@ -3485,7 +3537,8 @@
     const url = safeUrl(s?.primaryUrl || i.url);
     const inTrash = state.view === "trash";
     const tools = inTrash
-      ? `<button class="tool" type="button" data-act="restore" title="${esc(t.restore)}" aria-label="${esc(t.restore)}">${ic("undo")}</button>`
+      ? `<button class="tool" type="button" data-act="restore" title="${esc(t.restore)}" aria-label="${esc(t.restore)}">${ic("undo")}</button>
+         <button class="tool danger" type="button" data-act="purge" title="${esc(t.purge)}" aria-label="${esc(t.purge)}">${ic("trash")}</button>`
       : `<button class="tool grip" type="button" draggable="true" data-grip="${i.id}" title="${esc(t.dragHint)}" aria-hidden="true" tabindex="-1">${ic("grip")}</button>
          <button class="tool" type="button" data-act="move" title="${esc(t.moveTo)}" aria-label="${esc(t.moveTo)}">${ic("move")}</button>
          <button class="tool ${refreshing.has(i.id) ? "spin" : ""}" type="button" data-act="refresh" title="${esc(t.refresh)}" aria-label="${esc(t.refresh)}" ${refreshing.has(i.id) ? "disabled" : ""}>${ic("refresh")}</button>
@@ -3773,6 +3826,7 @@
     if (b.dataset.grip) return;
     if (b.dataset.act === "move") return openMovePicker(Number(b.closest(".swipe").dataset.id));
     if (b.dataset.act === "refresh") return refreshItem(Number(b.closest(".swipe").dataset.id));
+    if (b.dataset.act === "purge") { const sw = b.closest(".swipe"); return confirmClick(b, T().purgeSure, () => purgeCard(Number(sw.dataset.id), sw)); }
     run(b.closest(".swipe"), b.dataset.act);
   });
   $("list").addEventListener("dragstart", (e) => {

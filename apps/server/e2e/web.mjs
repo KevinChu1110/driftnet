@@ -302,6 +302,13 @@ try {
     assert.ok(await evaluate(s, `document.querySelector("#item-dlg .md-sec.demo")?.textContent.length > 20 && document.querySelector("#item-dlg .md-sec.why")?.textContent.length > 20`), "demo and why sections");
     assert.ok(await evaluate(s, `!!document.querySelector("#item-dlg .md-sec.try button[data-md=copy]") && !!document.querySelector("#item-dlg .md-sec.hl li") && !!document.querySelector("#item-dlg .md-sec.tags")`), "tryIt with a copy button, highlights, tags");
     assert.ok(await evaluate(s, `["favorite", "move", "refresh", "note", "trash"].every((a) => document.querySelector('#item-dlg [data-md="' + a + '"]'))`), "the actions are in the modal");
+    // Tags: edit in place, saved through the tags route.
+    await evaluate(s, `document.querySelector('#item-dlg [data-md="tags"]').click()`);
+    await waitFor(s, `!!document.getElementById("md-tags-in")`, "the tag editor opens");
+    await evaluate(s, `(() => { document.getElementById("md-tags-in").value = "Alpha, #beta"; document.querySelector("#item-dlg .tag-edit").requestSubmit(); })()`);
+    await waitFor(s, `!document.getElementById("md-tags-in") && [...document.querySelectorAll("#item-dlg .md-tags .tag")].map((e) => e.textContent).join() === "#alpha,#beta"`, "the new tags show");
+    assert.deepEqual((await api(`/api/items/${sharkId}`)).summary.tags, ["alpha", "beta"], "the server stored them lower-cased");
+    console.log("✓ modal: tags edited in place");
     await evaluate(s, `document.getElementById("item-dlg").querySelector(".md-scroll").scrollTop = 0`);
     await shoot(`web-card-modal-${LANG}.png`);
 
@@ -587,6 +594,25 @@ try {
   assert.equal((await api(`/api/items/${third}`)).trashedAt, undefined);
   assert.equal(await evaluate(s, `document.querySelectorAll(".swipe").length`), 0, "trash is empty again");
   console.log("✓ trash view: swipe right restored it");
+
+  // Delete forever: two clicks (the first only asks), the card and its history are gone, and the server agrees.
+  {
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "all view before purge");
+    const doomed = (await ids())[(await ids()).length - 1];
+    await evaluate(s, `document.querySelector('#item-${doomed} [data-act="trash"]').click()`);
+    await sleep(500);
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="trash"]').click()`);
+    await waitFor(s, `document.querySelector(".swipe")?.dataset.id === "${doomed}"`, "trash view before purge");
+    assert.ok(await evaluate(s, `!!document.getElementById("trash-empty")`), "the trash has an Empty trash button");
+    await evaluate(s, `document.querySelector('#item-${doomed} [data-act="purge"]').click()`);
+    await sleep(300);
+    assert.ok((await api(`/api/items/${doomed}`)).id, "the first click only asks");
+    await evaluate(s, `document.querySelector('#item-${doomed} [data-act="purge"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length === 0`, "the card left the trash view");
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/items/${doomed}`)).status, 404, "deleted for good");
+    console.log("✓ trash view: Delete forever asks first, then removes the card");
+  }
 
   // A vertical drag scrolls; it must not trigger anything.
   const before = (await api("/api/stats")).trash;

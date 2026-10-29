@@ -545,12 +545,13 @@ claude mcp add --transport http driftnet https://your-driftnet.example/mcp \
 | `driftnet_save_link` | 收錄一個連結 |
 | `driftnet_lease_items`／`driftnet_enrich_item` | 整理佇列，見下方 |
 | `driftnet_get_item` | 查看一張卡片的全部內容：摘要、用途、你的筆記、聊天室裡大家說的話、從裡面找到的工具 |
-| `driftnet_update_item` | 加最愛、寫筆記、投票（agent 的票也會計入信譽）、丟垃圾桶或還原 |
+| `driftnet_update_item` | 加最愛、寫筆記、整批替換標籤、投票（agent 的票也會計入信譽）、丟垃圾桶或還原 |
 | `driftnet_list_folders`／`driftnet_move_items` | 讀你的資料夾樹、把卡片放進去 |
 | `driftnet_undo_move` | 用 `driftnet_move_items` 回傳的復原代碼，把整批移動放回去 |
 | `driftnet_refresh_item` | 重新抓卡片的網頁、重寫摘要（保留讀者的筆記、最愛和自己選的資料夾） |
 | `driftnet_suggest_folders` | 請模型替資料夾樹提一份整理方案（只提案，要你在網頁上套用） |
-| `driftnet_create_folder`／`driftnet_update_folder`／`driftnet_delete_folder` | 新增、改名或改說明、刪除資料夾（內容會移到上一層；唯一標為「破壞性」的工具） |
+| `driftnet_create_folder`／`driftnet_update_folder`／`driftnet_delete_folder` | 新增、改名或改說明、刪除資料夾（內容會移到上一層） |
+| `driftnet_delete_item` | 永久刪除已在垃圾桶裡的卡片（無法復原，歷史紀錄也會一併刪除）。唯讀金鑰看不到這個工具 |
 
 </details>
 
@@ -662,7 +663,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack`（`?s=` 簽名連結）· `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `PUT /api/items/:id/tags` · `DELETE /api/items/:id`（限垃圾桶內）· `DELETE /api/trash` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
 `GET|PUT /api/settings`（限本機，或帶 token）· `GET /api/backup`（`?secrets=1` 並在 `X-Driftnet-Confirm` 標頭再送一次密碼）· `POST /api/backup/restore`（body 是 zip；兩者都限管理密碼）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>

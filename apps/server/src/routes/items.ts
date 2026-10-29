@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { BlockedUrl, HistoryError, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, HistoryError, ItemError, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
 import { agentBrief, leaseRow } from "../brief.ts";
 import { actorOf, isAdmin, token } from "../access.ts";
@@ -154,6 +154,38 @@ export const routes: Route[] = [
       const id = Number(m[1]);
       return dn.store.setNote(id, String(note ?? ""), actorOf(req, env, dn.store)) ? send(200, publicItem(dn.store.get(id)!)) : send(404, { error: "not found" });
     },
+  },
+  // The tag list is replaced as a whole ([] clears it).
+  {
+    method: "PUT", pattern: /^\/api\/items\/(\d+)\/tags$/, example: "/api/items/1/tags", access: "write",
+    handler: async ({ req, m, send, json, app: { dn, env } }) => {
+      const { tags } = await json<{ tags?: unknown }>();
+      if (!Array.isArray(tags)) throw new BadRequest("tags must be an array of strings");
+      try {
+        const item = dn.store.setTags(Number(m[1]), tags as string[], actorOf(req, env, dn.store));
+        return item ? send(200, publicItem(item)) : send(404, { error: "not found" });
+      } catch (err) {
+        if (err instanceof ItemError) return send(422, { error: err.message });
+        throw err;
+      }
+    },
+  },
+  // Delete a card for good: only from the trash, and its history goes with it.
+  {
+    method: "DELETE", pattern: /^\/api\/items\/(\d+)$/, example: "/api/items/1", access: "write",
+    handler: ({ m, send, app: { dn } }) => {
+      try {
+        return dn.store.purgeItem(Number(m[1])) ? send(200, { ok: true }) : send(404, { error: "not found" });
+      } catch (err) {
+        if (err instanceof ItemError) return send(409, { error: err.message });
+        throw err;
+      }
+    },
+  },
+  // Empty the trash: every trashed card, in one transaction.
+  {
+    method: "DELETE", pattern: "/api/trash", access: "write",
+    handler: ({ send, app: { dn } }) => send(200, { ok: true, removed: dn.store.purgeTrash() }),
   },
   // What this card looked like before each of its last 20 changes (same read rule as the card), and putting one back.
   {
