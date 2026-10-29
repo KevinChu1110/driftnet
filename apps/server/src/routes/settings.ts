@@ -3,6 +3,7 @@ import { isLocal, isPrivate, newKey, readKey, strength, token } from "../access.
 import { SettingsError } from "../settings.ts";
 import { pairRoute } from "../pair.ts";
 import { tokenRoute } from "../tokens.ts";
+import { dbPathOf, restorePending } from "../backup.ts";
 import type { App, Route } from "../route.ts";
 
 const SETTINGS_HINT = "settings can only be changed from this machine; set an admin password to change them remotely";
@@ -54,7 +55,7 @@ export const routes: Route[] = [
           throw err;
         }
       }
-      return send(200, { ...settings.view(), engines: dn.engines, plugins, ...accessView(req, app) });
+      return send(200, { ...settings.view(), engines: dn.engines, plugins, restorePending: restorePending(dbPathOf(env)), ...accessView(req, app) });
     },
   },
   // Agent tokens: one named key per agent. Admin password only, never a token itself (tokenRoute adds the per-method rules).

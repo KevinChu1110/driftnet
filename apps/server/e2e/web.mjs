@@ -31,7 +31,8 @@ const freePort = () => new Promise((r) => { const s = createServer(); s.listen(0
 // ── A catalogue with real summaries ─────────────────────────────────────────
 const home = mkdtempSync(join(tmpdir(), "driftnet-web-e2e-"));
 const port = await freePort();
-writeFileSync(join(home, ".env"), `PORT=${port}\nDRIFTNET_JUDGE=off\nDRIFTNET_LANGUAGE=${LANG === "zh-TW" ? "Traditional Chinese (Taiwan)" : "English"}\n`);
+// Not for README pictures: an "update available" notice (a pretend old version and a saved "9.9.9 is out") would sit in the header.
+writeFileSync(join(home, ".env"), `PORT=${port}\nDRIFTNET_JUDGE=off\nDRIFTNET_LANGUAGE=${LANG === "zh-TW" ? "Traditional Chinese (Taiwan)" : "English"}\n${SHOTS ? "" : "DRIFTNET_VERSION=0.0.1\n"}`);
 const seed = `
   import { loadCategories, Store } from "@driftnet/core";
   const items = JSON.parse(process.env.DEMO_ITEMS);
@@ -42,6 +43,7 @@ const seed = `
   const mine = store.createFolder({ name: zh ? "我的工作流" : "My workflow", description: "Tools I use every day" });
   store.createFolder({ name: zh ? "設計" : "Design", description: "UI and design helpers", parent: mine.id });
   store.updateFolder(mine.id, { position: -1 });
+  if (process.env.DEMO_UPDATE) store.setState("update_check", JSON.stringify({ at: Date.now(), latest: "9.9.9" }));
   for (const i of items) store.upsert({ url: i.url, aliases: [], title: i.title, flags: [], source: "demo", summary: i.summary,
     judgement: { isAiTool: 1, category: i.category, kind: i.kind, worth: i.worth, engine: "llm", confidence: 1 } });
   // Pictures: three for ascii-sharks (the first a GIF), one dead link on card 2. The browser serves the bytes (below).
@@ -58,7 +60,7 @@ const seed = `
 const demo = JSON.parse(readFileSync(join(HERE, "demo-items.json"), "utf8"))[LANG];
 await new Promise((resolve, reject) => {
   const p = spawn(join(SERVER, "../../node_modules/.bin/tsx"), ["--eval", seed], {
-    cwd: SERVER, stdio: "inherit", env: { ...process.env, DEMO_DB: join(home, "driftnet.db"), DEMO_ITEMS: JSON.stringify(demo), DEMO_LANG: LANG },
+    cwd: SERVER, stdio: "inherit", env: { ...process.env, DEMO_DB: join(home, "driftnet.db"), DEMO_ITEMS: JSON.stringify(demo), DEMO_LANG: LANG, ...(SHOTS ? {} : { DEMO_UPDATE: "1" }) },
   });
   p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error("seeding failed"))));
 });
@@ -390,6 +392,33 @@ try {
     await waitFor(s, `/2/.test(document.getElementById("im-status").textContent) && !document.getElementById("im-start").hidden`, "import preview with a Start button");
     assert.equal(await api("/api/items?q=import-e2e").then((r) => r.length), 0, "a preview adds nothing");
     console.log("✓ settings: import bookmarks previews the count before starting");
+    // Backup: a zip downloads without secrets; a restore is checked, staged, and the page says to restart (nothing changes now).
+    const bk = await evaluate(s, `(async () => {
+      const r = await fetch("/api/backup"); const b = new Uint8Array(await r.arrayBuffer());
+      const bad = new DataTransfer(); bad.items.add(new File(["not a zip"], "x.zip", { type: "application/zip" }));
+      const input = document.getElementById("bk-file"); input.files = bad.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((ok) => setTimeout(ok, 800));
+      const badMsg = document.getElementById("bk-status").textContent;
+      const good = new DataTransfer(); good.items.add(new File([b], "driftnet-backup.zip", { type: "application/zip" }));
+      input.files = good.files; input.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((ok) => setTimeout(ok, 1500));
+      return { type: r.headers.get("content-type"), pk: String.fromCharCode(b[0], b[1]), badMsg, okMsg: document.getElementById("bk-status").textContent,
+        copied: !!document.getElementById("bk-download") }; })()`);
+    assert.equal(bk.type, "application/zip"); assert.equal(bk.pk, "PK");
+    assert.match(bk.badMsg, /not a driftnet backup|not a zip/);
+    assert.match(bk.okMsg, LANG === "zh-TW" ? /重新啟動/ : /Restart driftnet to finish restoring/);
+    assert.equal((await api("/api/stats")).items, demo.length, "a staged restore changes nothing until restart");
+    console.log("✓ settings: backup downloads, a bad file is refused, a good one says to restart");
+    if (!SHOTS) {
+      // "A new version is out": a small header notice linking to the release; dismissed once per version.
+      await waitFor(s, `!document.getElementById("update").hidden`, "update notice");
+      assert.equal(await evaluate(s, `document.getElementById("update-link").href`), "https://github.com/KevinChu1110/driftnet/releases/tag/v9.9.9");
+      assert.match(await evaluate(s, `document.getElementById("update-link").textContent`), /9\.9\.9/);
+      await evaluate(s, `document.getElementById("update-x").click()`);
+      assert.equal(await evaluate(s, `document.getElementById("update").hidden && localStorage.getItem("driftnet-update-dismissed")`), "9.9.9");
+      console.log("✓ update notice: shown for a newer version, dismissed per version");
+    }
     await evaluate(s, `(() => {
       document.querySelector('[data-key="DRIFTNET_SUMMARY_RULES"]').value = "Say whether it is free.";
       document.querySelector('[data-pref="sort"]').value = "newest";

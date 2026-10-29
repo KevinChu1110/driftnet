@@ -50,6 +50,11 @@
   .brand { display: flex; align-items: center; gap: 8px; font-size: 19px; margin: 0; letter-spacing: -0.02em; font-weight: 750; }
   @media (min-width: 721px) { header { padding-inline: max(20px, calc((100vw - 1200px) / 2 + 20px)); } }
   .stats { color: var(--muted); font-size: 13px; }
+  .update { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 4px 2px 10px; background: var(--bg); }
+  .update[hidden] { display: none; }
+  .update a { color: var(--accent); text-decoration: none; }
+  .update a:hover, .update a:focus-visible { text-decoration: underline; }
+  .update button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px 6px; border-radius: 999px; line-height: 1; }
   .search { flex: 1; min-width: 180px; max-width: 420px; margin-left: auto; padding: 9px 12px; border: 1px solid var(--line);
             border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
   .skip { position: absolute; left: 8px; top: -60px; z-index: 50; background: var(--accent); color: #fff; padding: 10px 14px; border-radius: 10px; }
@@ -591,6 +596,7 @@
   </button>
   <h1 class="brand"><img src="/favicon.svg" alt="" width="26" height="26">driftnet</h1>
   <span class="stats" id="stats"></span>
+  <span class="update" id="update" hidden><a id="update-link" target="_blank" rel="noopener noreferrer"></a><button id="update-x" type="button">✕</button></span>
   <input id="q" class="search" type="search" enterkeyhint="search">
   <button id="lock" class="lock" type="button" hidden></button>
   <button id="palette-btn" class="lang" type="button" aria-haspopup="dialog"></button>
@@ -794,6 +800,13 @@
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
         savedServer: "Saved — already in effect", chat: "Chat replies", webhook: "Outgoing webhook", digest: "Scheduled digest", feed: "Feed (RSS)", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
+        updates: "Updates", bkTitle: "Backup", bkHelp: "One zip with your whole catalogue (cards, folders, notes, tokens) and your settings. Passwords and keys are left out unless you tick the box.",
+        bkDownload: "Download backup", bkSecrets: "Include passwords and keys (enter the admin password again)", bkPassword: "Admin password",
+        bkRestoreFile: "Restore from a backup file", bkRestoreHelp: "The backup is checked first. Nothing changes until you restart driftnet; your current data is kept next to it as a before-restore copy.",
+        bkChecking: "Checking the backup…", bkNeedPassword: "Type the admin password to include passwords and keys.", bkMade: "Backup downloaded.",
+        bkRestartTitle: "Restart driftnet to finish restoring", bkRestartBody: (n) => `The backup (${n} cards) is checked and waiting. It replaces your data the next time driftnet starts.`,
+        bkSettingsTitle: "Settings in the backup (not applied). Copy what you want into Settings:", bkPending: "A restore is waiting: restart driftnet to finish restoring.",
+        updOut: (v) => `driftnet ${v} is out`, updHow: "How to update", updDismiss: "Dismiss",
         impPackTitle: "From a pack link", impPackHelp: "Paste the link someone sent you for a folder pack. It comes in already summarised (no model calls), under its own folder.", impPackGo: "Check link", impPackConfirm: (name, n, dup) => `Pack “${name}”: ${n} new cards (${dup} already there). Import it?`, impPackNone: (name, dup) => `Pack “${name}” has nothing new (${dup} already there). Import anyway to file them?`, impPackDone: (name, added, already) => `Imported “${name}”: ${added} added, ${already} already there.`,
         impTitle: "Import bookmarks", impHelp: "Bring in a bookmarks file from your browser (HTML), Pocket, Raindrop (CSV), a driftnet JSON list, or any text with links.",
         impFile: "Choose a file", impKeep: "Keep my bookmark folders (under Imported)", impReading: "Reading the file…",
@@ -865,6 +878,8 @@
           DRIFTNET_PUBLIC_URL: ["This page's public URL", "Replies link here, e.g. https://driftnet.example.com"],
           DRIFTNET_SUMMARY_DEPTH: ["Summary detail", "How much each card says. Detailed costs more model tokens and reads twice as much of each page."],
           DRIFTNET_SUMMARY_RULES: ["Extra rules for summaries", "e.g. Say whether it's free. Mention if it needs a GPU."],
+          DRIFTNET_PROFILE: ["About you", "Who you are and what you care about (600 characters at most). The model uses it to judge what is worth your time and to write the \"why\" line. e.g. Backend engineer, Odoo and TypeScript; collecting AI coding tools and MCP servers; not interested in crypto."],
+          DRIFTNET_UPDATE_CHECK: ["Check for new versions", "Once a day driftnet asks the npm registry for the latest version number (nothing about you is sent) and shows a small notice. Off = never."],
           DRIFTNET_BLOCK_DOMAINS: ["Never catalogue these domains", "Comma or space separated, e.g. example.com, spam.io"],
           DRIFTNET_WEBHOOK_URL: ["Webhook URL", "driftnet POSTs each new or updated card here (n8n, Zapier, Slack workflows…). Treated as a secret."],
           DRIFTNET_WEBHOOK_SECRET: ["Webhook signing secret", "Optional. Adds X-Driftnet-Signature: sha256=<HMAC of the body>."],
@@ -894,6 +909,7 @@
           DRIFTNET_HEALTH: { "": "Off (default)", off: "Off", weekly: "Weekly (recommended)" },
           DRIFTNET_EMBED: { "": "Automatic (default): on when a local model is found", auto: "Automatic: on when a local model is found", off: "Off" },
           DRIFTNET_EMBED_PROVIDER: { "": "Automatic (local Ollama only)", ollama: "Ollama (on this computer)", openai: "OpenAI", gemini: "Gemini" },
+          DRIFTNET_UPDATE_CHECK: { "": "On (default)", 1: "On", 0: "Off" },
           DRIFTNET_VIDEO: { "": "Automatic (default)", auto: "Automatic: use the tools found", captions: "Captions only (light on battery: no download, OCR or speech)", off: "Off" },
         },
       },
@@ -977,6 +993,13 @@
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
         savedServer: "已儲存，馬上生效", chat: "聊天室回覆", webhook: "對外 Webhook", digest: "定時摘要", feed: "訂閱源（RSS）", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
         tabGeneral: "一般", tabAccess: "存取", tabAi: "AI",
+        updates: "更新", bkTitle: "備份", bkHelp: "一個 zip 檔，包含整個收藏（卡片、資料夾、筆記、權杖）和設定。除非勾選，否則不會包含密碼和金鑰。",
+        bkDownload: "下載備份", bkSecrets: "包含密碼和金鑰（需要再輸入一次管理員密碼）", bkPassword: "管理員密碼",
+        bkRestoreFile: "從備份檔還原", bkRestoreHelp: "會先檢查備份檔。重新啟動 driftnet 之前不會有任何改變；目前的資料會留在旁邊，檔名帶有 before-restore。",
+        bkChecking: "正在檢查備份檔…", bkNeedPassword: "要包含密碼和金鑰，請輸入管理員密碼。", bkMade: "備份已下載。",
+        bkRestartTitle: "請重新啟動 driftnet 以完成還原", bkRestartBody: (n) => `備份檔（${n} 張卡片）已檢查完畢並等待中，下次 driftnet 啟動時會取代目前的資料。`,
+        bkSettingsTitle: "備份裡的設定（不會自動套用）。需要的話請自行複製到「設定」：", bkPending: "有一份還原正在等待：請重新啟動 driftnet 以完成還原。",
+        updOut: (v) => `driftnet ${v} 已發布`, updHow: "如何更新", updDismiss: "關閉",
         impPackTitle: "從資料夾包連結匯入", impPackHelp: "貼上別人傳給你的資料夾包連結。卡片已經整理好（不會呼叫模型），會放進它自己的資料夾。", impPackGo: "檢查連結", impPackConfirm: (name, n, dup) => `資料夾包「${name}」：${n} 張新卡片（${dup} 張已經有了）。要匯入嗎？`, impPackNone: (name, dup) => `資料夾包「${name}」沒有新的卡片（${dup} 張已經有了）。仍要匯入把它們歸檔嗎？`, impPackDone: (name, added, already) => `已匯入「${name}」：新增 ${added}、原本就有 ${already}。`,
         impTitle: "匯入書籤", impHelp: "匯入瀏覽器的書籤檔（HTML）、Pocket、Raindrop（CSV）、driftnet 的 JSON 清單，或任何含有連結的文字檔。",
         impFile: "選擇檔案", impKeep: "保留我的書籤資料夾（放在「Imported」底下）", impReading: "讀取檔案中…",
@@ -1048,6 +1071,8 @@
           DRIFTNET_PUBLIC_URL: ["這個網頁的公開網址", "回覆裡的連結會指到這裡，例如 https://driftnet.example.com"],
           DRIFTNET_SUMMARY_DEPTH: ["摘要詳細程度", "每張卡片寫多少。詳細會用較多模型 token，且每個頁面讀兩倍的內容。"],
           DRIFTNET_SUMMARY_RULES: ["摘要的額外規則", "例如：說明是否免費。需要 GPU 的話要提到。"],
+          DRIFTNET_PROFILE: ["關於你", "你是誰、關心什麼（最多 600 字）。模型會用它判斷什麼值得你花時間，並寫「為什麼值得看」那一句。例如：後端工程師，做 Odoo 和 TypeScript；蒐集 AI 寫程式工具和 MCP 伺服器；對加密貨幣沒興趣。"],
+          DRIFTNET_UPDATE_CHECK: ["檢查新版本", "每天向 npm 查一次最新版本號（不會傳送任何與你有關的資料），有新版就顯示小提示。關閉＝完全不查。"],
           DRIFTNET_BLOCK_DOMAINS: ["不要收錄的網域", "用逗號或空白分隔，例如 example.com, spam.io"],
           DRIFTNET_WEBHOOK_URL: ["Webhook 網址", "每張新增或更新的卡片都會 POST 到這裡（n8n、Zapier、Slack 工作流程…）。視為機密。"],
           DRIFTNET_WEBHOOK_SECRET: ["Webhook 簽章密鑰", "選填。會加上 X-Driftnet-Signature: sha256=<內容的 HMAC>。"],
@@ -1077,6 +1102,7 @@
           DRIFTNET_HEALTH: { "": "關閉（預設）", off: "關閉", weekly: "每週（建議）" },
           DRIFTNET_EMBED: { "": "自動（預設）：找到本機模型就開", auto: "自動：找到本機模型就開", off: "關閉" },
           DRIFTNET_EMBED_PROVIDER: { "": "自動（只找本機 Ollama）", ollama: "Ollama（在這台電腦上）", openai: "OpenAI", gemini: "Gemini" },
+          DRIFTNET_UPDATE_CHECK: { "": "開啟（預設）", 1: "開啟", 0: "關閉" },
           DRIFTNET_VIDEO: { "": "自動（預設）", auto: "自動：有找到工具就用", captions: "只抓字幕（省電：不下載影片、不跑文字辨識和語音模型）", off: "關閉" },
         },
       },
@@ -1256,6 +1282,7 @@
     if (!STRINGS[saved] && STRINGS[ui.locale]) locale = ui.locale;
     applyLocale();
     $("stats").textContent = T().stats(stats.items, stats.shares);
+    showUpdate(stats.update);
     $("lock").innerHTML = `${ic("lock")}<span class="long">${esc(T().st.viewOnly)}</span><span class="short">${esc(T().st.unlockShort)}</span>`;
     const btn = (field, key, label, n, icon) =>
       `<button type="button" data-field="${field}" data-value="${esc(key)}" aria-pressed="${state[field] === key}">
@@ -1719,7 +1746,7 @@
       const yes = (b) => (b ? "✓" : "—");
       const accessStatus = `<p class="set-status">${esc(st.accessStatus(yes(a.passwordSet), yes(a.readKey), a.tunnel.running ? a.tunnel.url : "—"))}</p>`;
       server = {
-        general: group("language") + group("chat") + group("digest") + group("webhook") + importPanel(),
+        general: group("language") + group("chat") + group("digest") + group("webhook") + group("updates") + importPanel() + backupPanel(serverSettings),
         access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) + pairPanel(serverSettings.access) : ""),
         ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,
@@ -1743,6 +1770,53 @@
     $("settings-dlg").showModal();
     $("st-body").querySelector('[data-tab-btn][aria-selected="true"]')?.focus();
   }
+  /** Settings › Backup: download a zip (secrets only with the password typed again) or restore one (applied at the next start). */
+  function backupPanel(sv) {
+    const st = T().st;
+    return `<fieldset class="set-group" id="backup-panel"><legend>${esc(st.bkTitle)}</legend>
+      <small>${esc(st.bkHelp)}</small>
+      <label class="set-row check"><input type="checkbox" id="bk-secrets"><span>${esc(st.bkSecrets)}</span></label>
+      <label class="set-row" id="bk-pw-row" hidden><span>${esc(st.bkPassword)}</span><input type="password" id="bk-pw" autocomplete="off"></label>
+      <div><button class="btn" type="button" id="bk-download">${esc(st.bkDownload)}</button></div>
+      <small>${esc(st.bkRestoreHelp)}</small>
+      <label class="set-row"><span>${esc(st.bkRestoreFile)}</span><input type="file" id="bk-file" accept=".zip,application/zip"></label>
+      <p class="set-status" id="bk-status" role="status" aria-live="polite">${sv.restorePending ? esc(st.bkPending) : ""}</p>
+      <pre id="bk-settings" hidden style="white-space:pre-wrap;user-select:all;font-size:12px"></pre></fieldset>`;
+  }
+  $("st-body").addEventListener("change", (e) => {
+    if (e.target.id === "bk-secrets") $("bk-pw-row").hidden = !e.target.checked;
+  });
+  $("st-body").addEventListener("click", async (e) => {
+    if (e.target.id !== "bk-download") return;
+    const st = T().st, out = $("bk-status"), token = store.get("driftnet-token");
+    const secrets = $("bk-secrets").checked, pw = $("bk-pw").value;
+    if (secrets && !pw) { out.textContent = st.bkNeedPassword; return; }
+    const res = await fetch(`/api/backup${secrets ? "?secrets=1" : ""}`, { headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(secrets ? { "x-driftnet-confirm": pw } : {}) } }).catch(() => null);
+    $("bk-pw").value = "";
+    if (res?.status === 401) { askToken(); return; }
+    if (!res?.ok) { out.textContent = (await res?.json().catch(() => null))?.error ?? T().failed; return; }
+    const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "driftnet-backup.zip";
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(await res.blob()), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    out.textContent = st.bkMade;
+  });
+  $("st-body").addEventListener("change", async (e) => {
+    if (e.target.id !== "bk-file") return;
+    const st = T().st, out = $("bk-status"), pre = $("bk-settings"), token = store.get("driftnet-token");
+    const file = e.target.files?.[0];
+    pre.hidden = true;
+    if (!file) { out.textContent = ""; return; }
+    out.textContent = st.bkChecking;
+    const res = await fetch("/api/backup/restore", { method: "POST", body: file, headers: { "content-type": "application/zip", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
+    e.target.value = "";
+    if (res?.status === 401 || res?.status === 403) { askToken(); return; }
+    const body = res ? await res.json().catch(() => ({})) : {};
+    if (!res?.ok) { out.textContent = body.error ?? T().failed; return; }
+    out.textContent = `${st.bkRestartTitle}. ${st.bkRestartBody(body.items)}`;
+    out.style.fontWeight = "600";
+    if (body.settings) { pre.textContent = `${st.bkSettingsTitle}\n\n${body.settings}`; pre.hidden = false; }
+  });
   /** Settings › Import bookmarks: pick a file, preview the counts (dry run), confirm, then watch the job. */
   let importContent = "", importUrl = "", importPack = null, importTimer = null;
   function importPanel() {
@@ -3564,9 +3638,23 @@
     }
   }
 
+  /** A newer release is out: a small header notice, dismissed per version (this browser only). */
+  function showUpdate(u) {
+    const el = $("update");
+    const ok = u && /^\d{1,9}\.\d{1,9}\.\d{1,9}(-[0-9A-Za-z.-]{1,40})?$/.test(u.latest ?? "");
+    if (!ok || store.get("driftnet-update-dismissed") === u.latest) { el.hidden = true; return; }
+    const t = T().st;
+    const a = $("update-link");
+    a.href = `https://github.com/KevinChu1110/driftnet/releases/tag/v${u.latest}`;
+    a.textContent = `${t.updOut(u.latest)} · ${t.updHow}`;
+    $("update-x").setAttribute("aria-label", t.updDismiss);
+    $("update-x").onclick = () => { store.set("driftnet-update-dismissed", u.latest); el.hidden = true; };
+    el.hidden = false;
+  }
   async function refreshCounts() {
     const stats = await api("/api/stats").catch(() => null);
     if (!stats) return;
+    showUpdate(stats.update);
     $("stats").textContent = T().stats(stats.items, stats.shares);
     const set = (v, n) => { const c = $("nav").querySelector(`[data-field="view"][data-value="${v}"] .count`); if (c) c.textContent = n || (v === "all" ? "0" : ""); };
     set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash); set("inbox", stats.inbox); set("review", stats.review);

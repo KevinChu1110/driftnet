@@ -12,7 +12,7 @@ import { DAYS, parseTargets, validTime } from "./digest.ts";
  */
 export interface Setting {
   key: string;
-  group: "model" | "language" | "chat" | "rules" | "access" | "webhook" | "digest";
+  group: "model" | "language" | "chat" | "rules" | "access" | "webhook" | "digest" | "updates";
   secret?: boolean;
   choices?: readonly string[];
   multiline?: boolean;
@@ -35,6 +35,9 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_PUBLIC_URL", group: "chat" },
   { key: "DRIFTNET_SUMMARY_DEPTH", group: "model", choices: ["", "brief", "standard", "detailed"] },
   { key: "DRIFTNET_SUMMARY_RULES", group: "rules", multiline: true, max: 1000 },
+  // Who you are and what you care about: goes into the model's system prompt once (clipped to 600 characters / ~125 tokens), see core/profile.ts.
+  { key: "DRIFTNET_PROFILE", group: "model", multiline: true, max: 600 },
+  { key: "DRIFTNET_UPDATE_CHECK", group: "updates", choices: ["", "0", "1"] },
   { key: "DRIFTNET_BLOCK_DOMAINS", group: "rules", max: 2000 },
   // Outgoing webhook: the URL is secret-ish (tokens often live in it), so it is masked like a key.
   { key: "DRIFTNET_WEBHOOK_URL", group: "webhook", secret: true },
@@ -75,6 +78,13 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_EMBED_API_KEY", group: "model", secret: true },
   { key: "DRIFTNET_EMBED_FLOOR", group: "model", max: 5 },
 ];
+
+/**
+ * Anything that grants access or reaches another service. The flag on the entry is the
+ * rule; the name test is the net for keys that forgot it (the share key, a credentials path).
+ */
+export const isSecretSetting = (key: string): boolean =>
+  !!SETTINGS.find((s) => s.key === key)?.secret || /TOKEN|KEY|SECRET|PASSWORD|CREDENTIALS/i.test(key);
 
 export class SettingsError extends Error {}
 
@@ -174,6 +184,6 @@ export class Settings {
 }
 
 /** Plain when safe; otherwise backtick-quoted, which keeps quotes, # and line breaks as they are. */
-function serialize(value: string): string {
+export function serialize(value: string): string {
   return /^[\w.,:/@+\-=*%]*$/.test(value) ? value : `\`${value}\``;
 }

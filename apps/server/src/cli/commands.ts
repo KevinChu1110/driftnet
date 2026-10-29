@@ -7,6 +7,7 @@ import { parseArgs, UsageError, type ArgSpec } from "./args.ts";
 import { call, HttpError, ok, resolveConnection, ServerDown, type Connection } from "./client.ts";
 import { completionScript } from "./completion.ts";
 import { init } from "./init.ts";
+import { backupCmd, restoreCmd } from "./backup.ts";
 
 /** Everything the commands touch outside themselves, so tests can swap it. */
 export interface Ctx {
@@ -266,8 +267,9 @@ export async function status(ctx: Ctx, argv: string[]): Promise<number> {
     const where = `settings: ${c.envFile ?? `none (${join(home, ".env")} not created yet)`}\ndata: ${c.env.DRIFTNET_DB ?? join(home, "driftnet.db")}`;
     try {
       const r = await call(c, ctx.fetch, "GET", "/api/stats", { timeoutMs: 5000 });
-      const s = ok<{ items: number }>(r);
-      ctx.out(`running at ${c.url}\nitems: ${s.items}\n${where}`);
+      const s = ok<{ items: number; update?: { latest: string; current: string } }>(r);
+      const update = s.update ? `\nupdate: driftnet ${s.update.latest} is out (you have ${s.update.current}): https://github.com/KevinChu1110/driftnet/releases/tag/v${s.update.latest}` : "";
+      ctx.out(`running at ${c.url}\nitems: ${s.items}${update}\n${where}`);
       return 0;
     } catch (e) {
       if (!(e instanceof ServerDown)) throw e;
@@ -289,5 +291,7 @@ export async function completion(ctx: Ctx, argv: string[]): Promise<number> {
 
 export const HANDLERS: Record<string, (ctx: Ctx, argv: string[]) => Promise<number>> = {
   add, search, open, export: exportCmd, import: importCmd, completion, status, init,
+  backup: (ctx, argv) => guarded(ctx, () => backupCmd(ctx, argv)),
+  restore: (ctx, argv) => guarded(ctx, () => restoreCmd(ctx, argv)),
 };
 export type { ArgSpec };

@@ -269,7 +269,7 @@ Bot tokens are read when driftnet starts: put them in `~/.driftnet/.env`, then s
 
 ## Command line
 
-With driftnet running (`npx driftnet`), the same command talks to it. `search` and `export` also work when it is not running (they read `~/.driftnet/driftnet.db` directly); `add` and `import` need it running.
+With driftnet running (`npx driftnet`), the same command talks to it. `search`, `export` and `backup` also work when it is not running (they read `~/.driftnet/driftnet.db` directly); `restore` only works when it is *not* running; `add` and `import` need it running.
 
 | Command | Example |
 |---|---|
@@ -278,7 +278,9 @@ With driftnet running (`npx driftnet`), the same command talks to it. `search` a
 | `driftnet open [id]` | `npx driftnet open 12` |
 | `driftnet export [--format json\|md\|vault] [-o file]` | `npx driftnet export --format vault -o links.zip` |
 | `driftnet import <file or pack link> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
-| `driftnet status` | `npx driftnet status` |
+| `driftnet backup [-o file] [--secrets]` | `npx driftnet backup -o driftnet.zip` |
+| `driftnet restore <file> [--print-settings]` | `npx driftnet restore driftnet.zip` |
+| `driftnet status` (also says when a newer version is out) | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 | `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
 
@@ -666,6 +668,8 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_CATEGORIES` | built-in | JSON file of starting folders, `{ "id": "description" }`, used once on a new database; after that, edit folders on the page |
 | `GITHUB_TOKEN` | — | GitHub API limit from 60 to 5,000 requests per hour |
 | `DRIFTNET_SUMMARY_RULES` | — | Your own instructions for every summary, e.g. “Say whether it is free.” Agents get them too |
+| `DRIFTNET_PROFILE` | — | Who you are and what you care about, 600 characters at most (⚙ Settings › AI › About you). The model uses it to judge what is worth your time and to write each card's “why” line; agents get it too. It sits once in the model's system prompt (about 150 tokens, so prompt caching still hits) and is never copied into cards |
+| `DRIFTNET_UPDATE_CHECK` | `1` | Once a day driftnet asks `registry.npmjs.org` for the latest version number and shows a small “driftnet x.y.z is out” notice in the page header (and in `driftnet status`). Nothing about you is sent. `0` turns it off |
 | `DRIFTNET_BLOCK_DOMAINS` | — | Domains never catalogued (subdomains included), comma separated |
 | `DRIFTNET_HEALTH` | `off` | `weekly` re-checks links about once a week and marks dead, archived and stale cards (see Link health). Off by default: it makes network requests |
 | `DRIFTNET_VIDEO` | `auto` | `auto` uses whichever of `yt-dlp`, `ffmpeg`, `tesseract` and `whisper` are installed; `captions` only reads captions and descriptions (light on battery); `off` never reads videos (see Reels and shorts) |
@@ -695,7 +699,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack` (`?s=` signed link) · `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·
-`GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings` (this machine, or with the token) · `GET /api/backup` (`?secrets=1` plus the password again in `X-Driftnet-Confirm`) · `POST /api/backup/restore` (a zip body; both admin password only) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -747,7 +751,13 @@ driftnet.example.com {
 > (title, outline, the chat text it was shared with) to **TypeSafe** if Jev is on and to **your
 > model provider** if one is set. Chat messages without a link are never processed or stored. With
 > Ollama and `DRIFTNET_JUDGE=off`, nothing leaves your machine. Take it all with you any time: export
-> to Markdown or an Obsidian / Notion vault from the sidebar, or `GET /api/export`.
+> to Markdown or an Obsidian / Notion vault from the sidebar, or `GET /api/export`. The only other
+> call driftnet makes on its own is the once-a-day check for a new version (a plain request to the npm
+> registry; set `DRIFTNET_UPDATE_CHECK=0` to stop it).
+
+### Backup and restore
+
+**⚙ Settings › General › Backup** downloads one zip: `driftnet.db` (a consistent snapshot, made while driftnet runs), `settings.env` and `manifest.json` (driftnet version, schema version, date, number of cards). **Passwords, keys and tokens are left out of `settings.env`**; tick “Include passwords and keys” and type the admin password again to keep them. Restoring from a file checks it first (it must be a driftnet backup with an intact database, not from a newer driftnet), keeps your current data as `driftnet.db.before-restore-<time>`, and swaps the backup in the next time driftnet starts, so the page asks you to restart. Settings inside a backup are shown but never applied; copy what you want. Only the admin password can back up or restore, never a share key or agent token. From a terminal: `npx driftnet backup -o driftnet.zip` (works while stopped too) and `npx driftnet restore driftnet.zip` (driftnet must be stopped).
 
 ## Contributing
 

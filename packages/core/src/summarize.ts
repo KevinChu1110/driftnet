@@ -3,6 +3,7 @@ import { WORTH, type Digest, type Judgement, type Suggestion, type Summary } fro
 import { cleanSuggestions } from "./suggest.ts";
 import { judgeState, WORTH_CRITERIA } from "./judge/index.ts";
 import { IncompleteOutput, type LlmProvider } from "./llm/types.ts";
+import { profileLine } from "./profile.ts";
 
 const SummarySchema = z.object({
   name: z
@@ -130,6 +131,8 @@ export class Summarizer {
     private readonly rules = "",
     /** DRIFTNET_SUMMARY_DEPTH: brief | standard | detailed. */
     private readonly depth: Depth = "standard",
+    /** DRIFTNET_PROFILE, already cleaned by readerProfile(): in the (cacheable) system prompt, once. */
+    private readonly profile = "",
   ) {}
 
   get label(): string {
@@ -199,6 +202,7 @@ export class Summarizer {
       "Be concrete and terse. Never invent features that are not in the input.",
       ...this.depthRules(),
       "Reply with JSON only.",
+      profileLine(this.profile),
       this.rules && `The reader's own rules — follow them unless they conflict with the rules above:\n${this.rules}`,
       categories &&
         [
