@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BlockedUrl, canonicalize, cardLink, FolderError, ItemError, suggestionsFor, WORTH, type Driftnet, type Health, type Item } from "@driftnet/core";
+import { BlockedUrl, canonicalize, cardLink, FolderError, HistoryError, ItemError, suggestionsFor, WORTH, type Driftnet, type Health, type Item } from "@driftnet/core";
 import { shareBase } from "./access.ts";
 import { saveUndo, undoById } from "./bulk.ts";
 import { planForAgent } from "./plan.ts";
@@ -240,7 +240,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         "note replaces the whole note, so read the current one with driftnet_get_item first if you mean to add to it; an empty string clears it. " +
         "vote counts once per agent per item, and a new vote replaces yours; down-votes lower the publisher's reputation and two net down-votes hide the item from search. vote_reason is stored only together with a vote. " +
         "So for a wrong or spammy summary prefer vote down, and trash only what the reader asked to remove. trashed=true hides the item everywhere without deleting it; trashed=false brings it back with its folder, note and favorite. " +
-        "Setting a value it already has changes nothing. Fails if the item does not exist.",
+        "restore_version puts an earlier version back (alone; a wrong version id lists the valid ones). Setting a value it already has changes nothing. Fails if the item does not exist.",
       inputSchema: {
         id: itemId("Item id from driftnet_search_items (view 'trash' lists trashed ones)"),
         favorite: z.boolean().optional().describe("true to star, false to unstar"),
@@ -248,19 +248,31 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         vote: z.enum(["up", "down"]).optional().describe("up: useful and accurate; down: spam, outdated, wrong or polluted"),
         vote_reason: z.string().max(300).optional().describe("Short reason for the vote, e.g. 'summary describes the wrong tool'"),
         trashed: z.boolean().optional().describe("true to move to the trash, false to restore from it"),
+        restore_version: z.number().int().positive().optional().describe("Version id of an earlier state of this item to put back; cannot be combined with other fields"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ id, favorite, note, vote, vote_reason, trashed }) => {
+    async ({ id, favorite, note, vote, vote_reason, trashed, restore_version }) => {
       const current = dn.store.get(id);
       if (!current) return fail(`No item ${id}.`);
+      if (restore_version !== undefined) {
+        if (favorite !== undefined || note !== undefined || vote !== undefined || vote_reason !== undefined || trashed !== undefined) return fail("restore_version cannot be combined with other fields.");
+        try {
+          const r = dn.store.restoreVersion(id, restore_version, `agent:${agentName}`);
+          return done(`Item ${id}: restored version ${restore_version}${r.trashedAt ? " (still in the trash)" : ""}.`);
+        } catch (err) {
+          if (!(err instanceof HistoryError)) throw err;
+          const known = dn.store.history(id).slice(0, 8).map((h) => `${h.v} (${h.fields.join("+")}, ${h.at.slice(0, 16)})`).join("; ");
+          return fail(`${err.message}.${err.status === 404 && known ? ` Versions: ${known}.` : ""}`);
+        }
+      }
       if (favorite === undefined && note === undefined && vote === undefined && trashed === undefined) return fail("Pass at least one of favorite, note, vote or trashed.");
       const changed: string[] = [];
-      if (trashed === false && current.trashedAt) { dn.store.setTrashed(id, false); changed.push("restored"); }
-      if (favorite !== undefined) { dn.store.setFavorite(id, favorite); changed.push(favorite ? "starred" : "unstarred"); }
-      if (note !== undefined) { dn.store.setNote(id, note); changed.push(note.trim() ? "note saved" : "note cleared"); }
+      if (trashed === false && current.trashedAt) { dn.store.setTrashed(id, false, `agent:${agentName}`); changed.push("restored"); }
+      if (favorite !== undefined) { dn.store.setFavorite(id, favorite, `agent:${agentName}`); changed.push(favorite ? "starred" : "unstarred"); }
+      if (note !== undefined) { dn.store.setNote(id, note, `agent:${agentName}`); changed.push(note.trim() ? "note saved" : "note cleared"); }
       if (vote) { dn.store.vote(id, vote === "up" ? 1 : -1, `agent:${agentName}`, vote_reason); changed.push(`voted ${vote}`); }
-      if (trashed === true && !current.trashedAt) { dn.store.setTrashed(id, true); changed.push("moved to the trash (restorable)"); }
+      if (trashed === true && !current.trashedAt) { dn.store.setTrashed(id, true, `agent:${agentName}`); changed.push("moved to the trash (restorable)"); }
       return done(changed.length ? `Item ${id}: ${changed.join(", ")}.` : `Item ${id}: nothing to change.`);
     },
   );

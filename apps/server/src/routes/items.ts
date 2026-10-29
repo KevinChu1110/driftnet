@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { BlockedUrl, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, HistoryError, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
 import { agentBrief } from "../brief.ts";
 import { actorOf, token } from "../access.ts";
@@ -83,7 +83,7 @@ export const routes: Route[] = [
     method: "POST", pattern: /^\/api\/items\/bulk(\/undo)?$/, example: "/api/items/bulk", access: "write",
     handler: async ({ req, m, send, json, app: { dn, env } }) => {
       const body = await json<unknown>();
-      const out = !m[1] ? bulkAction(dn.store, body, actorOf(req, env, dn.store)) : bulkUndo(dn.store, body);
+      const out = !m[1] ? bulkAction(dn.store, body, actorOf(req, env, dn.store)) : bulkUndo(dn.store, body, Date.now(), actorOf(req, env, dn.store));
       return send(out.status, out.body);
     },
   },
@@ -146,10 +146,29 @@ export const routes: Route[] = [
   },
   {
     method: "PUT", pattern: /^\/api\/items\/(\d+)\/note$/, example: "/api/items/1/note", access: "write",
-    handler: async ({ m, send, json, app: { dn } }) => {
+    handler: async ({ req, m, send, json, app: { dn, env } }) => {
       const { note } = await json<{ note?: string }>();
       const id = Number(m[1]);
-      return dn.store.setNote(id, String(note ?? "")) ? send(200, publicItem(dn.store.get(id)!)) : send(404, { error: "not found" });
+      return dn.store.setNote(id, String(note ?? ""), actorOf(req, env, dn.store)) ? send(200, publicItem(dn.store.get(id)!)) : send(404, { error: "not found" });
+    },
+  },
+  // What this card looked like before each of its last 20 changes (same read rule as the card), and putting one back.
+  {
+    method: "GET", pattern: /^\/api\/items\/(\d+)\/history$/, example: "/api/items/1/history", access: "read",
+    handler: ({ m, send, app: { dn } }) => {
+      const id = Number(m[1]);
+      return dn.store.get(id) ? send(200, dn.store.history(id)) : send(404, { error: "not found" });
+    },
+  },
+  {
+    method: "POST", pattern: /^\/api\/items\/(\d+)\/history\/(\d+)\/restore$/, example: "/api/items/1/history/1/restore", access: "write",
+    handler: ({ req, m, send, app: { dn, env } }) => {
+      try {
+        return send(200, publicItem(dn.store.restoreVersion(Number(m[1]), Number(m[2]), actorOf(req, env, dn.store))));
+      } catch (err) {
+        if (err instanceof HistoryError) return send(err.status, { error: err.message });
+        throw err;
+      }
     },
   },
   {
@@ -167,13 +186,14 @@ export const routes: Route[] = [
   // Library actions from the web page: trash / restore / favorite / unfavorite.
   {
     method: "POST", pattern: /^\/api\/items\/(\d+)\/(trash|restore|favorite|unfavorite)$/, example: "/api/items/1/trash", access: "write",
-    handler: ({ m, send, app: { dn } }) => {
+    handler: ({ req, m, send, app: { dn, env } }) => {
       const id = Number(m[1]);
       const action = m[2];
+      const actor = actorOf(req, env, dn.store);
       const ok =
         action === "trash" || action === "restore"
-          ? dn.store.setTrashed(id, action === "trash")
-          : dn.store.setFavorite(id, action === "favorite");
+          ? dn.store.setTrashed(id, action === "trash", actor)
+          : dn.store.setFavorite(id, action === "favorite", actor);
       return ok ? send(200, publicItem(dn.store.get(id)!)) : send(404, { error: "not found" });
     },
   },

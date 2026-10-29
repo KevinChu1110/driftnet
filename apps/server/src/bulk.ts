@@ -55,8 +55,8 @@ export function bulkAction(store: Store, input: unknown, actor?: string, now = D
   try {
     let previous: Snapshot;
     if (req.action === "move") previous = store.moveItems(unique, req.folder, actor).map(({ id, category, user_placed }) => ({ id, folder: category, user_placed }));
-    else if (req.action === "trash" || req.action === "restore") previous = store.setTrashedMany(unique, req.action === "trash");
-    else previous = store.setFavoriteMany(unique, req.action === "favorite");
+    else if (req.action === "trash" || req.action === "restore") previous = store.setTrashedMany(unique, req.action === "trash", actor);
+    else previous = store.setFavoriteMany(unique, req.action === "favorite", actor);
     return { status: 200, body: { ok: true, undo: saveUndo(store, previous, now), count: unique.length } };
   } catch (err) {
     return failure(err);
@@ -64,11 +64,11 @@ export function bulkAction(store: Store, input: unknown, actor?: string, now = D
 }
 
 /** Revert a whole batch from the snapshot the server kept for it. One-shot: the snapshot is deleted. */
-export function bulkUndo(store: Store, input: unknown, now = Date.now()): Reply {
+export function bulkUndo(store: Store, input: unknown, now = Date.now(), actor?: string): Reply {
   const parsed = undoRequest.safeParse(input);
   if (!parsed.success) return { status: 400, body: { error: "expected { undo: the id a bulk response returned }" } };
   try {
-    const count = undoById(store, parsed.data.undo, now);
+    const count = undoById(store, parsed.data.undo, now, actor);
     return count ? { status: 200, body: { ok: true, count } } : { status: 404, body: { error: "nothing to undo: unknown or expired id" } };
   } catch (err) {
     return failure(err);
@@ -76,7 +76,7 @@ export function bulkUndo(store: Store, input: unknown, now = Date.now()): Reply 
 }
 
 /** Restore a stored snapshot and delete it; the number of items put back, or 0 when there is none (or it is older than 24 h). */
-export function undoById(store: Store, id: string, now = Date.now()): number {
+export function undoById(store: Store, id: string, now = Date.now(), actor?: string): number {
   const key = UNDO_PREFIX + id;
   const raw = store.getState(key);
   if (!raw) return 0;
@@ -88,7 +88,7 @@ export function undoById(store: Store, id: string, now = Date.now()): number {
   // An AI plan also changed the folder tree: put that back before the cards, in the same transaction.
   store.transaction(() => {
     if (folders) store.restoreFolders(folders);
-    store.restoreItems(previous.map(({ folder, ...rest }) => ({ ...rest, ...(folder !== undefined ? { category: folder } : {}) })));
+    store.restoreItems(previous.map(({ folder, ...rest }) => ({ ...rest, ...(folder !== undefined ? { category: folder } : {}) })), actor);
   });
   store.deleteState(key);
   return previous.length || folders?.length || 0;

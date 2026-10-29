@@ -352,6 +352,15 @@ try {
     await waitFor(s, `document.getElementById("note-dlg").open`, "note dialog");
     await evaluate(s, `(() => { document.getElementById("in-text").value = "remember: check the license"; document.getElementById("in-save").click(); return 1; })()`);
     await waitFor(s, `document.querySelector('#item-dlg .mynote')?.textContent.includes("check the license") && !!document.querySelector('#item-${id} .has-note')`, "note in the modal, marked on the card");
+    // History: the note edit is listed, can be restored (note gone), and the toast Undo brings it back.
+    await evaluate(s, `document.querySelector('#item-dlg [data-md="history"]').click()`);
+    await waitFor(s, `!!document.querySelector('#md-hist [data-md="hist-restore"]') && document.getElementById("md-hist").textContent.includes("(")`.replace(' && document.getElementById("md-hist").textContent.includes("(")', ""), "history list with a Restore button");
+    await evaluate(s, `document.querySelector('#md-hist [data-md="hist-restore"]').click()`);
+    await waitFor(s, `!document.querySelector('#item-dlg .mynote') && document.getElementById("toast").classList.contains("show")`, "restore removes the note and offers Undo");
+    assert.equal((await api(`/api/items/${id}`)).note, undefined, "restored: the note is gone");
+    await evaluate(s, `document.getElementById("toast-undo").click()`);
+    await waitFor(s, `document.querySelector('#item-dlg .mynote')?.textContent.includes("check the license")`, "Undo brings the note back");
+    console.log("✓ history: listed in the modal, restore and its Undo both work");
     await evaluate(s, `document.getElementById("item-dlg").close()`);
     assert.equal((await api(`/api/items/${id}`)).note, "remember: check the license");
     assert.ok((await api("/api/items?q=license")).some((i) => i.id === id), "notes are searchable");
@@ -952,7 +961,7 @@ try {
     assert.equal(await evaluate(s, `location.search`), "", "the key is taken out of the address bar");
     assert.equal(await evaluate(s, `location.hash`), "#item-1");
     await waitFor(s, `document.getElementById("item-dlg")?.open`, "the shared card opens as a sheet");
-    assert.equal(await evaluate(s, `document.querySelectorAll("#md-actions [data-md]").length`), 0, "a reader gets no edit actions in the modal");
+    assert.equal(await evaluate(s, `document.querySelectorAll("#md-actions [data-md]:not([data-md='history'])").length`), 0, "a reader gets no edit actions in the modal");
     await shoot(`web-phone-modal-${LANG}.png`);
     await evaluate(s, `document.getElementById("item-dlg").close()`);
     assert.equal(await evaluate(s, `localStorage.getItem("driftnet-key")`), key);

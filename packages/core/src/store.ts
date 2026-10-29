@@ -7,6 +7,7 @@ import type { Health, Item, Judgement, Kind, MediaRef, ShareContext, Suggestion,
 import { migrate } from "./migrations.ts";
 import { ftsMatchQuery, FTS_WEIGHTS, reindexItem } from "./search-index.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
+import { guard } from "./guard.ts";
 
 interface ItemRow {
   id: number; url: string; title: string; kind: string; category: string; worth: string;
@@ -44,6 +45,20 @@ export interface FolderRow { id: string; parent: string | null; name: string | n
 export class FolderError extends Error {}
 /** A bulk action named an item that doesn't exist; nothing was changed. */
 export class ItemError extends Error {}
+/** A history version that cannot be shown or applied; `status` is the HTTP code the route answers with. */
+export class HistoryError extends ItemError {
+  constructor(message: string, readonly status: 404 | 409 | 422) { super(message); }
+}
+
+/** The card fields a change can touch, grouped the way the reader thinks of them. */
+const HISTORY_GROUPS = {
+  note: ["note"], summary: ["summary"], title: ["title"], folder: ["category", "user_placed"],
+  favorite: ["favorite"], trashed: ["trashed_at"],
+} as const;
+type HistoryField = keyof typeof HISTORY_GROUPS;
+export const HISTORY_KEEP = 20;
+export const HISTORY_DAYS = 180;
+export interface HistoryEntry { v: number; at: string; actor: string; fields: HistoryField[]; before: Record<string, unknown> }
 
 /** A named key for one agent. Only its sha256 is stored; the token itself is shown once, at creation. */
 export interface AgentToken {
@@ -102,6 +117,88 @@ export class Store {
     this.db = new DatabaseSync(path);
     this.db.exec("PRAGMA journal_mode = WAL");
     migrate(this.db, { path });
+    // Once per start: forget what is older than the retention (per-card pruning keeps the rest short).
+    this.db.prepare("DELETE FROM item_history WHERE at < ?").run(new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString());
+  }
+
+  // ── History ──────────────────────────────────────────────────────────────
+
+  /**
+   * Remember what a change replaced: one INSERT of only the changed groups' old values, then trim this
+   * card to its newest 20 versions and the last 180 days (index-only, same transaction as the change).
+   * Nothing is written when nothing differs.
+   */
+  private log(id: number, actor: string | undefined, before: Record<string, unknown>, after: Record<string, unknown>): void {
+    const fields: HistoryField[] = [];
+    const old: Record<string, unknown> = {};
+    for (const [group, cols] of Object.entries(HISTORY_GROUPS) as [HistoryField, readonly string[]][]) {
+      if (!cols.every((c) => c in before && c in after)) continue;
+      if (cols.every((c) => (before[c] ?? null) === (after[c] ?? null))) continue;
+      fields.push(group);
+      for (const c of cols) old[c] = before[c] ?? null;
+    }
+    if (!fields.length) return;
+    const now = new Date();
+    this.db.prepare("INSERT INTO item_history (item_id, at, actor, field_set, before) VALUES (?, ?, ?, ?, ?)")
+      .run(id, now.toISOString(), actor || "system", fields.join(","), JSON.stringify(old));
+    this.db.prepare(
+      `DELETE FROM item_history WHERE item_id = ? AND (at < ? OR id NOT IN (SELECT id FROM item_history WHERE item_id = ? ORDER BY id DESC LIMIT ${HISTORY_KEEP}))`,
+    ).run(id, new Date(now.getTime() - HISTORY_DAYS * 86_400_000).toISOString(), id);
+  }
+
+  /** A card's saved versions, newest first (at most 20). `v` is what {@link restoreVersion} takes. */
+  history(id: number): HistoryEntry[] {
+    return (this.db.prepare("SELECT id, at, actor, field_set, before FROM item_history WHERE item_id = ? ORDER BY id DESC LIMIT ?")
+      .all(id, HISTORY_KEEP) as { id: number; at: string; actor: string; field_set: string; before: string }[])
+      .map((r) => ({ v: r.id, at: r.at, actor: r.actor, fields: r.field_set.split(",") as HistoryField[], before: JSON.parse(r.before) as Record<string, unknown> }));
+  }
+
+  /**
+   * Put a card's earlier values back as one new change (itself recorded, so it can be undone).
+   * Goes through the same limits as a normal write: note length, the injection guard on summary text,
+   * folders that still exist. A trashed card only takes a version that brings it back.
+   */
+  restoreVersion(id: number, v: number, actor?: string): Item {
+    const ver = this.db.prepare("SELECT before FROM item_history WHERE id = ? AND item_id = ?").get(v, id) as { before: string } | undefined;
+    if (!ver) throw new HistoryError(`no version ${v} for item ${id}`, 404);
+    const b = JSON.parse(ver.before) as Record<string, unknown>;
+    const cur = this.db.prepare("SELECT title, summary, category, user_placed, note, favorite, trashed_at FROM items WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+    if (!cur) throw new HistoryError(`no item ${id}`, 404);
+    if (cur.trashed_at && !("trashed_at" in b && b.trashed_at === null)) throw new HistoryError("this card is in the trash; restore it from the trash first", 409);
+
+    const patch: Record<string, unknown> = {};
+    if ("note" in b) patch.note = typeof b.note === "string" ? b.note.trim().slice(0, 5000) || null : null;
+    if ("title" in b) patch.title = String(b.title ?? "").slice(0, 300);
+    if ("summary" in b) {
+      if (b.summary !== null) {
+        let ok = false;
+        try { const o = JSON.parse(String(b.summary)); ok = !!o && typeof o === "object" && !Array.isArray(o) && typeof o.name === "string"; } catch { /* not JSON */ }
+        if (!ok) throw new HistoryError("that version's summary is not valid", 422);
+        const g = guard(String(b.summary));
+        if (g.flags.length) throw new HistoryError(`Rejected: ${g.flags.join(", ")} in the summary.`, 422);
+      }
+      patch.summary = b.summary ?? null;
+    }
+    if ("category" in b) {
+      if (!this.folderExists(String(b.category))) throw new HistoryError(`the folder ${String(b.category)} no longer exists`, 409);
+      patch.category = String(b.category);
+      patch.user_placed = Number(b.user_placed ?? 0) ? 1 : 0;
+    }
+    if ("favorite" in b) patch.favorite = Number(b.favorite) ? 1 : 0;
+    if ("trashed_at" in b) patch.trashed_at = b.trashed_at === null ? null : String(b.trashed_at);
+
+    this.transaction(() => {
+      const cols = Object.keys(patch);
+      const row = this.db.prepare(`UPDATE items SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ? RETURNING title, summary, category, user_placed, note, favorite, trashed_at`)
+        .get(...(cols.map((c) => patch[c]) as (string | number | null)[]), id) as Record<string, unknown>;
+      this.log(id, actor, cur, row);
+      if (patch.note !== undefined || patch.summary !== undefined || patch.title !== undefined) this.reindex(id);
+    });
+    if ("trashed_at" in patch && (patch.trashed_at === null) !== (cur.trashed_at === null)) {
+      const trashed = patch.trashed_at !== null;
+      setImmediate(() => { try { if (!!this.get(id)?.trashedAt === trashed) this.onTrash?.(id, trashed); } catch { /* a hook must not break the store */ } });
+    }
+    return this.get(id)!;
   }
 
   /** Looks up by canonical URL or any URL that previously resolved to the same item. */
@@ -121,8 +218,14 @@ export class Store {
     flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[];
     /** Repo facts the extractor already fetched: stars, last push, archived (stored as health 'archived'). */
     repo?: RepoFacts;
-  }): Item {
+  }, actor = "system"): Item {
+    return this.transaction(() => this.upsertRow(input, actor));
+  }
+
+  private upsertRow(input: Parameters<Store["upsert"]>[0], actor: string): Item {
     const { judgement: j } = input;
+    // An existing card is overwritten by the ON CONFLICT branch: remember what it replaces.
+    const old = this.db.prepare("SELECT id, title, summary, category, user_placed FROM items WHERE url = ?").get(input.url) as Record<string, unknown> | undefined;
     const row = this.db
       .prepare(
         `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source, suggestions, media, stars, pushed_at, health, health_checked_at)
@@ -145,6 +248,7 @@ export class Store {
       ) as unknown as ItemRow;
     const alias = this.db.prepare("INSERT OR IGNORE INTO aliases (url, item_id) VALUES (?, ?)");
     for (const a of input.aliases) if (a !== input.url) alias.run(a, row.id);
+    if (old) this.log(row.id, actor, old, row as unknown as Record<string, unknown>);
     this.reindex(row.id);
     return toItem(row);
   }
@@ -156,9 +260,14 @@ export class Store {
   refreshItem(id: number, input: {
     title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[]; repo?: RepoFacts;
   }): Item | null {
+    return this.transaction(() => this.refreshRow(id, input));
+  }
+
+  private refreshRow(id: number, input: Parameters<Store["refreshItem"]>[1]): Item | null {
     const j = input.judgement;
     // No new summary (no model, it failed, source distrusted): the old summary and what came with it stay; only metadata moves.
-    const keep = !input.summary && this.get(id)?.summary ? 1 : 0;
+    const old = this.db.prepare("SELECT id, title, summary, category, user_placed FROM items WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+    const keep = !input.summary && old?.summary ? 1 : 0;
     const row = this.db
       .prepare(
         `UPDATE items SET title = CASE WHEN ? THEN title ELSE ? END, kind = ?,
@@ -180,6 +289,7 @@ export class Store {
         input.media?.length ? JSON.stringify(input.media) : null,
         ...repoArgs(input.repo), keep, keep, keep, id,
       ) as unknown as ItemRow | undefined;
+    if (row && old) this.log(id, "system:refresh", old, row as unknown as Record<string, unknown>);
     if (row) this.reindex(row.id);
     return row ? toItem(row) : null;
   }
@@ -351,7 +461,12 @@ export class Store {
   /** The reader put this item here; classification won't touch it again. */
   moveItem(itemId: number, folderId: string, actor?: string): boolean {
     if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
-    const moved = this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, itemId).changes > 0;
+    const moved = this.transaction(() => {
+      const old = this.db.prepare("SELECT category, user_placed FROM items WHERE id = ?").get(itemId) as Record<string, unknown> | undefined;
+      const did = this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, itemId).changes > 0;
+      if (did) this.log(itemId, actor, old!, { category: folderId, user_placed: 1 });
+      return did;
+    });
     if (moved) this.bumpFolderUse(folderId);
     return moved;
   }
@@ -361,6 +476,7 @@ export class Store {
     if (!this.folderExists(folderId)) throw new FolderError(`no folder ${folderId}`);
     const before = this.inTransaction(ids, "category, user_placed", (id, before) => {
       this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, id);
+      this.log(id, actor, before, { category: folderId, user_placed: 1 });
       return { id, category: String(before.category), user_placed: Number(before.user_placed) };
     });
     this.bumpFolderUse(folderId, ids.length);
@@ -368,13 +484,16 @@ export class Store {
   }
 
   /** Put items back exactly as an earlier bulk action found them (folder and placement, trash, star). */
-  restoreItems(rows: { id: number; category?: string; user_placed?: number; trashed_at?: string | null; favorite?: number }[]): void {
+  restoreItems(rows: { id: number; category?: string; user_placed?: number; trashed_at?: string | null; favorite?: number }[], actor = "system"): void {
     const ids = rows.map((r) => r.id);
     for (const r of rows) if (r.category !== undefined && !this.folderExists(r.category)) throw new FolderError(`no folder ${r.category}`);
     const byId = new Map(rows.map((r) => [r.id, r]));
     const undone = new Map<string, number>();
-    this.inTransaction(ids, "category", (id, before) => {
+    this.inTransaction(ids, "category, user_placed, trashed_at, favorite", (id, before) => {
       const r = byId.get(id)!;
+      const after = { category: r.category ?? before.category, user_placed: r.category !== undefined ? (r.user_placed ?? 0) : before.user_placed,
+        trashed_at: r.trashed_at !== undefined ? r.trashed_at : before.trashed_at, favorite: r.favorite !== undefined ? (r.favorite ? 1 : 0) : before.favorite };
+      this.log(id, actor, before, after);
       if (r.category !== undefined) undone.set(String(before.category), (undone.get(String(before.category)) ?? 0) + 1);
       if (r.category !== undefined) this.db.prepare("UPDATE items SET category = ?, user_placed = ? WHERE id = ?").run(r.category, r.user_placed ?? 0, id);
       if (r.trashed_at !== undefined) this.db.prepare("UPDATE items SET trashed_at = ? WHERE id = ?").run(r.trashed_at, id);
@@ -520,11 +639,14 @@ export class Store {
   // ── Notes ────────────────────────────────────────────────────────────────
 
   /** The reader's note on an item; empty text clears it. */
-  setNote(id: number, note: string): boolean {
+  setNote(id: number, note: string, actor?: string): boolean {
     const text = note.trim().slice(0, 5000);
-    const changed = this.db.prepare("UPDATE items SET note = ? WHERE id = ?").run(text || null, id).changes > 0;
-    if (changed) this.reindex(id);
-    return changed;
+    return this.transaction(() => {
+      const old = this.db.prepare("SELECT note FROM items WHERE id = ?").get(id) as { note: string | null } | undefined;
+      const changed = this.db.prepare("UPDATE items SET note = ? WHERE id = ?").run(text || null, id).changes > 0;
+      if (changed) { this.log(id, actor, old!, { note: text || null }); this.reindex(id); }
+      return changed;
+    });
   }
 
   /**
@@ -579,10 +701,15 @@ export class Store {
   }
 
   /** Soft delete: hidden everywhere, restorable from the trash. Returns false if there is no such item. */
-  setTrashed(id: number, trashed: boolean): boolean {
-    const changed = this.db
-      .prepare("UPDATE items SET trashed_at = CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ','now') ELSE NULL END WHERE id = ? AND (trashed_at IS NOT NULL) <> ?")
-      .run(trashed ? 1 : 0, id, trashed ? 1 : 0).changes > 0;
+  setTrashed(id: number, trashed: boolean, actor?: string): boolean {
+    const changed = this.transaction(() => {
+      const old = this.db.prepare("SELECT trashed_at FROM items WHERE id = ?").get(id) as { trashed_at: string | null } | undefined;
+      const did = this.db
+        .prepare("UPDATE items SET trashed_at = CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%SZ','now') ELSE NULL END WHERE id = ? AND (trashed_at IS NOT NULL) <> ?")
+        .run(trashed ? 1 : 0, id, trashed ? 1 : 0).changes > 0;
+      if (did) this.log(id, actor, old!, { trashed_at: trashed ? "now" : null });
+      return did;
+    });
     if (changed) {
       // Announced after the (possibly enclosing) transaction has settled; a rolled-back change is not announced.
       setImmediate(() => {
@@ -595,22 +722,27 @@ export class Store {
   /** Called (never awaited) after an item went to the trash or came back. */
   onTrash?: (id: number, trashed: boolean) => void;
 
-  setFavorite(id: number, favorite: boolean): boolean {
-    return this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(favorite ? 1 : 0, id).changes > 0;
+  setFavorite(id: number, favorite: boolean, actor?: string): boolean {
+    return this.transaction(() => {
+      const old = this.db.prepare("SELECT favorite FROM items WHERE id = ?").get(id) as { favorite: number } | undefined;
+      const changed = this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(favorite ? 1 : 0, id).changes > 0;
+      if (changed) this.log(id, actor, old!, { favorite: favorite ? 1 : 0 });
+      return changed;
+    });
   }
 
   /** Bulk {@link setTrashed}, all or nothing. Returns each item's earlier trash time for undo. */
-  setTrashedMany(ids: number[], trashed: boolean): { id: number; trashed_at: string | null }[] {
+  setTrashedMany(ids: number[], trashed: boolean, actor?: string): { id: number; trashed_at: string | null }[] {
     return this.inTransaction(ids, "trashed_at", (id, before) => {
-      this.setTrashed(id, trashed);
+      this.setTrashed(id, trashed, actor);
       return { id, trashed_at: (before.trashed_at as string | null) ?? null };
     });
   }
 
   /** Bulk {@link setFavorite}, all or nothing. Returns each item's earlier star for undo. */
-  setFavoriteMany(ids: number[], favorite: boolean): { id: number; favorite: number }[] {
+  setFavoriteMany(ids: number[], favorite: boolean, actor?: string): { id: number; favorite: number }[] {
     return this.inTransaction(ids, "favorite", (id, before) => {
-      this.setFavorite(id, favorite);
+      this.setFavorite(id, favorite, actor);
       return { id, favorite: Number(before.favorite) };
     });
   }
@@ -759,6 +891,11 @@ export class Store {
 
   /** Store an agent's summary; optionally its classification. Releases the lease. */
   enrich(id: number, summary: Summary, by: string, classify?: { category?: string; worth?: Worth }): Item {
+    return this.transaction(() => this.enrichRow(id, summary, by, classify));
+  }
+
+  private enrichRow(id: number, summary: Summary, by: string, classify?: { category?: string; worth?: Worth }): Item {
+    const old = this.db.prepare("SELECT id, title, summary, category, user_placed FROM items WHERE id = ?").get(id) as Record<string, unknown> | undefined;
     const row = this.db
       .prepare(
         `UPDATE items SET summary = ?, title = ?, enriched_by = ?, claimed_at = NULL, claimed_by = NULL,
@@ -767,6 +904,7 @@ export class Store {
          WHERE id = ? RETURNING *`,
       )
       .get(JSON.stringify(summary), summary.name, by, classify?.category ?? null, classify?.worth ?? null, id) as unknown as ItemRow;
+    if (old) this.log(id, by, old, row as unknown as Record<string, unknown>);
     this.reindex(id);
     return toItem(row);
   }

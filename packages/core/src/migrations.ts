@@ -165,6 +165,18 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  // (version 4 belongs to the semantic-search branch.)
+  {
+    version: 5,
+    description: "per-card change history (undo / restore)",
+    up(db) {
+      db.exec(`CREATE TABLE IF NOT EXISTS item_history (
+        id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL, at TEXT NOT NULL, actor TEXT NOT NULL,
+        field_set TEXT NOT NULL, before TEXT NOT NULL
+      )`);
+      db.exec("CREATE INDEX IF NOT EXISTS idx_item_history_item ON item_history (item_id, id)");
+    },
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

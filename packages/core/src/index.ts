@@ -26,7 +26,7 @@ export { videoTools, describeVideoTools, type VideoTools } from "./extractors/vi
 export { HealthChecker, healthFor, isPrivateTarget } from "./health.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi, type PluginExports } from "./plugins.ts";
-export { FolderError, ItemError, Store, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation, type RepoFacts } from "./store.ts";
+export { FolderError, HistoryError, HISTORY_KEEP, HISTORY_DAYS, ItemError, Store, type HistoryEntry, hashToken, type AgentToken, type Folder, type FolderRow, type Note, type ListQuery, type Reputation, type RepoFacts } from "./store.ts";
 export { createProvider, registerProvider, IncompleteOutput, parseStructured, type LlmProvider, type ProviderFactory, type StructuredRequest } from "./llm/index.ts";
 export { registerJudge, type JudgeFactory } from "./judge/index.ts";
 export { parseRules, RulesJudge } from "./judge/rules.ts";

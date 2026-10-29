@@ -156,3 +156,23 @@ test("the inbox filter and suggested folders show up for agents; suggest_folders
   assert.match(text(r), /AI model/);
   await client.close();
 });
+
+test("driftnet_update_item can put an earlier version back, alone, and the tool list stays at 14", async () => {
+  const client = await connect();
+  assert.equal((await client.listTools()).tools.length, 14);
+  const it = dn.store.upsert({ url: "https://mcp.test/hist", aliases: [], title: "h", judgement, summary: null, flags: [], source: "s" });
+  await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, note: "one" } });
+  await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, note: "two" } });
+  const h = dn.store.history(it.id);
+  assert.equal(h[0]!.actor, "agent:test");
+  assert.doesNotMatch(text(await client.callTool({ name: "driftnet_get_item", arguments: { id: it.id } })), /histor|version/i, "get_item carries no history");
+  const mixed = await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, note: "x", restore_version: h[0]!.v } });
+  assert.equal(mixed.isError, true);
+  const wrong = await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, restore_version: 99999 } });
+  assert.equal(wrong.isError, true);
+  assert.match(text(wrong), new RegExp(`Versions: ${h[0]!.v} \\(note`));
+  const ok = await client.callTool({ name: "driftnet_update_item", arguments: { id: it.id, restore_version: h[0]!.v } });
+  assert.equal(ok.isError, undefined);
+  assert.equal(dn.store.get(it.id)!.note, "one");
+  await client.close();
+});

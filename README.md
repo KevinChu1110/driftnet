@@ -307,6 +307,11 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   now comes back empty, the old summary is kept.
 - **Undo** right after removing, or restore anything later from **Trash**. Trashed links disappear from
   agents and `/llms.txt` too; if someone shares one again, it comes back.
+- **Every change can be undone.** Open a card and press **History**: its last 20 changes (note, summary,
+  title, folder, star, trash; up to 180 days) are listed with who made them and what the card said before,
+  and **Restore** puts one back as a new change, so a restore can be undone too. Anyone who can read the
+  card can see its history; restoring needs write access and passes the same checks as a normal edit.
+  An agent can do the same with `restore_version` on `driftnet_update_item`.
 - **Notes.** 📝 on any card for your own note (tried it? needs a GPU?). What people wrote with the link
   in chat shows on the card too (💬), and both are searchable. **📝 Notes** in the sidebar holds
   free-standing Markdown notes; `#12` links card 12.
@@ -667,7 +672,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack` (`?s=` signed link) · `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `GET /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·
 `GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>

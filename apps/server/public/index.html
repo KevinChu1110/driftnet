@@ -515,6 +515,10 @@
   .md-try pre { margin: 0; padding: 10px 70px 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: auto; font-size: 13px; user-select: text; -webkit-user-select: text; }
   .md-try button { position: absolute; top: 6px; right: 6px; }
   .md-tags { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; color: var(--muted); }
+  .md-hist ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+  .md-hist li { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; padding: 8px 10px; border-radius: 8px; background: var(--star-soft); font-size: 13px; }
+  .md-hist li div { min-width: 0; overflow-wrap: anywhere; }
+  .md-hist li small { display: block; color: var(--muted); }
   .md-fine { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 12px; }
   .md-actions { flex: none; margin: 0; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
   .md-actions .spacer { flex: 1; }
@@ -745,6 +749,9 @@
       layoutBoth: "Both sides", layoutRight: "Right side", layoutHelp: "Switch between branches on both sides (XMind) and all to the right",
       zoom: "Zoom", gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", mdDemo: "What you'll see", mdWhy: "Why it's here", mdHighlights: "Highlights", mdUse: "Good for", mdTry: "Try it", mdCopy: "Copy", mdCopied: "Copied", mdPrev: "Previous card", mdNext: "Next card", mdPos: (n, m) => `${n} of ${m}`, mdSlide: (n, m) => `Picture ${n} of ${m}`, mdPlay: "Play the video", mdPictures: "Pictures", mdTags: "Tags", mdHasNote: "Has your note", showInList: "Show in the list", close: "Close",
       needPassword: "Changing things needs the admin password.",
+      histBtn: "History", histTitle: "Change history", histNone: "No changes recorded yet.", histRestore: "Restore", histRestored: "Restored an earlier version.", histErr: "Could not load the history.",
+      histField: { note: "Note", summary: "Summary", title: "Title", folder: "Folder", favorite: "Star", trashed: "Trash" }, histEmptyVal: "(empty)", histStarOn: "starred", histStarOff: "not starred", histInTrash: "in the trash", histOutTrash: "not in the trash",
+      histActor: (a) => a === "admin" ? "You" : a === "system:refresh" ? "Refresh" : a === "system" ? "System" : a.replace(/^agent:/, "agent "),
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
       noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
@@ -917,6 +924,9 @@
       layoutBoth: "兩側展開", layoutRight: "往右展開", layoutHelp: "切換：分支分佈在兩側（XMind 預設）或全部往右",
       zoom: "縮放", gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", mdDemo: "你會看到什麼", mdWhy: "為什麼收進來", mdHighlights: "重點", mdUse: "適合用在", mdTry: "試試看", mdCopy: "複製", mdCopied: "已複製", mdPrev: "上一張卡片", mdNext: "下一張卡片", mdPos: (n, m) => `第 ${n} / ${m} 張`, mdSlide: (n, m) => `第 ${n} 張圖，共 ${m} 張`, mdPlay: "播放影片", mdPictures: "圖片", mdTags: "標籤", mdHasNote: "有你的筆記", showInList: "在清單中查看", close: "關閉",
       needPassword: "要修改需要管理密碼。",
+      histBtn: "修改紀錄", histTitle: "修改紀錄", histNone: "還沒有修改紀錄。", histRestore: "還原", histRestored: "已還原成先前的版本。", histErr: "無法載入修改紀錄。",
+      histField: { note: "筆記", summary: "摘要", title: "標題", folder: "資料夾", favorite: "星號", trashed: "垃圾桶" }, histEmptyVal: "（空白）", histStarOn: "已加星", histStarOff: "未加星", histInTrash: "在垃圾桶", histOutTrash: "不在垃圾桶",
+      histActor: (a) => a === "admin" ? "你" : a === "system:refresh" ? "重新整理" : a === "system" ? "系統" : a.replace(/^agent:/, "agent "),
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
       noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
@@ -2639,11 +2649,58 @@
         : btn("favorite", "star", i.favorite ? t.unfavorite : t.favorite, i.favorite ? "on" : "") + btn("move", "move", t.moveTo) +
           `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refresh)}</button>` +
           btn("health", "refresh", t.checkLink) + btn("note", "note", i.note ? t.editNote : t.addNote) + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
+      btn("history", "undo", t.histBtn, histFor === i.id ? "on" : "") +
       (modalFrom === "map" ? btn("list", "list", t.showInList) : "");
+    if (histFor === i.id) paintHistory(i);
+  }
+  // ── Change history (read: anyone who can read the card; restore: admin) ──
+  let histFor = null, histRows = null;
+  function histPreview(row, f) {
+    const t = T(), b = row.before, cut = (x) => { x = String(x ?? "").replace(/\s+/g, " ").trim(); return x ? (x.length > 80 ? x.slice(0, 80) + "…" : x) : t.histEmptyVal; };
+    if (f === "note" || f === "title") return cut(b[f]);
+    if (f === "summary") { try { const o = JSON.parse(b.summary); return cut(o.oneLiner || o.name); } catch { return t.histEmptyVal; } }
+    if (f === "folder") return folderPath(b.category);
+    if (f === "favorite") return b.favorite ? t.histStarOn : t.histStarOff;
+    return b.trashed_at ? t.histInTrash : t.histOutTrash;
+  }
+  function paintHistory(i) {
+    const t = T(), admin = role === "admin";
+    let sec = document.getElementById("md-hist");
+    if (!sec) { sec = document.createElement("section"); sec.id = "md-hist"; sec.className = "md-sec md-hist"; $("md-scroll").appendChild(sec); }
+    const body = histRows == null ? "…" : !histRows.length ? `<p>${esc(t.histNone)}</p>` :
+      `<ul>${histRows.map((r) => `<li><div>${r.fields.map((f) => `<span>${esc(t.histField[f] ?? f)}: ${esc(histPreview(r, f))}</span>`).join("<br>")}<small>${when(r.at)} · ${esc(t.histActor(r.actor))}</small></div>${
+        admin ? `<button class="btn" type="button" data-md="hist-restore" data-v="${r.v}">${esc(t.histRestore)}</button>` : ""}</li>`).join("")}</ul>`;
+    sec.innerHTML = `<h4>${esc(t.histTitle)}</h4>${body}`;
+  }
+  const when = (iso) => { const d = new Date(iso); return esc(isNaN(d) ? iso : d.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })); };
+  async function loadHistory(id) {
+    try { const rows = await api(`/api/items/${id}/history`); if (histFor === id) histRows = rows; } catch { if (histFor === id) { histRows = []; toast(T().histErr); } }
+    if (histFor === id && modalId === id && mdlDlg.open) paintModal();
+  }
+  async function restoreVersion(id, v) {
+    const saved = await mapWrite(`/api/items/${id}/history/${v}/restore`, "POST");
+    if (!saved) return;
+    const item = find(id);
+    if (item) {
+      // The server omits empty optional fields (a cleared note): replace the card's data, keep what only the list adds.
+      const extra = { found: item.found, said: item.said, suggestions: item.suggestions };
+      for (const k of Object.keys(item)) delete item[k];
+      Object.assign(item, saved, extra);
+      const el = document.getElementById(`item-${id}`);
+      if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); }
+    }
+    if (mapShown()) drawMap();
+    refreshCounts(); refreshFolders();
+    const rows = await api(`/api/items/${id}/history`).catch(() => null);
+    const undoV = rows?.[0]?.v;   // the restore itself is the newest version: restoring it again undoes it
+    histRows = rows ?? histRows;
+    if (modalId === id && mdlDlg.open) paintModal();
+    toast(T().histRestored, undoV ? async () => { await restoreVersion(id, undoV); } : undefined);
   }
   function openModal(id, from = "list") {
     if (!find(id)) return;
     const wasOpen = mdlDlg.open;
+    if (modalId !== id) { histFor = null; histRows = null; }
     modalId = id; modalFrom = from;
     paintModal();
     if (!wasOpen) mdlDlg.showModal();
@@ -2694,6 +2751,12 @@
       history.replaceState(null, "", `#item-${id}`);
       return load();
     }
+    if (act1 === "history") {
+      histFor = histFor === id ? null : id; histRows = null;
+      if (histFor) loadHistory(id);
+      return paintModal();
+    }
+    if (act1 === "hist-restore") return restoreVersion(id, Number(b.dataset.v));
     if (act1 === "move") { mdlDlg.close(); return openMovePicker(id); }
     if (act1 === "refresh") return refreshItem(id);
     if (act1 === "health") return checkLink(id);

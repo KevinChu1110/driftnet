@@ -285,6 +285,10 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 - **重新整理**卡片：重新抓網頁、重寫摘要，適合當初卡在登入牆、或網頁內容已經改了的時候。你的筆記、最愛、分享次數和自己選的資料夾都會保留；
   如果這次抓回來是空的，會保留原本的摘要。
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
+- **每個改動都能復原。**打開卡片按**修改紀錄**，會列出最近 20 次改動（筆記、摘要、標題、資料夾、星號、垃圾桶；最多保留 180 天），
+  顯示是誰改的、改之前的內容；按**還原**會把它放回來，而且這次還原本身也是一筆紀錄，所以還原也能再復原。
+  看得到卡片的人就看得到它的紀錄；還原需要寫入權限，並且和一般編輯一樣要通過同樣的檢查。
+  agent 也能用 `driftnet_update_item` 的 `restore_version` 做同樣的事。
 - **筆記。**每張卡片都能按 📝 寫自己的筆記（試過了嗎？要 GPU 嗎？）。大家丟連結時在聊天室說的話也會顯示在卡片上（💬），
   兩者都搜尋得到。側邊欄的 **📝 筆記** 可以寫不綁卡片的 Markdown 筆記，寫 `#12` 就會連到第 12 張卡片。
 - 網頁上的 **⚙ 設定**：模型、Jev、摘要語言、聊天室回覆方式、自訂摘要規則、不收錄的網域，存進 `~/.driftnet/.env`，
@@ -619,7 +623,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack`（`?s=` 簽名連結）· `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `GET /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
 `GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
