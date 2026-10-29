@@ -4,7 +4,7 @@ const [cmd = "start"] = process.argv.slice(2);
 const VERSION = process.env.DRIFTNET_VERSION ?? "dev";
 
 const rest = process.argv.slice(3);
-const SUBCOMMANDS = ["add", "search", "open", "export", "import", "completion", "status", "init"];
+const SUBCOMMANDS = ["add", "search", "open", "export", "import", "completion", "status", "init", "backup", "restore"];
 
 if (cmd === "start") await import("./main.ts");
 else if (cmd === "mcp") await import("./mcp-stdio.ts");
@@ -28,6 +28,8 @@ Commands (talk to a running driftnet; search and export also read the database d
   driftnet open [id]                    open the web page (or one card) in the browser
   driftnet export [--format json|md|vault] [-o file]   (vault is a zip: needs -o)
   driftnet import <file|pack link> [--keep-folders] [--yes]  import bookmarks or a pack
+  driftnet backup [-o file] [--secrets]  zip of your whole catalogue (secrets left out unless --secrets + --token)
+  driftnet restore <file> [--print-settings]  put a backup back (only while driftnet is stopped; the old data is kept)
   driftnet status                       is it running, how many links, where the data lives
   driftnet completion bash|zsh          print a shell completion script
   driftnet init [--client claude-code|claude-desktop|cursor|windsurf|codex|all] [--remote URL --token T] [--yes] [--dry-run]

@@ -1,4 +1,4 @@
-import { summaryDepth, type Driftnet } from "@driftnet/core";
+import { profileLine, readerProfile, summaryDepth, type Driftnet } from "@driftnet/core";
 
 const DEPTH_BRIEF = {
   brief: "Keep it short: one_liner plus 2 highlights, demo in one sentence, no use_cases.",
@@ -15,6 +15,7 @@ export function agentBrief(dn: Driftnet, leased: number, env: NodeJS.ProcessEnv 
   const language = env.DRIFTNET_LANGUAGE || "English";
   const rules = env.DRIFTNET_SUMMARY_RULES?.trim();
   const depth = summaryDepth();
+  const profile = profileLine(readerProfile(env.DRIFTNET_PROFILE));
   return [
     DATA_NOTICE,
     `Pending in total: ${dn.store.pendingCount()}. Leased to you: ${leased}.`,
@@ -30,5 +31,6 @@ export function agentBrief(dn: Driftnet, leased: number, env: NodeJS.ProcessEnv 
     "category — one of the reader's folders (id: path — what belongs there):",
     ...Object.entries(dn.categories).map(([id, about]) => `- ${id}: ${about}`),
     ...(rules ? [`The reader's own rules: ${rules}`] : []),
+    ...(profile ? [profile] : []),
   ].join("\n");
 }

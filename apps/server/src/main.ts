@@ -7,12 +7,16 @@ import { isPrivate, token, Tunnel } from "./access.ts";
 import { createApp } from "./app.ts";
 import { startDigestScheduler } from "./digest.ts";
 import { Settings } from "./settings.ts";
+import { applyPendingRestore, dbPathOf } from "./backup.ts";
+import { checkForUpdate } from "./update.ts";
 
 const env = process.env;
 // Settings the environment itself provides (systemd, Docker, the shell) win over the file; the page shows them read-only.
 const fromEnvironment = new Set(Object.keys(env).filter((k) => env[k] !== undefined));
 const envFile = loadHomeEnv(env);
 const plugins = await loadPlugins(env);
+// A restore staged from the page is swapped in here, before the store opens the file.
+try { applyPendingRestore(dbPathOf(env)); } catch (err) { console.error(`[restore] could not apply the staged restore: ${(err as Error).message}`); process.exit(1); }
 const dn = createDriftnet();
 const settings = new Settings(env, fromEnvironment);
 const PORT = Number(env.PORT ?? 8787);
@@ -52,6 +56,8 @@ server.listen(PORT, HOST, () => {
   if (plugins.length) console.log(`plugins: ${plugins.join(", ")}`);
   healthFor(dn.store).start(env); // does nothing unless DRIFTNET_HEALTH=weekly (read live)
   void suggestLocalModel();
+  // At most once a day (the time of the last try is in the database), 3 s timeout, never blocks start.
+  void checkForUpdate(dn.store, env).catch(() => {});
   // First run in a terminal: open the page, where ⚙ Settings walks through the rest.
   if (!envFile && process.stdout.isTTY && env.DRIFTNET_OPEN !== "0" && !env.CI) openBrowser(`http://localhost:${PORT}/`);
   if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);

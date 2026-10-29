@@ -7,6 +7,7 @@ import { handleSlack } from "../adapters/slack.ts";
 import { collect, toMarkdown, toVault, zip } from "../export.ts";
 import { atomFeed, llmsTxt, openApi } from "../feeds.ts";
 import { createMcpServer } from "../mcp.ts";
+import { updateNotice } from "../update.ts";
 import { BadRequest, type Route } from "../route.ts";
 
 const PAGE_HEADERS = {
@@ -68,7 +69,11 @@ export const routes: Route[] = [
   },
   {
     method: "GET", pattern: "/api/stats", access: "read",
-    handler: ({ send, app: { dn } }) => send(200, { ...dn.store.stats(), inbox: dn.store.inboxCount(), review: dn.store.reviewCount(), engines: dn.engines }),
+    handler: ({ send, app: { dn, env } }) => {
+      // update: only when the last daily check found a newer release (no network here); the page shows it as a dismissible notice.
+      const update = updateNotice(dn.store, env);
+      return send(200, { ...dn.store.stats(), inbox: dn.store.inboxCount(), review: dn.store.reviewCount(), engines: dn.engines, ...(update ? { update } : {}) });
+    },
   },
   // Export: one Markdown file, or a zip vault for Obsidian / Notion.
   {

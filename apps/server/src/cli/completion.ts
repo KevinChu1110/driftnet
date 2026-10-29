@@ -6,6 +6,8 @@ export const COMMANDS: Record<string, string[]> = {
   open: ["--url", "--token"],
   export: ["--format", "--output", "--url", "--token"],
   import: ["--keep-folders", "--yes", "--url", "--token"],
+  backup: ["--output", "--secrets", "--url", "--token"],
+  restore: ["--print-settings"],
   completion: [],
   status: ["--url", "--token"],
   init: ["--client", "--remote", "--token", "--yes", "--dry-run"],
@@ -29,7 +31,7 @@ _driftnet() {
     --view) COMPREPLY=( $(compgen -W "${VIEWS}" -- "$cur") ); return ;;
     --format) COMPREPLY=( $(compgen -W "${FORMATS}" -- "$cur") ); return ;;
     completion) COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ); return ;;
-    import|-o|--output) COMPREPLY=( $(compgen -f -- "$cur") ); return ;;
+    import|restore|-o|--output) COMPREPLY=( $(compgen -f -- "$cur") ); return ;;
   esac
   if [ "$COMP_CWORD" -eq 1 ]; then
     COMPREPLY=( $(compgen -W "${names} ${GLOBAL.join(" ")}" -- "$cur") ); return
@@ -57,7 +59,7 @@ _driftnet() {
     --view) _values 'view' ${VIEWS}; return ;;
     --format) _values 'format' ${FORMATS}; return ;;
     completion) _values 'shell' bash zsh; return ;;
-    import|-o|--output) _files; return ;;
+    import|restore|-o|--output) _files; return ;;
   esac
   case "$words[2]" in
 ${cases}

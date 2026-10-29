@@ -13,6 +13,7 @@ import { Summarizer, summaryDepth } from "./summarize.ts";
 import { categoryLabel, resolveLocale, type Locale } from "./i18n.ts";
 import { sendWebhook } from "./webhook.ts";
 import { defaultDbPath } from "./home.ts";
+import { readerProfile } from "./profile.ts";
 
 export * from "./types.ts";
 export { canonicalize, extractUrls } from "./url.ts";
@@ -31,6 +32,8 @@ export { createProvider, registerProvider, IncompleteOutput, parseStructured, ty
 export { registerJudge, type JudgeFactory } from "./judge/index.ts";
 export { parseRules, RulesJudge } from "./judge/rules.ts";
 export { Summarizer, summaryDepth, DEPTHS, type Depth } from "./summarize.ts";
+export { readerProfile, profileLine, PROFILE_MAX_CHARS, PROFILE_MAX_TOKENS } from "./profile.ts";
+export { LATEST_VERSION as SCHEMA_LATEST, schemaVersion, migrate } from "./migrations.ts";
 export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
@@ -118,7 +121,7 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
 function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { judge: string; summarizer: string }; llm: LlmProvider | undefined } {
   const judge = buildJudge(env);
   const llm = createProvider(env);
-  const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "", summaryDepth(env)) : undefined;
+  const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "", summaryDepth(env), readerProfile(env.DRIFTNET_PROFILE)) : undefined;
   const blockedDomains = (env.DRIFTNET_BLOCK_DOMAINS ?? "").split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^\*?\./, "")).filter(Boolean);
   const minConfidence = env.DRIFTNET_MIN_CONFIDENCE ? Number(env.DRIFTNET_MIN_CONFIDENCE) : undefined;
   return {

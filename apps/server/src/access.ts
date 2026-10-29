@@ -25,7 +25,7 @@ export const token = (env: NodeJS.ProcessEnv) => env.DRIFTNET_TOKEN || undefined
 export const readKey = (env: NodeJS.ProcessEnv) => env.DRIFTNET_READ_KEY || undefined;
 export const isPrivate = (env: NodeJS.ProcessEnv) => env.DRIFTNET_ACCESS === "private";
 
-function same(given: string | null | undefined, want: string | undefined): boolean {
+export function same(given: string | null | undefined, want: string | undefined): boolean {
   if (!given || !want) return false;
   const a = Buffer.from(given);
   const b = Buffer.from(want);

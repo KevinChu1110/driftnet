@@ -43,7 +43,7 @@ export interface Reply { status: number; headers: Headers; text: string; bytes: 
 
 export async function call(
   conn: Connection, fetchFn: typeof fetch, method: string, path: string,
-  opts: { json?: unknown; timeoutMs?: number } = {},
+  opts: { json?: unknown; timeoutMs?: number; headers?: Record<string, string> } = {},
 ): Promise<Reply> {
   let res: Response;
   try {
@@ -51,6 +51,7 @@ export async function call(
       method,
       headers: {
         "X-Driftnet-Agent": "cli",
+        ...opts.headers,
         ...(conn.token ? { Authorization: `Bearer ${conn.token}` } : {}),
         ...(opts.json !== undefined ? { "content-type": "application/json" } : {}),
       },

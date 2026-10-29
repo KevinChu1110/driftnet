@@ -239,7 +239,7 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 
 ## 指令列
 
-driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話。`search` 和 `export` 在它沒開時也能用（直接讀 `~/.driftnet/driftnet.db`）；`add` 和 `import` 需要它在跑。
+driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話。`search`、`export` 和 `backup` 在它沒開時也能用（直接讀 `~/.driftnet/driftnet.db`）；`restore` 只能在它「沒開」時用；`add` 和 `import` 需要它在跑。
 
 | 指令 | 範例 |
 |---|---|
@@ -248,7 +248,9 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 | `driftnet open [id]` | `npx driftnet open 12` |
 | `driftnet export [--format json\|md\|vault] [-o 檔案]` | `npx driftnet export --format vault -o links.zip` |
 | `driftnet import <檔案或資料夾包連結> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
-| `driftnet status` | `npx driftnet status` |
+| `driftnet backup [-o file] [--secrets]` | `npx driftnet backup -o driftnet.zip` |
+| `driftnet restore <file> [--print-settings]` | `npx driftnet restore driftnet.zip` |
+| `driftnet status`（有新版也會告訴你） | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 | `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
 
@@ -591,6 +593,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_CATEGORIES` | 內建 | 起始資料夾的 JSON 檔：`{ "id": "說明" }`，只在新資料庫用一次，之後直接在網頁上改 |
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
+| `DRIFTNET_PROFILE` | — | 你是誰、關心什麼，最多 600 字（⚙ 設定 › AI › 關於你）。模型用它判斷什麼值得你花時間，並寫每張卡片的「為什麼值得看」；agent 也會收到。它只在模型的 system prompt 放一次（約 150 token，所以 prompt caching 照常命中），也不會被抄進卡片 |
+| `DRIFTNET_UPDATE_CHECK` | `1` | 每天向 `registry.npmjs.org` 查一次最新版本號，有新版就在網頁標題列顯示小提示「driftnet x.y.z 已發布」（`driftnet status` 也會顯示）。不會傳送任何與你有關的資料。設 `0` 就關閉 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
 | `DRIFTNET_VIDEO` | `auto` | `auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`；`captions` 只讀字幕和說明（省電）；`off` 完全不讀影片（見「Reels 與 Shorts」） |
@@ -620,7 +624,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack`（`?s=` 簽名連結）· `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
-`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings`（限本機，或帶 token）· `GET /api/backup`（`?secrets=1` 並在 `X-Driftnet-Confirm` 標頭再送一次密碼）· `POST /api/backup/restore`（body 是 zip；兩者都限管理密碼）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
 
@@ -664,7 +668,12 @@ driftnet.example.com {
 > 清單留在你的電腦上。判斷和摘要時，driftnet 會把連結的**摘錄**（標題、大綱、分享時附的聊天文字）送到
 > **TypeSafe**（有開 Jev 時）和**你設定的模型供應商**。沒有連結的聊天訊息不會被處理或儲存。
 > 用 Ollama 並設 `DRIFTNET_JUDGE=off`，就完全不會有資料離開你的電腦。隨時都能整包帶走：側邊欄可以匯出成
-> Markdown 或 Obsidian／Notion 的 vault，也可以用 `GET /api/export`。
+> Markdown 或 Obsidian／Notion 的 vault，也可以用 `GET /api/export`。driftnet 自己主動發出的另一個請求，
+> 只有每天一次的新版本檢查（對 npm registry 的單純請求；設 `DRIFTNET_UPDATE_CHECK=0` 就停用）。
+
+### 備份與還原
+
+**⚙ 設定 › 一般 › 備份** 會下載一個 zip：`driftnet.db`（一致的快照，driftnet 執行中也能做）、`settings.env` 和 `manifest.json`（driftnet 版本、資料庫結構版本、日期、卡片數）。**`settings.env` 不含密碼、金鑰和 token**；勾選「包含密碼和金鑰」並再輸入一次管理員密碼才會保留。從檔案還原時會先檢查（必須是 driftnet 的備份、資料庫完整、不是來自較新版的 driftnet），把目前的資料留成 `driftnet.db.before-restore-<時間>`，並在 driftnet 下次啟動時換上備份，所以頁面會請你重新啟動。備份裡的設定只會顯示、不會自動套用，需要的自己複製。只有管理員密碼能備份或還原，分享金鑰和 agent token 都不行。終端機：`npx driftnet backup -o driftnet.zip`（沒開時也能用）和 `npx driftnet restore driftnet.zip`（driftnet 必須先停掉）。
 
 ## 參與開發
 
