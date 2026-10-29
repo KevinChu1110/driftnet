@@ -23,6 +23,8 @@
 
 </div>
 
+<p align="center"><img src="assets/demo-en.gif" alt="driftnet demo: a link dropped in a chat becomes a sorted, explained card you can search, and your agent can use it" width="100%"></p>
+
 ## 📖 What it is
 
 Every day your feed carries great articles, open-source repos and tools past you. You paste them
