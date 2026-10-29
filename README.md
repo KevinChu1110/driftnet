@@ -7,7 +7,7 @@
 
 **English** · [繁體中文](README.zh-TW.md)
 
-[📖 What it is](#-what-it-is) · [🎥 See it work](#-see-it-work) · [✨ Core features](#-core-features) · [🚀 Quick start](#-quick-start) · [How links are handled](#how-your-links-are-handled) · [Ways in](#ways-in) · [Command line](#command-line) · [Command line](#command-line) · [Web page](#the-web-page) · [Models](#models) · [Agents](#agents) · [Settings](#settings) · [Online](#putting-it-online-optional) · [Your data](#where-your-data-goes) · [Contributing](#contributing)
+[📖 What it is](#-what-it-is) · [🎥 See it work](#-see-it-work) · [✨ Core features](#-core-features) · [🚀 Quick start](#-quick-start) · [How links are handled](#how-your-links-are-handled) · [Ways in](#ways-in) · [Command line](#command-line) · [Web page](#the-web-page) · [Models](#models) · [Agents](#agents) · [Settings](#settings) · [Online](#putting-it-online-optional) · [Your data](#where-your-data-goes) · [Contributing](#contributing)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
@@ -198,22 +198,6 @@ Bot tokens are read when driftnet starts: put them in `~/.driftnet/.env`, then s
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet answering a Discord message with two links: one line per link, each pointing to its page" width="80%"></p>
 <sub>A real run in Discord (<code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>): two links in one message, one line back for each. Name and server address hidden.</sub>
-
-## Command line
-
-With driftnet running (`npx driftnet`), the same command talks to it. `search` and `export` also work when it is not running (they read `~/.driftnet/driftnet.db` directly); `add` and `import` need it running.
-
-| Command | Example |
-|---|---|
-| `driftnet add <url> [--note "…"]` | `npx driftnet add https://github.com/acme/widget --note "for the demo"` |
-| `driftnet search [query…] [--folder id] [--kind …] [--view inbox\|favorites\|trash] [--limit N] [--json]` | `npx driftnet search vector database --kind repo --limit 5` |
-| `driftnet open [id]` | `npx driftnet open 12` |
-| `driftnet export [--format json\|md\|vault] [-o file]` | `npx driftnet export --format vault -o links.zip` |
-| `driftnet import <file> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
-| `driftnet status` | `npx driftnet status` |
-| `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
-
-For a server elsewhere, add `--url http://host:8787 --token <password>` (or set `DRIFTNET_URL` and `DRIFTNET_TOKEN`; the password is also read from `~/.driftnet/.env`).
 
 ## Command line
 
