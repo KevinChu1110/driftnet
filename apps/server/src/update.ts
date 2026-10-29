@@ -68,9 +68,13 @@ export async function checkForUpdate(
   if (now - last.at < DAY && last.at <= now) return updateNotice(store, env)?.latest;
   // Remember the try first: a registry that is down is not asked again until tomorrow.
   store.setState(STATE_KEY, JSON.stringify({ ...last, at: now }));
+  // A plain timer, not AbortSignal.timeout(): Node 22 doesn't let that one keep a short-lived process
+  // (the CLI, a test) alive, so the abort could never fire there.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), opts.timeoutMs ?? 3000);
   try {
     const res = await (opts.fetch ?? fetch)(UPDATE_URL, {
-      method: "GET", headers: { accept: "application/json" }, credentials: "omit", redirect: "error", signal: AbortSignal.timeout(opts.timeoutMs ?? 3000),
+      method: "GET", headers: { accept: "application/json" }, credentials: "omit", redirect: "error", signal: abort.signal,
     });
     if (!res.ok) return updateNotice(store, env)?.latest;
     const text = await res.text();
@@ -80,6 +84,8 @@ export async function checkForUpdate(
     if (typeof version === "string" && parseSemver(version)) store.setState(STATE_KEY, JSON.stringify({ at: now, latest: version.replace(/^v/, "") }));
   } catch {
     // offline, slow, blocked: say nothing
+  } finally {
+    clearTimeout(timer);
   }
   return updateNotice(store, env)?.latest;
 }
