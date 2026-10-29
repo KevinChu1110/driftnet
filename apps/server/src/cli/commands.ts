@@ -228,8 +228,9 @@ export async function importCmd(ctx: Ctx, argv: string[]): Promise<number> {
     const c = conn(ctx, flags);
     const folders = flags["keep-folders"] ? "keep" : "none";
     const preview = ok<Counts>(await call(c, ctx.fetch, "POST", "/api/import", { json: { content, folders, dryRun: true } }));
-    ctx.out(`${preview.total} links found: ${preview.total - preview.duplicates - preview.skipped} new, ${preview.duplicates} already saved, ${preview.skipped} skipped.`);
-    if (preview.total - preview.duplicates - preview.skipped <= 0) { ctx.out("nothing new to import."); return 0; }
+    // total is what will be imported: duplicates and skipped links are already left out of it.
+    ctx.out(`${preview.total + preview.duplicates + preview.skipped} links found: ${preview.total} new, ${preview.duplicates} already saved, ${preview.skipped} skipped.`);
+    if (preview.total <= 0) { ctx.out("nothing new to import."); return 0; }
     if (!flags.yes) {
       if (!ctx.isTTY) { ctx.err("driftnet: not a terminal, so I can't ask. Re-run with --yes to import."); return 1; }
       if (!(await ctx.confirm("Import these links?"))) { ctx.err("cancelled."); return 1; }

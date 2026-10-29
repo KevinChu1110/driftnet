@@ -130,7 +130,7 @@ test("cli import: preview, --yes, progress, done; refusal without --yes; 409", a
   const m = await mock((r) => {
     if (r.method === "POST") {
       const b = JSON.parse(r.body);
-      return b.dryRun ? [200, { total: 10, duplicates: 2, skipped: 1, preview: [] }] : [202, { job: "j1", total: 10, duplicates: 2, skipped: 1 }];
+      return b.dryRun ? [200, { total: 7, duplicates: 2, skipped: 1, preview: [] }] : [202, { job: "j1", total: 7, duplicates: 2, skipped: 1 }];
     }
     polls++;
     return polls < 3
