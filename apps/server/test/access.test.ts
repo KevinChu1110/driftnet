@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { IncomingMessage } from "node:http";
-import { canRead, isAdmin, isLocal, newKey, readOnly, strength, Tunnel } from "../src/access.ts";
+import { canRead, clientIp, hostAllowed, isAdmin, isLocal, newKey, readOnly, strength, Tunnel } from "../src/access.ts";
 
 const req = (o: { url?: string; auth?: string; host?: string; ip?: string; headers?: Record<string, string> } = {}) =>
   ({
@@ -90,4 +90,23 @@ test("another website's page is never trusted to write, even with no password", 
   assert.ok(!foreignOrigin(req({ headers: { origin: "http://localhost:8787" } })), "the page itself");
   assert.ok(!foreignOrigin(req({ headers: { origin: "chrome-extension://abcdef" } })), "the browser extension");
   assert.ok(!foreignOrigin(req()), "curl, agents, chat platforms send no Origin");
+});
+
+test("without a password only this machine's, the public and the allowed Host names get in (DNS rebinding)", () => {
+  const ok = (host: string, e: NodeJS.ProcessEnv = {}) => hostAllowed(req({ host }), e);
+  for (const h of ["localhost", "localhost:8787", "127.0.0.1:3000", "[::1]:8787"]) assert.ok(ok(h), h);
+  assert.ok(!ok("evil.example.com"));
+  assert.ok(!ok("evil.example.com:8787"));
+  assert.ok(!ok("192.168.1.5:8787"));
+  const e = { DRIFTNET_PUBLIC_URL: "https://dn.example.org/", DRIFTNET_TUNNEL_URL: "https://abc.trycloudflare.com", DRIFTNET_ALLOWED_HOSTS: "nas.lan, Box.local:8787" };
+  for (const h of ["dn.example.org", "abc.trycloudflare.com", "nas.lan", "box.local:8787"]) assert.ok(ok(h, e), h);
+  assert.ok(!ok("evil.example.com", e));
+  assert.ok(ok("evil.example.com", { DRIFTNET_TOKEN: "admin-pass-123" }), "with a password the password is the defence");
+});
+
+test("the throttle counts the socket peer; forwarded headers count only from a local proxy", () => {
+  assert.equal(clientIp(req({ ip: "203.0.113.9", headers: { "x-forwarded-for": "1.2.3.4", "cf-connecting-ip": "5.6.7.8" } })), "203.0.113.9");
+  assert.equal(clientIp(req({ ip: "::ffff:127.0.0.1", headers: { "cf-connecting-ip": "5.6.7.8", "x-forwarded-for": "9.9.9.9" } })), "5.6.7.8");
+  assert.equal(clientIp(req({ headers: { "x-forwarded-for": "6.6.6.6, 1.2.3.4, 7.7.7.7" } })), "7.7.7.7", "the last entry is the proxy's own sighting");
+  assert.equal(clientIp(req()), "127.0.0.1");
 });

@@ -24,7 +24,7 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_LLM_MODEL", group: "model" },
   { key: "DRIFTNET_LLM_BASE_URL", group: "model" },
   { key: "DRIFTNET_LLM_API_KEY", group: "model", secret: true },
-  { key: "DRIFTNET_LLM_EFFORT", group: "model", choices: ["", "low", "medium", "high"] },
+  { key: "DRIFTNET_LLM_EFFORT", group: "model", choices: ["", "low", "medium", "high", "xhigh"] },
   { key: "TYPESAFE_API_KEY", group: "model", secret: true },
   { key: "DRIFTNET_JUDGE", group: "model", choices: ["", "off"] },
   { key: "GITHUB_TOKEN", group: "model", secret: true },
@@ -92,6 +92,8 @@ export class Settings {
       let value = raw === null ? null : raw.trim();
       if (s.secret && value === "") continue;
       if (value === "") value = null;
+      // Unchanged: nothing to validate (the file may hold a value from before a rule changed).
+      if ((this.env[key] ?? null) === value) continue;
       if (value !== null) {
         if (s.choices && !s.choices.includes(value)) throw new SettingsError(`${key} must be one of ${s.choices.filter(Boolean).join(", ")}`);
         if (value.length > (s.max ?? 500)) throw new SettingsError(`${key} is too long`);
@@ -101,7 +103,7 @@ export class Settings {
         if (!s.multiline && /[\r\n]/.test(value)) throw new SettingsError(`${key} must be one line`);
         if (/URL$/.test(key) && !/^https?:\/\/\S+$/.test(value)) throw new SettingsError(`${key} must be an http(s) URL`);
       }
-      if ((this.env[key] ?? null) !== value) next.set(key, value);
+      next.set(key, value);
     }
     if (!next.size) return [];
     this.write(next);

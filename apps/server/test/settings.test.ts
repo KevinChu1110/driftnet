@@ -57,3 +57,11 @@ test("the webhook URL is masked like a key and must be http(s)", () => {
   assert.throws(() => settings.update({ DRIFTNET_WEBHOOK_URL: "ftp://x/y" }), SettingsError);
   assert.throws(() => settings.update({ DRIFTNET_WEBHOOK_ALLOW_LOCAL: "yes" }), SettingsError);
 });
+
+test("saving other settings works when the file holds a value no longer in the choices; xhigh is a choice", () => {
+  const { settings, env } = setup("DRIFTNET_LLM_EFFORT=ultra\n");
+  assert.deepEqual(settings.update({ DRIFTNET_LLM_EFFORT: "ultra", DRIFTNET_REPLY: "off" }), ["DRIFTNET_REPLY"]);
+  assert.throws(() => settings.update({ DRIFTNET_LLM_EFFORT: "extreme" }), SettingsError);
+  assert.deepEqual(settings.update({ DRIFTNET_LLM_EFFORT: "xhigh" }), ["DRIFTNET_LLM_EFFORT"]);
+  assert.equal(env.DRIFTNET_LLM_EFFORT, "xhigh");
+});

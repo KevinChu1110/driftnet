@@ -32,6 +32,15 @@ await build({
   banner: { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' },
   logLevel: "warning",
 });
+// The bin is a plain-JS shim that checks Node before loading the bundle (which needs node:sqlite).
+writeFileSync(join(out, "dist/cli.mjs"), `#!/usr/bin/env node
+const [major, minor] = process.versions.node.split(".").map(Number);
+if (major < 22 || (major === 22 && minor < 13)) {
+  console.error(\`driftnet needs Node 22.13 or newer (you have \${process.versions.node}). Install it with nvm install 22 or from nodejs.org.\`);
+  process.exit(1);
+}
+await import("./driftnet.mjs");
+`, { mode: 0o755 });
 cpSync(join(root, "apps/server/public"), join(out, "public"), { recursive: true });
 for (const f of ["LICENSE", ".env.example"]) cpSync(join(root, f), join(out, f));
 // npmjs.com can't see the repo's assets/ folder: point images and links at GitHub.
@@ -49,12 +58,13 @@ writeFileSync(join(out, "package.json"), JSON.stringify({
   description: rootPkg.description,
   license: rootPkg.license,
   type: "module",
-  bin: { driftnet: "dist/driftnet.mjs" },
+  bin: { driftnet: "dist/cli.mjs" },
   files: ["dist", "public", "examples", ".env.example", "README.zh-TW.md"],
   engines: rootPkg.engines,
   repository: { type: "git", url: "git+https://github.com/KevinChu1110/driftnet.git" },
   homepage: "https://github.com/KevinChu1110/driftnet#readme",
-  keywords: ["ai", "links", "bookmarks", "chatbot", "discord", "telegram", "slack", "line", "mcp", "agents"],
+  bugs: { url: "https://github.com/KevinChu1110/driftnet/issues" },
+  keywords: ["ai", "links", "bookmarks", "chatbot", "discord", "telegram", "slack", "line", "mcp", "agents", "mcp-server", "model-context-protocol", "claude", "llm", "self-hosted", "sqlite", "knowledge-base", "read-later", "chrome-extension"],
   dependencies,
 }, null, 2) + "\n");
 console.log(`dist/npm: driftnet@${version}`);

@@ -2,7 +2,7 @@
   "name": "driftnet",
   "private": true,
   "type": "module",
-  "description": "Drop links into any chat. Get them sorted, explained and searchable — for a fraction of a cent each.",
+  "description": "Drop links into any chat; get them sorted, explained and searchable, for you and your agents. Any model, or none.",
   "license": "MIT",
   "engines": {
     "node": ">=22.13"

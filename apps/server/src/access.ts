@@ -95,6 +95,40 @@ export function readOnly(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: S
   return !!token(env) && !isAdmin(req, env, store);
 }
 
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+const hostOf = (url: string | undefined): string | undefined => {
+  try { return url ? new URL(url).host.toLowerCase() : undefined; } catch { return undefined; }
+};
+
+/**
+ * DNS rebinding guard. Without an admin password a web page could point its own
+ * domain at 127.0.0.1 and read the catalogue through the browser, so the Host
+ * header must name this machine, the public or tunnel address, or a host in
+ * DRIFTNET_ALLOWED_HOSTS. With a password set, the password is the defence.
+ */
+export function hostAllowed(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
+  if (token(env)) return true;
+  const host = (req.headers.host ?? "").toLowerCase();
+  if (LOOPBACK_HOST.test(host)) return true;
+  const allowed = [hostOf(env.DRIFTNET_PUBLIC_URL), hostOf(env.DRIFTNET_TUNNEL_URL), ...(env.DRIFTNET_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase())];
+  return !!host && allowed.includes(host);
+}
+
+/**
+ * The address to count wrong passwords against: the socket peer, unless that is
+ * a local proxy or tunnel, which says who it forwarded in cf-connecting-ip or
+ * the last (the proxy's own) x-forwarded-for entry. Anything else is spoofable.
+ */
+export function clientIp(req: IncomingMessage): string {
+  const peer = req.socket.remoteAddress ?? "?";
+  if (peer !== "127.0.0.1" && peer !== "::1" && peer !== "::ffff:127.0.0.1") return peer;
+  const header = (name: string) => {
+    const v = req.headers[name];
+    return (Array.isArray(v) ? v[0] : v)?.trim() || undefined;
+  };
+  return header("cf-connecting-ip") ?? header("x-forwarded-for")?.split(",").pop()?.trim() ?? peer;
+}
+
 /**
  * This very machine, not something forwarded to it: a loopback socket, a
  * loopback Host (which also stops DNS rebinding) and no proxy headers. A tunnel

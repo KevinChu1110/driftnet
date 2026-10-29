@@ -812,7 +812,7 @@
         },
         choices: {
           DRIFTNET_LLM_PROVIDER: { "": "None", anthropic: "Anthropic (API key)", openai: "OpenAI-compatible (OpenAI, Gemini, Grok, Ollama…)", "claude-cli": "Claude subscription (Claude Code CLI)", "gemini-cli": "Google account (Gemini CLI)" },
-          DRIFTNET_LLM_EFFORT: { "": "Default", low: "Low", medium: "Medium", high: "High" },
+          DRIFTNET_LLM_EFFORT: { "": "Default", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high" },
           DRIFTNET_JUDGE: { "": "On when a key is set", off: "Off" },
           DRIFTNET_SUMMARY_DEPTH: { "": "Standard (default)", brief: "Brief: one line, 2 highlights, what you see", standard: "Standard", detailed: "Detailed: more highlights, use cases, how to try it" },
           DRIFTNET_LOCALE: { "": "Same as the summaries", en: "English", "zh-TW": "繁體中文" },
@@ -828,7 +828,7 @@
       empty: "還沒有內容，把連結丟進聊天室吧。", emptyFav: "還沒有最愛，把卡片往右滑或按星號。",
       emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
-      worth: { skip: "略過", low: "普通", normal: "值得看", "must-see": "必看" },
+      worth: { skip: "略過", low: "次要", normal: "值得看", "must-see": "必看" },
       flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源" },
       pending: "等待摘要", noModel: "沒有摘要（未設定模型）", enrichedBy: (a) => `由 ${a} 整理`,
       favorite: "加入最愛", unfavorite: "移出最愛", remove: "移到垃圾桶", restore: "還原",
@@ -946,7 +946,7 @@
         },
         choices: {
           DRIFTNET_LLM_PROVIDER: { "": "不使用", anthropic: "Anthropic（API 金鑰）", openai: "OpenAI 相容（OpenAI、Gemini、Grok、Ollama…）", "claude-cli": "Claude 訂閱（Claude Code CLI）", "gemini-cli": "Google 帳號（Gemini CLI）" },
-          DRIFTNET_LLM_EFFORT: { "": "預設", low: "低", medium: "中", high: "高" },
+          DRIFTNET_LLM_EFFORT: { "": "預設", low: "低", medium: "中", high: "高", xhigh: "極高" },
           DRIFTNET_JUDGE: { "": "有金鑰就開", off: "關閉" },
           DRIFTNET_SUMMARY_DEPTH: { "": "標準（預設）", brief: "簡短：一句話、2 個重點、看得到什麼", standard: "標準", detailed: "詳細：更多重點、使用情境、怎麼試用" },
           DRIFTNET_LOCALE: { "": "跟摘要一樣", en: "English", "zh-TW": "繁體中文" },
