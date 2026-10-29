@@ -6,6 +6,7 @@ import { driftnetHome } from "@driftnet/core";
 import { parseArgs, UsageError, type ArgSpec } from "./args.ts";
 import { call, HttpError, ok, resolveConnection, ServerDown, type Connection } from "./client.ts";
 import { completionScript } from "./completion.ts";
+import { init } from "./init.ts";
 
 /** Everything the commands touch outside themselves, so tests can swap it. */
 export interface Ctx {
@@ -285,6 +286,6 @@ export async function completion(ctx: Ctx, argv: string[]): Promise<number> {
 }
 
 export const HANDLERS: Record<string, (ctx: Ctx, argv: string[]) => Promise<number>> = {
-  add, search, open, export: exportCmd, import: importCmd, completion, status,
+  add, search, open, export: exportCmd, import: importCmd, completion, status, init,
 };
 export type { ArgSpec };

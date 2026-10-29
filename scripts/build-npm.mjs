@@ -50,6 +50,8 @@ for (const f of ["README.md", "README.zh-TW.md"]) {
     .replace(/\]\((?!https?:|#)([^)]+)\)/g, "](https://github.com/KevinChu1110/driftnet/blob/main/$1)"));
 }
 cpSync(join(root, "examples"), join(out, "examples"), { recursive: true });
+// `driftnet init` copies this into ~/.claude/skills/.
+cpSync(join(root, "skills/driftnet"), join(out, "skills/driftnet"), { recursive: true });
 writeFileSync(join(out, "package.json"), JSON.stringify({
   name: "driftnet",
   version,
@@ -59,7 +61,7 @@ writeFileSync(join(out, "package.json"), JSON.stringify({
   license: rootPkg.license,
   type: "module",
   bin: { driftnet: "dist/cli.mjs" },
-  files: ["dist", "public", "examples", ".env.example", "README.zh-TW.md"],
+  files: ["dist", "public", "examples", "skills", ".env.example", "README.zh-TW.md"],
   engines: rootPkg.engines,
   repository: { type: "git", url: "git+https://github.com/KevinChu1110/driftnet.git" },
   homepage: "https://github.com/KevinChu1110/driftnet#readme",

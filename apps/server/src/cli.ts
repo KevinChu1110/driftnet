@@ -4,7 +4,7 @@ const [cmd = "start"] = process.argv.slice(2);
 const VERSION = process.env.DRIFTNET_VERSION ?? "dev";
 
 const rest = process.argv.slice(3);
-const SUBCOMMANDS = ["add", "search", "open", "export", "import", "completion", "status"];
+const SUBCOMMANDS = ["add", "search", "open", "export", "import", "completion", "status", "init"];
 
 if (cmd === "start") await import("./main.ts");
 else if (cmd === "mcp") await import("./mcp-stdio.ts");
@@ -30,6 +30,8 @@ Commands (talk to a running driftnet; search and export also read the database d
   driftnet import <file> [--keep-folders] [--yes]      import a bookmarks file
   driftnet status                       is it running, how many links, where the data lives
   driftnet completion bash|zsh          print a shell completion script
+  driftnet init [--client claude-code|claude-desktop|cursor|windsurf|codex|all] [--remote URL --token T] [--yes] [--dry-run]
+                                        connect your agents (MCP + skill) in one command
   Options for all of them: --url <server>  --token <password>   (or DRIFTNET_URL / DRIFTNET_TOKEN)
 
 Press Ctrl+C to stop.

@@ -8,6 +8,7 @@ export const COMMANDS: Record<string, string[]> = {
   import: ["--keep-folders", "--yes", "--url", "--token"],
   completion: [],
   status: ["--url", "--token"],
+  init: ["--client", "--remote", "--token", "--yes", "--dry-run"],
   help: [],
 };
 const GLOBAL = ["--help", "--version"];

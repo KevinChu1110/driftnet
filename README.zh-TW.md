@@ -82,6 +82,14 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 
 不需要伺服器，也不需要雲端帳號。需要 Node.js 22.13 以上。
 
+### 讓 agent 幫你裝
+
+把這句話貼給 Claude Code、Cursor、Codex 或任何能執行指令的 agent：
+
+> Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
+
+或自己來：先 `npx driftnet` 啟動，再 `npx driftnet init` 把這台機器上的 agent 都接起來。
+
 ### 1. 一行指令
 
 ```bash
@@ -211,6 +219,7 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 | `driftnet import <檔案> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
 | `driftnet status` | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
+| `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
 
 連到別台機器：加 `--url http://host:8787 --token <密碼>`（或設 `DRIFTNET_URL`、`DRIFTNET_TOKEN`；密碼也會從 `~/.driftnet/.env` 讀）。
 

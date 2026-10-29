@@ -84,6 +84,14 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 No server, no cloud account. Needs Node.js 22.13+.
 
+### Let your agent set it up
+
+Paste this to Claude Code, Cursor, Codex or any agent that can run commands:
+
+> Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
+
+Or do it yourself: `npx driftnet` to start, then `npx driftnet init` to connect the agents on this machine.
+
 ### 1. One command
 
 ```bash
@@ -216,6 +224,7 @@ With driftnet running (`npx driftnet`), the same command talks to it. `search` a
 | `driftnet import <file> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
 | `driftnet status` | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
+| `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
 
 For a server elsewhere, add `--url http://host:8787 --token <password>` (or set `DRIFTNET_URL` and `DRIFTNET_TOKEN`; the password is also read from `~/.driftnet/.env`).
 
