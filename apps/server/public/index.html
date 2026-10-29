@@ -736,7 +736,7 @@
       save: "Save", cancel: "Cancel", del: "Delete folder", delSure: "Delete? Links move up",
       refresh: "Refresh (fetch and summarise again)", refreshed: (n) => `Refreshed “${n}”`, refreshBusy: "Already refreshing this one.", refreshWait: "Refreshed a moment ago — try again in a minute.", refreshFailed: (why) => `Couldn’t refresh${why ? `: ${why}` : ""}`,
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
-      dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
+      dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", related: "Related:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
       pkShare: "Share as pack…", pkTitle: "Share as pack", pkHelp: "A pack is this folder, its sub-folders and the cards in them as one file. Someone else imports it with one click. Your notes, chat text and counters are never included.", pkName: "Pack name", pkDesc: "Description", pkDownload: "Download pack", pkLinkL: "Link to share", pkCopy: "Copy link", pkCopied: "Link copied", pkSigned: "Anyone with this link can download this one pack, and nothing else in your catalogue.", pkOpen: "Anyone who can reach this address can download this pack.", pkNoLink: "No public address is set, so there is no link to share yet. Set one in Settings → Access, or start a tunnel. You can still download the file.", pkClose: "Close", pkTooBig: "This folder is too big to share as a pack.",
       mapAll: "All", focusCrumb: "Mind map location", focusUp: "Up one level", focusFolder: "Focus on this folder", mapTree: "Mind map",
@@ -843,6 +843,12 @@
           DRIFTNET_LLM_EFFORT: ["Reasoning effort", ""],
           TYPESAFE_API_KEY: ["Jev key", "Optional: a ~100 ms classifier that saves model calls (console.typesafe.ai)"],
           DRIFTNET_JUDGE: ["Judge", "Who files each link before the model does. Rules is free: it needs no model."],
+          DRIFTNET_EMBED: ["Search by meaning", "Finds cards by what they are about, not just the words (\"login\" finds OAuth). Needs an embedding model: Ollama with nomic-embed-text, or a provider below. Costs no summary tokens."],
+          DRIFTNET_EMBED_PROVIDER: ["Embedding provider", "Naming one turns Search by meaning on. Ollama stays on your machine; OpenAI and Gemini send each card's summary (never your notes or chat) to them."],
+          DRIFTNET_EMBED_MODEL: ["Embedding model", "Default: nomic-embed-text (Ollama), text-embedding-3-small (OpenAI), gemini-embedding-001 (Gemini). Changing it re-embeds everything in the background."],
+          DRIFTNET_EMBED_BASE_URL: ["Embedding API URL", "Ollama or an OpenAI-compatible server, e.g. http://127.0.0.1:11434. Empty: the provider's own address."],
+          DRIFTNET_EMBED_API_KEY: ["Embedding API key", "OpenAI or Gemini. The summary model's key is reused only when it is the same vendor."],
+          DRIFTNET_EMBED_FLOOR: ["Meaning match threshold", "0–1. How close a card must be in meaning to show without a matching word. Default 0.55 for nomic-embed-text; higher shows fewer matches."],
           DRIFTNET_LLM_REGION: ["Region", "Bedrock: e.g. us-east-1. Vertex: e.g. us-central1 (default). Not used by other providers."],
           AWS_ACCESS_KEY_ID: ["AWS access key ID", "Bedrock. Leave empty if you use a Bedrock API key."],
           AWS_SECRET_ACCESS_KEY: ["AWS secret access key", "Bedrock."],
@@ -886,6 +892,8 @@
           DRIFTNET_DIGEST_DAY: { "": "Monday (default)", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "No (public addresses only)", 1: "Yes" },
           DRIFTNET_HEALTH: { "": "Off (default)", off: "Off", weekly: "Weekly (recommended)" },
+          DRIFTNET_EMBED: { "": "Automatic (default): on when a local model is found", auto: "Automatic: on when a local model is found", off: "Off" },
+          DRIFTNET_EMBED_PROVIDER: { "": "Automatic (local Ollama only)", ollama: "Ollama (on this computer)", openai: "OpenAI", gemini: "Gemini" },
           DRIFTNET_VIDEO: { "": "Automatic (default)", auto: "Automatic: use the tools found", captions: "Captions only (light on battery: no download, OCR or speech)", off: "Off" },
         },
       },
@@ -911,7 +919,7 @@
       save: "儲存", cancel: "取消", del: "刪除資料夾", delSure: "確定刪除？內容移到上一層",
       refresh: "重新整理（再抓一次並重新摘要）", refreshed: (n) => `已重新整理「${n}」`, refreshBusy: "這張卡片正在重新整理。", refreshWait: "剛剛才整理過，請一分鐘後再試。", refreshFailed: (why) => `重新整理失敗${why ? `：${why}` : ""}`,
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
-      dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
+      dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", related: "相關卡片：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
       pkShare: "分享成資料夾包…", pkTitle: "分享成資料夾包", pkHelp: "資料夾包把這個資料夾、底下的子資料夾和裡面的卡片包成一個檔案，別人一鍵就能匯入。你的筆記、聊天內容和各種計數都不會放進去。", pkName: "資料夾包名稱", pkDesc: "說明", pkDownload: "下載資料夾包", pkLinkL: "分享連結", pkCopy: "複製連結", pkCopied: "已複製連結", pkSigned: "拿到這個連結的人只能下載這一個資料夾包，看不到你目錄裡的其他內容。", pkOpen: "任何連得到這個位址的人都能下載這個資料夾包。", pkNoLink: "還沒設定公開網址，所以暫時沒有可分享的連結。請到「設定 → 存取」設定，或啟動通道。現在仍可以下載檔案。", pkClose: "關閉", pkTooBig: "這個資料夾太大，無法分享成資料夾包。",
       mapAll: "全部", focusCrumb: "樹狀圖位置", focusUp: "回上一層", focusFolder: "聚焦這個資料夾", mapTree: "樹狀圖",
@@ -1018,6 +1026,12 @@
           DRIFTNET_LLM_EFFORT: ["推理強度", ""],
           TYPESAFE_API_KEY: ["Jev 金鑰", "選填：約 100ms 的分類器，可以省下模型呼叫（console.typesafe.ai）"],
           DRIFTNET_JUDGE: ["判斷器", "在模型之前先決定每個連結放哪。「規則」免費，不需要模型。"],
+          DRIFTNET_EMBED: ["以語意搜尋", "依內容意思找卡片，不只比對字（搜「登入」能找到 OAuth）。需要嵌入模型：本機 Ollama 的 nomic-embed-text，或下面的服務。不花摘要的 token。"],
+          DRIFTNET_EMBED_PROVIDER: ["嵌入服務", "指定一個就會開啟語意搜尋。Ollama 全程在你的電腦上；OpenAI、Gemini 會收到每張卡片的摘要（不會有你的筆記或聊天內容）。"],
+          DRIFTNET_EMBED_MODEL: ["嵌入模型", "預設：nomic-embed-text（Ollama）、text-embedding-3-small（OpenAI）、gemini-embedding-001（Gemini）。更換後會在背景重新計算全部卡片。"],
+          DRIFTNET_EMBED_BASE_URL: ["嵌入 API 網址", "Ollama 或相容 OpenAI 的伺服器，例如 http://127.0.0.1:11434。留空：用該服務的預設位址。"],
+          DRIFTNET_EMBED_API_KEY: ["嵌入 API 金鑰", "OpenAI 或 Gemini 用。只有摘要模型是同一家時才會沿用它的金鑰。"],
+          DRIFTNET_EMBED_FLOOR: ["語意相符門檻", "0–1。沒有字面相符時，意思要多接近才會出現。nomic-embed-text 預設 0.55；調高結果會變少。"],
           DRIFTNET_LLM_REGION: ["區域", "Bedrock：例如 us-east-1。Vertex：例如 us-central1（預設）。其他供應商用不到。"],
           AWS_ACCESS_KEY_ID: ["AWS 存取金鑰 ID", "Bedrock 用。有 Bedrock API 金鑰就留空。"],
           AWS_SECRET_ACCESS_KEY: ["AWS 秘密存取金鑰", "Bedrock 用。"],
@@ -1061,6 +1075,8 @@
           DRIFTNET_DIGEST_DAY: { "": "週一（預設）", mon: "週一", tue: "週二", wed: "週三", thu: "週四", fri: "週五", sat: "週六", sun: "週日" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "否（只允許公開位址）", 1: "是" },
           DRIFTNET_HEALTH: { "": "關閉（預設）", off: "關閉", weekly: "每週（建議）" },
+          DRIFTNET_EMBED: { "": "自動（預設）：找到本機模型就開", auto: "自動：找到本機模型就開", off: "關閉" },
+          DRIFTNET_EMBED_PROVIDER: { "": "自動（只找本機 Ollama）", ollama: "Ollama（在這台電腦上）", openai: "OpenAI", gemini: "Gemini" },
           DRIFTNET_VIDEO: { "": "自動（預設）", auto: "自動：有找到工具就用", captions: "只抓字幕（省電：不下載影片、不跑文字辨識和語音模型）", off: "關閉" },
         },
       },
@@ -2610,6 +2626,20 @@
     return `<div class="gallery"><div class="g-track" id="g-track" tabindex="0" role="region" aria-label="${esc(t.mdPictures)}">${m.map(slide).join("")}</div>${
       m.length > 1 ? `<div class="g-thumbs">${m.map((x, n) => `<button type="button" class="g-th ${n ? "" : "on"}" data-g="${n}" aria-label="${esc(t.mdSlide(n + 1, m.length))}">${img(x, "t")}</button>`).join("")}</div>` : ""}</div>`;
   }
+  // Related cards ({id, name}) come with the single-card endpoint; fetched once per card, painted into their own row.
+  const relatedCache = new Map();
+  function paintRelated(id) {
+    const box = $("md-related");
+    if (!box) return;
+    const rel = relatedCache.get(id);
+    if (rel === undefined) {
+      relatedCache.set(id, []);
+      api(`/api/items/${id}`).then((r) => { relatedCache.set(id, r.related ?? []); if (modalId === id) paintRelated(id); }).catch(() => relatedCache.delete(id));
+      return;
+    }
+    box.hidden = !rel.length;
+    box.innerHTML = rel.length ? `<span>${esc(T().related)}</span>${rel.map((c) => `<a href="#item-${c.id}" data-open="${c.id}">${esc(c.name)}</a>`).join("")}` : "";
+  }
   function paintModal() {
     const i = find(modalId);
     if (!i) return void (mdlDlg.open && mdlDlg.close());
@@ -2640,8 +2670,10 @@
       ${sec("try", t.mdTry, s?.tryIt ? `<div class="md-try"><pre><code>${esc(s.tryIt)}</code></pre><button class="btn" type="button" data-md="copy">${esc(t.mdCopy)}</button></div>` : "")}
       ${sec("tags", t.mdTags, s?.tags?.length ? `<div class="md-tags tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</div>` : "")}
       ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}" data-open="${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
+      <div class="found" id="md-related" hidden></div>
       ${flagLines(i, t)}
       <div class="md-fine">${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}<span>${esc(i.createdAt.slice(0, 10))}</span>${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}</div>`;
+    paintRelated(i.id);
     const busy = refreshing.has(i.id);
     const btn = (act, icon, label, extra = "") => `<button class="btn ${extra}" type="button" data-md="${act}">${ic(icon)} ${esc(label)}</button>`;
     $("md-actions").innerHTML = `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ic("link")} ${esc(t.openLink)}</a>` +

@@ -67,6 +67,13 @@ export const SETTINGS: readonly Setting[] = [
   { key: "GOOGLE_CLOUD_PROJECT", group: "model", max: 100 },
   { key: "DRIFTNET_VERTEX_CREDENTIALS", group: "model", max: 500 },
   { key: "DRIFTNET_JUDGE_RULES", group: "rules", max: 500 },
+  // Search by meaning (optional embeddings). Off unless a local Ollama has the model or a provider is named.
+  { key: "DRIFTNET_EMBED", group: "model", choices: ["", "auto", "off"] },
+  { key: "DRIFTNET_EMBED_PROVIDER", group: "model", choices: ["", "ollama", "openai", "gemini"] },
+  { key: "DRIFTNET_EMBED_MODEL", group: "model", max: 100 },
+  { key: "DRIFTNET_EMBED_BASE_URL", group: "model" },
+  { key: "DRIFTNET_EMBED_API_KEY", group: "model", secret: true },
+  { key: "DRIFTNET_EMBED_FLOOR", group: "model", max: 5 },
 ];
 
 export class SettingsError extends Error {}

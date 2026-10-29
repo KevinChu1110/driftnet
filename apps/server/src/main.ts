@@ -50,6 +50,7 @@ server.listen(PORT, HOST, () => {
   for (const w of dn.warnings) console.warn(`⚠️  ${w}`);
   console.log(`settings: ${envFile ?? `none (create ${driftnetHome(env)}/.env, or open the page's ⚙ Settings)`}  data: ${env.DRIFTNET_DB ?? defaultDbPath(env)}`);
   if (plugins.length) console.log(`plugins: ${plugins.join(", ")}`);
+  void dn.semantic.configure(env).then((line) => console.log(line), (e) => console.warn(`semantic search: off (${e instanceof Error ? e.message : "error"})`));
   healthFor(dn.store).start(env); // does nothing unless DRIFTNET_HEALTH=weekly (read live)
   void suggestLocalModel();
   // First run in a terminal: open the page, where ⚙ Settings walks through the rest.

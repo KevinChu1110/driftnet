@@ -6,6 +6,7 @@ import { normalizeMedia } from "./media.ts";
 import type { Health, Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
 import { migrate } from "./migrations.ts";
 import { ftsMatchQuery, FTS_WEIGHTS, reindexItem } from "./search-index.ts";
+import { VectorIndex } from "./vectors.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 import { guard } from "./guard.ts";
 
@@ -99,7 +100,19 @@ export interface ListQuery {
   limit?: number;
   /** Skip this many rows (paging). */
   offset?: number;
+  /**
+   * The query's embedding, computed beforehand (it is async; list is not). With it, a text search fuses
+   * the keyword rank and the vector rank (reciprocal-rank fusion) instead of keywords alone. Ignored for
+   * the trash, the inbox and explicit sorts, and when no vectors are stored.
+   */
+  semantic?: { vec: Float32Array; floor?: number };
 }
+
+/** RRF constant (Cormack et al.): flattens the head of each ranking so neither one dominates. */
+const RRF_K = 60;
+/** At most this many vector-only candidates join a text search: it bounds the result set however low the floor is. */
+const SEMANTIC_MAX = 50;
+export const DEFAULT_FLOOR = 0.35;
 
 /** Untrusted numbers (query strings, JSON bodies) → an integer in range, never NaN. */
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
@@ -111,6 +124,10 @@ const WORTH_ORDER = "CASE worth WHEN 'skip' THEN 0 WHEN 'low' THEN 1 WHEN 'norma
 
 export class Store {
   private readonly db: DatabaseSync;
+  /** Item embeddings for semantic search (empty and unused unless an embedder is configured). */
+  readonly vectors: VectorIndex;
+  /** Called after an item's searchable text changed; semantic search queues the item for embedding. */
+  onIndexed?: (id: number) => void;
 
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -119,6 +136,7 @@ export class Store {
     migrate(this.db, { path });
     // Once per start: forget what is older than the retention (per-card pruning keeps the rest short).
     this.db.prepare("DELETE FROM item_history WHERE at < ?").run(new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString());
+    this.vectors = new VectorIndex(this.db);
   }
 
   // ── History ──────────────────────────────────────────────────────────────
@@ -297,6 +315,7 @@ export class Store {
   /** Rebuild one item's search row; every writer of an indexed field (title, summary, note, share notes) calls this. */
   private reindex(id: number): void {
     reindexItem(this.db, id);
+    try { this.onIndexed?.(id); } catch { /* a hook must not break the store */ }
   }
 
   /** Replace an item's pictures (empty list keeps what is there: a page that is down must not wipe them). */
@@ -943,6 +962,8 @@ export class Store {
     const likeTerms = terms.filter((t) => [...t].length < 3);
     const joinArgs: string[] = [];
     let join = "";
+    const baseWhere = where.length;
+    const baseArgs = args.length;
     if (ftsTerms.length) {
       join = "JOIN (SELECT rowid, bm25(item_fts, " + FTS_WEIGHTS.join(", ") + ") AS rank FROM item_fts WHERE item_fts MATCH ?) f ON f.rowid = items.id";
       joinArgs.push(ftsMatchQuery(ftsTerms));
@@ -968,10 +989,84 @@ export class Store {
       : query.sort === "shared" ? `share_count DESC, ${WORTH_ORDER} DESC, updated_at DESC`
       : join ? `f.rank, ${WORTH_ORDER} DESC, updated_at DESC`
       : `${WORTH_ORDER} DESC, updated_at DESC`;
+    const sem = query.semantic;
+    if (sem && terms.length && this.vectors.count() > 0 && (!query.sort || query.sort === "best") && (!query.view || query.view === "all" || query.view === "favorites")) {
+      return this.hybrid(sem, { join, joinArgs, where, args, baseWhere, baseArgs, order }, query, out);
+    }
     if (out) out.total = (this.db.prepare(`SELECT COUNT(*) AS n FROM items ${join} WHERE ${where.join(" AND ")}`).get(...joinArgs, ...args) as { n: number }).n;
     const sql = `SELECT items.* FROM items ${join} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ? OFFSET ?`;
     args.push(clampInt(query.limit, 1, 500, 50), clampInt(query.offset, 0, 1_000_000, 0));
     return (this.db.prepare(sql).all(...joinArgs, ...args) as unknown as ItemRow[]).map(toItem);
+  }
+
+  /**
+   * Keyword rank + vector rank, fused. Every filter still applies (the vector side only considers items
+   * the filters allow), and the page and total are cut from the fused list, so X-Total-Count is its length.
+   */
+  private hybrid(
+    sem: { vec: Float32Array; floor?: number },
+    q: { join: string; joinArgs: string[]; where: string[]; args: (string | number)[]; baseWhere: number; baseArgs: number; order: string },
+    query: ListQuery, out?: { total?: number },
+  ): Item[] {
+    const lex = (this.db.prepare(`SELECT items.id FROM items ${q.join} WHERE ${q.where.join(" AND ")} ORDER BY ${q.order}`)
+      .all(...q.joinArgs, ...q.args) as { id: number }[]).map((r) => r.id);
+    const allowed = new Set((this.db.prepare(`SELECT items.id FROM items WHERE ${q.where.slice(0, q.baseWhere).join(" AND ")}`)
+      .all(...q.args.slice(0, q.baseArgs)) as { id: number }[]).map((r) => r.id));
+    const near = this.vectors.nearest(sem.vec, { floor: sem.floor ?? DEFAULT_FLOOR, max: SEMANTIC_MAX, allowed });
+    const score = new Map<number, number>();
+    const lexRank = new Map<number, number>();
+    lex.forEach((id, i) => { lexRank.set(id, i); score.set(id, 1 / (RRF_K + i + 1)); });
+    near.forEach((h, i) => score.set(h.id, (score.get(h.id) ?? 0) + 1 / (RRF_K + i + 1)));
+    const merged = [...score.keys()].sort((a, b) => score.get(b)! - score.get(a)! || (lexRank.get(a) ?? 1e9) - (lexRank.get(b) ?? 1e9) || a - b);
+    if (out) out.total = merged.length;
+    const page = merged.slice(clampInt(query.offset, 0, 1_000_000, 0)).slice(0, clampInt(query.limit, 1, 500, 50));
+    if (!page.length) return [];
+    const rows = this.db.prepare(`SELECT * FROM items WHERE id IN (${page.map(() => "?").join(",")})`).all(...page) as unknown as ItemRow[];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return page.map((id) => byId.get(id)!).map(toItem);
+  }
+
+  /**
+   * Cards like this one, as {id, name}: nearest by vector when vectors exist, topped up (or replaced)
+   * by shared tags and name words. Never the card itself, trashed, down-voted or injection-flagged ones.
+   */
+  related(id: number, limit = 5, floor = DEFAULT_FLOOR + 0.15): { id: number; name: string }[] {
+    const clean = `trashed_at IS NULL AND flags NOT LIKE '%injection%' AND ${Store.NET_VOTES} > -2`;
+    const picked: number[] = [];
+    const vec = this.vectors.count() > 0 ? this.vectors.vectorOf(id) : undefined;
+    if (vec) {
+      const allowed = new Set((this.db.prepare(`SELECT id FROM items WHERE id <> ? AND ${clean}`).all(id) as { id: number }[]).map((r) => r.id));
+      picked.push(...this.vectors.nearest(vec, { floor, max: limit, allowed, exclude: id }).map((h) => h.id));
+    }
+    if (picked.length < limit) {
+      for (const c of this.relatedByWords(id, clean)) if (picked.length < limit && !picked.includes(c)) picked.push(c);
+    }
+    if (!picked.length) return [];
+    const rows = this.db.prepare(`SELECT id, title, json_extract(CASE WHEN json_valid(summary) THEN summary ELSE '{}' END, '$.name') AS name FROM items WHERE id IN (${picked.map(() => "?").join(",")})`)
+      .all(...picked) as { id: number; title: string; name: string | null }[];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return picked.map((pid) => byId.get(pid)!).map((r) => ({ id: r.id, name: r.name || r.title }));
+  }
+
+  /** The no-vector fallback: a shared tag is worth 1, a shared word of the name 2; at least 2 to count. */
+  private relatedByWords(id: number, clean: string): number[] {
+    const item = this.get(id);
+    if (!item) return [];
+    const tags = [...new Set((item.summary?.tags ?? []).map((t) => t.replace(/"/g, "").trim()).filter((t) => [...t].length >= 3))].slice(0, 8);
+    const name = item.summary?.name ?? item.title;
+    const words = [...new Set(name.split(/[\s\-_/:.,()]+/).map((w) => w.replace(/"/g, "")).filter((w) => [...w].length >= 3))].slice(0, 3);
+    const score = new Map<number, number>();
+    const find = (col: string, term: string, weight: number) => {
+      for (const r of this.db.prepare("SELECT rowid FROM item_fts WHERE item_fts MATCH ? LIMIT 500").all(`${col} : ${ftsMatchQuery([term])}`) as { rowid: number }[]) {
+        if (r.rowid !== id) score.set(r.rowid, (score.get(r.rowid) ?? 0) + weight);
+      }
+    };
+    for (const t of tags) find("tags", t, 1);
+    for (const w of words) find("name", w, 2);
+    const cands = [...score].filter(([, v]) => v >= 2).map(([k]) => k);
+    if (!cands.length) return [];
+    const ok = new Set((this.db.prepare(`SELECT id FROM items WHERE id IN (${cands.map(() => "?").join(",")}) AND ${clean}`).all(...cands) as { id: number }[]).map((r) => r.id));
+    return cands.filter((c) => ok.has(c)).sort((a, b) => score.get(b)! - score.get(a)! || a - b);
   }
 
   /** Items shared at least `min` times since `since` (counting share events, not the lifetime total), most first. */

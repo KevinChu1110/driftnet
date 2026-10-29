@@ -13,6 +13,7 @@ import { Summarizer, summaryDepth } from "./summarize.ts";
 import { categoryLabel, resolveLocale, type Locale } from "./i18n.ts";
 import { sendWebhook } from "./webhook.ts";
 import { defaultDbPath } from "./home.ts";
+import { Semantic } from "./semantic.ts";
 
 export * from "./types.ts";
 export { canonicalize, extractUrls } from "./url.ts";
@@ -37,6 +38,9 @@ export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";
 export { sendWebhook, sendDigestWebhook, shouldNotify, webhookPayload, signBody } from "./webhook.ts";
 export { IMPORT_CAP, IMPORT_FOLDER, IMPORT_FORMATS, detectFormat, importFolder, parseImport, planImport, runImport, runPackImport, type ImportEntry, type ImportFormat, type ImportPlan, type ImportProgress } from "./import.ts";
 export { PACK_MAX_BYTES, PACK_MAX_ITEMS, PackError, buildPack, isPackJson, packDisposition, packFileName, packSigOk, parsePack, signPack, type Pack, type PackFolder, type PackItem, type ParsedPack } from "./pack.ts";
+export { Semantic, embedText, EMBED_TEXT_MAX, type SemanticOptions } from "./semantic.ts";
+export { createEmbedder, EmbedConfigError, geminiEmbedder, ollamaEmbedder, openaiEmbedder, DEFAULT_MODELS, type Embedder } from "./llm/embed.ts";
+export { DEFAULT_FLOOR } from "./store.ts";
 export { renderLink, renderText } from "./render.ts";
 export { categoryLabel, categoryLabels, LOCALES, messages, resolveLocale, type Locale, type Messages } from "./i18n.ts";
 export type { Judge, JudgeResult } from "./judge/index.ts";
@@ -53,6 +57,8 @@ export interface Driftnet {
   readonly engines: { judge: string; summarizer: string };
   /** The configured model, or undefined when none is (AI features then say so). */
   readonly llm: LlmProvider | undefined;
+  /** Optional semantic search. Inactive until the server calls `semantic.configure(env)`; then keyword search gains meaning. */
+  readonly semantic: Semantic;
   /** Rebuild the judge, model and rules from (new) settings without restarting. */
   reconfigure(env?: NodeJS.ProcessEnv): { judge: string; summarizer: string };
   /** Configuration problems worth printing at startup. */
@@ -72,6 +78,7 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   };
   const choices = () => store.folderChoices((f) => f.name ?? categoryLabel(f.id, "en"));
 
+  const semantic = new Semantic(store, { log: (l) => console.warn(l) });
   let built = buildEngines(env);
   const pipeline = new Pipeline({
     store,
@@ -100,7 +107,10 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
     get llm() {
       return built.llm;
     },
+    semantic,
     reconfigure(next = env) {
+      // Only once the server has switched it on or off; the CLI's direct fallback never starts it.
+      if (semantic.configured) void semantic.configure(next);
       built = buildEngines(next);
       pipeline.configure(built.engines);
       return built.labels;

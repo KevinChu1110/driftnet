@@ -203,6 +203,28 @@ without running one: on real links, a Chinese article went from 831 to 404 token
 
 Links rot and repos get archived. Set `DRIFTNET_HEALTH=weekly` (recommended; it is off by default because it makes network requests) and driftnet re-checks each card about once a week, a few at a time. GitHub repos go through the API (stars, archived, last push; set `GITHUB_TOKEN` for a higher limit, and it pauses on a rate limit); other links get a quiet `HEAD` through the same private-address guard. A card is marked `dead` (404 / gone, or a name that no longer resolves), `archived`, `stale` (no push for 18 months) or `moved` (repo renamed); server errors and timeouts change nothing and are retried. Marked cards show a badge, appear under **Needs review** on the page and in `driftnet_search_items` with `view=needs_review`, and the card's check button (or `POST /api/items/:id/health`) tests one link right now.
 
+## Search by meaning
+
+Optional. With an embedding model, search also finds cards by what they are about, not only by the words in them: "login" finds an OAuth kit, "scanned documents" finds an OCR tool. It is off until a local model is found (or you name a provider), costs **no summary tokens**, and when it is off, slow or down, search is exactly the keyword search it always was.
+
+```bash
+ollama pull nomic-embed-text      # that's it: restart driftnet and the startup line says "semantic search: on"
+```
+
+- **What is embedded.** A few hundred characters per card: its name, one-liner, tags, highlights, title and the link's host, the same fields the summarizer already saw. Chat text is never embedded; your own notes only if the model runs on this machine. Cards are embedded in the background after they are saved (one request at a time), and existing cards are filled in after you turn it on; saving a link never waits for it.
+- **Where it goes.** `ollama` and a local `DRIFTNET_EMBED_BASE_URL` keep everything on your machine. `openai` and `gemini` send each card's text above, and each search query, to that provider, so name them only if you are fine with that. A key is sent only to that provider's own address (or the base URL you typed), and the summary model's key is reused only for the same vendor.
+- **Speed.** Vectors are stored compactly and compared in memory (about 12 ms for 10,000 cards). A search waits at most 1.5 s for its query vector, then falls back to keywords; after a failure it stops trying for 30 s. Repeated queries are cached.
+- **Related cards.** A card's detail shows up to 5 similar cards (vectors when available, otherwise shared tags and name words). The same list is in `GET /api/items/:id` and in the `driftnet_get_item` tool.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DRIFTNET_EMBED` | `auto` | `auto`: on when a local Ollama has the embedding model, or when `DRIFTNET_EMBED_PROVIDER` is set. `off`: never |
+| `DRIFTNET_EMBED_PROVIDER` | *(auto)* | `ollama`, `openai` (also any OpenAI-compatible `/embeddings`, including Ollama's `/v1`) or `gemini` |
+| `DRIFTNET_EMBED_MODEL` | per provider | `nomic-embed-text` (Ollama), `text-embedding-3-small` (OpenAI), `gemini-embedding-001` (Gemini). Changing it re-embeds everything in the background |
+| `DRIFTNET_EMBED_BASE_URL` | Ollama `http://127.0.0.1:11434`, OpenAI's own | Endpoint for `ollama` / `openai` |
+| `DRIFTNET_EMBED_API_KEY` | — | Key for `openai` / `gemini` (not needed locally) |
+| `DRIFTNET_EMBED_FLOOR` | `0.55` for nomic; `0.3` OpenAI; `0.5` Gemini | Cosine a card needs to appear with no matching word; raise it for fewer matches. Only nomic-embed-text was measured |
+
 ## Ways in
 
 | | Set up | On a laptop? | Sent while it was off |

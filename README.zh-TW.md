@@ -199,6 +199,28 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 
 連結會失效、儲存庫會被封存。設定 `DRIFTNET_HEALTH=weekly`（建議開啟；預設關閉，因為會對外發送請求），driftnet 就會每週左右重新檢查每張卡片，一次檢查幾張。GitHub 儲存庫走 API（星數、是否封存、最後推送；可設 `GITHUB_TOKEN` 提高上限，遇到速率限制會自動暫停）；其他連結則用同一套私有位址防護發一個輕量的 `HEAD`。卡片會被標成 `dead`（404／已移除，或網域已不存在）、`archived`（已封存）、`stale`（超過 18 個月沒有推送）或 `moved`（儲存庫改名／搬家）；伺服器錯誤和逾時不會改變狀態，之後會再試。被標記的卡片會顯示徽章，出現在網頁的「需要檢查」和 `driftnet_search_items` 的 `view=needs_review`，卡片上的「檢查連結」按鈕（或 `POST /api/items/:id/health`）可以立刻測一個連結。
 
+## 以語意搜尋
+
+選配。有了嵌入模型，搜尋除了比對字，也能依「內容在講什麼」找卡片：搜「登入」會找到 OAuth 工具，搜「掃描文件」會找到 OCR 工具。找不到本機模型（或你沒指定服務）就不會開，**不花摘要的 token**；關閉、太慢或服務掛掉時，搜尋就和以前的關鍵字搜尋完全一樣。
+
+```bash
+ollama pull nomic-embed-text      # 這樣就好：重啟 driftnet，啟動訊息會寫「semantic search: on」
+```
+
+- **嵌入什麼。**每張卡片幾百個字：名稱、一句話介紹、標籤、重點、標題、連結的網域，也就是摘要模型本來就看過的欄位。聊天內容一律不嵌入；你自己寫的筆記只有在模型跑在這台電腦上時才會用到。卡片存好後在背景嵌入（一次一個請求），開啟後既有的卡片也會慢慢補上；存連結不會等它。
+- **資料去哪。**`ollama` 和本機的 `DRIFTNET_EMBED_BASE_URL` 全程不離開你的電腦。`openai`、`gemini` 會把上述卡片文字和每次搜尋的關鍵字送給該服務，能接受再指定。金鑰只會送到該服務自己的位址（或你填的網址），摘要模型的金鑰只有同一家時才會沿用。
+- **速度。**向量用精簡格式存、在記憶體內比對（一萬張卡片約 12 毫秒）。搜尋最多等 1.5 秒取得關鍵字的向量，等不到就改用關鍵字；失敗後 30 秒內不再嘗試。重複的搜尋有快取。
+- **相關卡片。**卡片詳情最多列 5 張相似的卡片（有向量用向量，否則用共同標籤和名稱字詞）。`GET /api/items/:id` 和 `driftnet_get_item` 工具也會附上同一份清單。
+
+| 變數 | 預設 | 用途 |
+|---|---|---|
+| `DRIFTNET_EMBED` | `auto` | `auto`：本機 Ollama 有嵌入模型、或設了 `DRIFTNET_EMBED_PROVIDER` 就開。`off`：一律不開 |
+| `DRIFTNET_EMBED_PROVIDER` | *（自動）* | `ollama`、`openai`（也適用任何相容的 `/embeddings`，包含 Ollama 的 `/v1`）或 `gemini` |
+| `DRIFTNET_EMBED_MODEL` | 依服務 | `nomic-embed-text`（Ollama）、`text-embedding-3-small`（OpenAI）、`gemini-embedding-001`（Gemini）。更換後會在背景重新嵌入全部卡片 |
+| `DRIFTNET_EMBED_BASE_URL` | Ollama `http://127.0.0.1:11434`、OpenAI 官方位址 | `ollama` / `openai` 的端點 |
+| `DRIFTNET_EMBED_API_KEY` | — | `openai` / `gemini` 的金鑰（本機不需要） |
+| `DRIFTNET_EMBED_FLOOR` | nomic `0.55`；OpenAI `0.3`；Gemini `0.5` | 沒有字面相符時，餘弦相似度要多高才會出現；調高則結果變少。只實測過 nomic-embed-text |
+
 ## 接法
 
 | | 設定 | 筆電上能用？ | 關機期間的訊息 |
