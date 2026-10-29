@@ -311,7 +311,8 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 - 剛移除時可以馬上按**復原**，之後也能隨時從**垃圾桶**還原。移到垃圾桶的連結，agent 和 `/llms.txt` 也看不到；如果有人再次分享，它會自動回來。
 - **每個改動都能復原。**打開卡片按**修改紀錄**，會列出最近 20 次改動（筆記、摘要、標題、資料夾、星號、垃圾桶；最多保留 180 天），
   顯示是誰改的、改之前的內容；按**還原**會把它放回來，而且這次還原本身也是一筆紀錄，所以還原也能再復原。
-  看得到卡片的人就看得到它的紀錄；還原需要寫入權限，並且和一般編輯一樣要通過同樣的檢查。
+  看得到卡片的人就看得到它的紀錄（你私人筆記的舊內容只有管理員看得到）；還原需要寫入權限，並且和一般編輯一樣要通過同樣的檢查。
+  **清除紀錄**（管理員）可以抹掉單張卡片的紀錄。
   agent 也能用 `driftnet_update_item` 的 `restore_version` 做同樣的事。
 - **筆記。**每張卡片都能按 📝 寫自己的筆記（試過了嗎？要 GPU 嗎？）。大家丟連結時在聊天室說的話也會顯示在卡片上（💬），
   兩者都搜尋得到。側邊欄的 **📝 筆記** 可以寫不綁卡片的 Markdown 筆記，寫 `#12` 就會連到第 12 張卡片。
@@ -620,7 +621,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
 | `DRIFTNET_PROFILE` | — | 你是誰、關心什麼，最多 600 字（⚙ 設定 › AI › 關於你）。模型用它判斷什麼值得你花時間，並寫每張卡片的「為什麼值得看」；agent 也會收到。它只在模型的 system prompt 放一次（約 150 token，所以 prompt caching 照常命中），也不會被抄進卡片 |
-| `DRIFTNET_UPDATE_CHECK` | `1` | 每天向 `registry.npmjs.org` 查一次最新版本號，有新版就在網頁標題列顯示小提示「driftnet x.y.z 已發布」（`driftnet status` 也會顯示）。不會傳送任何與你有關的資料。設 `0` 就關閉 |
+| `DRIFTNET_UPDATE_CHECK` | 關閉 | 設 `1` 才會每天向 `registry.npmjs.org` 查一次最新版本號，有新版就在網頁標題列顯示小提示「driftnet x.y.z 已發布」（`driftnet status` 也會顯示）。不會傳送任何與你有關的資料。預設關閉，設 `1` 才開啟 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
 | `DRIFTNET_VIDEO` | `auto` | `auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`；`captions` 只讀字幕和說明（省電）；`off` 完全不讀影片（見「Reels 與 Shorts」） |
@@ -649,7 +650,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack`（`?s=` 簽名連結）· `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
 `GET|PUT /api/settings`（限本機，或帶 token）· `GET /api/backup`（`?secrets=1` 並在 `X-Driftnet-Confirm` 標頭再送一次密碼）· `POST /api/backup/restore`（body 是 zip；兩者都限管理密碼）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
@@ -694,8 +695,8 @@ driftnet.example.com {
 > 清單留在你的電腦上。判斷和摘要時，driftnet 會把連結的**摘錄**（標題、大綱、分享時附的聊天文字）送到
 > **TypeSafe**（有開 Jev 時）和**你設定的模型供應商**。沒有連結的聊天訊息不會被處理或儲存。
 > 用 Ollama 並設 `DRIFTNET_JUDGE=off`，就完全不會有資料離開你的電腦。隨時都能整包帶走：側邊欄可以匯出成
-> Markdown 或 Obsidian／Notion 的 vault，也可以用 `GET /api/export`。driftnet 自己主動發出的另一個請求，
-> 只有每天一次的新版本檢查（對 npm registry 的單純請求；設 `DRIFTNET_UPDATE_CHECK=0` 就停用）。
+> Markdown 或 Obsidian／Notion 的 vault，也可以用 `GET /api/export`。若你開啟（`DRIFTNET_UPDATE_CHECK=1`），driftnet 自己主動發出的另一個請求，
+> 只有每天一次的新版本檢查（對 npm registry 的單純請求）；預設是關閉的。
 
 ### 備份與還原
 

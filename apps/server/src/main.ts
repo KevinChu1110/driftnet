@@ -16,7 +16,7 @@ const fromEnvironment = new Set(Object.keys(env).filter((k) => env[k] !== undefi
 const envFile = loadHomeEnv(env);
 const plugins = await loadPlugins(env);
 // A restore staged from the page is swapped in here, before the store opens the file.
-try { applyPendingRestore(dbPathOf(env)); } catch (err) { console.error(`[restore] could not apply the staged restore: ${(err as Error).message}`); process.exit(1); }
+await applyPendingRestore(dbPathOf(env)); // never throws: a bad staged file is set aside and the start goes on
 const dn = createDriftnet();
 const settings = new Settings(env, fromEnvironment);
 const PORT = Number(env.PORT ?? 8787);

@@ -34,7 +34,7 @@ export { registerJudge, type JudgeFactory } from "./judge/index.ts";
 export { parseRules, RulesJudge } from "./judge/rules.ts";
 export { Summarizer, summaryDepth, DEPTHS, type Depth } from "./summarize.ts";
 export { readerProfile, profileLine, PROFILE_MAX_CHARS, PROFILE_MAX_TOKENS } from "./profile.ts";
-export { LATEST_VERSION as SCHEMA_LATEST, schemaVersion, migrate } from "./migrations.ts";
+export { LATEST_VERSION as SCHEMA_LATEST, MIGRATIONS, schemaVersion, migrate } from "./migrations.ts";
 export { keywordSuggestions, cleanSuggestions, suggestionsFor } from "./suggest.ts";
 export { applyPlan, proposePlan, validatePlan, PlanError, PLAN_MAX_OPS, PLAN_MAX_CARDS, type PlanOp, type PlanResult } from "./folderPlan.ts";
 export { defaultDbPath, driftnetHome, loadHomeEnv } from "./home.ts";

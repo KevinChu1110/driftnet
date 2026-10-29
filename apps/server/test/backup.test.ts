@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { createServer, request, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { SCHEMA_LATEST, createDriftnet } from "@driftnet/core";
 import { createApp } from "../src/app.ts";
-import { applyPendingRestore, checkBackupZip, pendingPath, settingsForBackup, zipStream } from "../src/backup.ts";
+import { applyPendingRestore, buildBackup, checkBackupZip, inspectDb, pendingPath, settingsForBackup, snapshotTo, zipStream } from "../src/backup.ts";
 import { HANDLERS, type Ctx } from "../src/cli/commands.ts";
 import { agentBrief } from "../src/brief.ts";
 
@@ -212,7 +212,7 @@ test("restore: a valid backup is staged, nothing live changes, the settings are 
   assert.equal(JSON.parse(view.body.toString()).restorePending, true);
   // next start: swap
   const logs: string[] = [];
-  const done = applyPendingRestore(b.db, (m) => logs.push(m));
+  const done = await applyPendingRestore(b.db, (m) => logs.push(m));
   assert.ok(done?.before && existsSync(done.before) && /\.before-restore-/.test(done.before));
   assert.ok(!existsSync(pendingPath(b.db)));
   const live = new DatabaseSync(b.db, { readOnly: true });
@@ -228,10 +228,10 @@ test("restore: a valid backup is staged, nothing live changes, the settings are 
 
 test("pending swap at start: nothing staged is a no-op; a staged file that no longer validates is set aside, the live database stays", async () => {
   const b = await boot();
-  assert.equal(applyPendingRestore(b.db, () => {}), null);
+  assert.equal(await applyPendingRestore(b.db, () => {}), null);
   writeFileSync(pendingPath(b.db), "garbage, not a database");
   const logs: string[] = [];
-  assert.equal(applyPendingRestore(b.db, (m) => logs.push(m)), null);
+  assert.equal(await applyPendingRestore(b.db, (m) => logs.push(m)), null);
   assert.ok(!existsSync(pendingPath(b.db)));
   assert.ok(readdirSync(b.home).some((n) => n.includes(".restore-rejected-")));
   assert.match(logs[0]!, /not valid/);
@@ -241,7 +241,7 @@ test("pending swap at start: nothing staged is a no-op; a staged file that no lo
   const home = mkdtempSync(join(tmpdir(), "driftnet-fresh-"));
   const db = join(home, "driftnet.db");
   writeFileSync(pendingPath(db), g.db);
-  assert.deepEqual(applyPendingRestore(db, () => {}), {});
+  assert.deepEqual(await applyPendingRestore(db, () => {}), {});
   assert.ok(existsSync(db));
 });
 
@@ -347,4 +347,124 @@ test("brief: the agent queue brief carries the reader's profile once, clipped an
   assert.ok(!brief.includes("\u0000"));
   assert.ok(brief.length < agentBrief(b.dn, 1, {}).length + 900);
   assert.ok(!agentBrief(b.dn, 1, {}).includes("Reader's own description"));
+});
+
+// ── Hardening ────────────────────────────────────────────────────────────────
+
+const stateKeys = (file: string) => {
+  const d = new DatabaseSync(file, { readOnly: true });
+  try { return (d.prepare("SELECT key FROM state").all() as { key: string }[]).map((r) => r.key); } finally { d.close(); }
+};
+
+test("backup: a default backup carries no signing secrets (not even in free pages); --secrets keeps them", async () => {
+  const b = await boot();
+  b.dn.store.setState("media_secret", "MEDIA-SECRET-VALUE-xyz");
+  b.dn.store.setState("pack_secret", "PACK-SECRET-VALUE-xyz");
+  b.dn.store.setState("folder_uses", "{}");
+  const plain = await unzipTo((await b.call("GET", "/api/backup", b.auth)).body);
+  const keys = stateKeys(plain.db);
+  assert.ok(!keys.includes("media_secret") && !keys.includes("pack_secret"), keys.join());
+  assert.ok(keys.includes("folder_uses"), "other state stays");
+  const bytes = readFileSync(plain.db);
+  assert.ok(!bytes.includes("MEDIA-SECRET-VALUE") && !bytes.includes("PACK-SECRET-VALUE"), "the values must not linger in the file");
+  const full = await unzipTo((await b.call("GET", "/api/backup?secrets=1", { ...b.auth, "x-driftnet-confirm": PASSWORD })).body);
+  assert.ok(stateKeys(full.db).includes("media_secret") && stateKeys(full.db).includes("pack_secret"));
+  // the same holds for the file-level snapshot used by the CLI
+  const dest = join(mkdtempSync(join(tmpdir(), "driftnet-snap-")), "s.db");
+  await snapshotTo(b.db, dest, false);
+  assert.ok(!stateKeys(dest).includes("media_secret"));
+});
+
+test("backup: the snapshot and the integrity check run in a worker, so the event loop keeps ticking", async () => {
+  const b = await boot();
+  let ticks = 0;
+  const t = setInterval(() => ticks++, 1);
+  const built = await buildBackup({ dbPath: b.db, envFile: join(b.home, ".env"), version: "9.9.9", secrets: false });
+  const snap = join(mkdtempSync(join(tmpdir(), "driftnet-w-")), "x.db");
+  await snapshotTo(b.db, snap, true);
+  assert.equal((await inspectDb(snap)).items, 3);
+  clearInterval(t);
+  built.cleanup();
+  assert.ok(ticks > 0, "timers ran while the work was going on");
+  writeFileSync(snap, "SQLite format 3\0" + "x".repeat(4096));
+  await assert.rejects(inspectDb(snap), /damaged|could not be read/);
+});
+
+test("restore check: a backup missing one of our tables or columns is refused; extra columns are fine", async () => {
+  const b = await boot();
+  const make = (sql: string) => {
+    const f = join(mkdtempSync(join(tmpdir(), "driftnet-struct-")), "d.db");
+    const src = new DatabaseSync(b.db, { readOnly: true });
+    src.exec(`VACUUM INTO '${f}'`);
+    src.close();
+    const d = new DatabaseSync(f);
+    d.exec(sql);
+    d.close();
+    return f;
+  };
+  assert.equal((await inspectDb(make("ALTER TABLE items ADD COLUMN extra_col TEXT"))).items, 3);
+  await assert.rejects(inspectDb(make("DROP TABLE shares")), /table shares is missing/);
+  await assert.rejects(inspectDb(make("ALTER TABLE items DROP COLUMN note")), /items\.note is missing/);
+  await assert.rejects(inspectDb(make("ALTER TABLE agent_tokens DROP COLUMN revoked_at")), /agent_tokens\.revoked_at is missing/);
+});
+
+test("settingsForBackup: a value that carries a credential is dropped whatever the key", () => {
+  const f = join(mkdtempSync(join(tmpdir(), "driftnet-env2-")), ".env");
+  writeFileSync(f, [
+    "DRIFTNET_PUBLIC_URL=https://me.example",
+    "DRIFTNET_LLM_BASE_URL=https://user:pw123@llm.example/v1",
+    "DRIFTNET_EMBED_BASE_URL=https://emb.example/v1?api_key=zzz",
+    "DRIFTNET_PLUGINS=https://x.example/p.js?token=abc",
+    "DRIFTNET_LANGUAGE=English",
+  ].join("\n") + "\n");
+  const text = settingsForBackup(f, false);
+  assert.match(text, /DRIFTNET_PUBLIC_URL=https:\/\/me\.example/);
+  assert.match(text, /DRIFTNET_LANGUAGE=English/);
+  assert.ok(!/pw123|zzz|abc/.test(text), text);
+});
+
+test("pending restore: any failure sets the file aside and starts on; leftovers keep only the newest two", async () => {
+  const b = await boot();
+  const g = await genuine(b);
+  const home = mkdtempSync(join(tmpdir(), "driftnet-pend-"));
+  const db = join(home, "driftnet.db");
+  writeFileSync(db, g.db);
+  for (let i = 1; i <= 4; i++) {
+    for (const kind of ["before-restore", "restore-rejected"]) {
+      const f = `${db}.${kind}-2026-01-0${i}T00-00-00-000Z`;
+      writeFileSync(f, "x");
+      utimesSync(f, new Date(2026, 0, i), new Date(2026, 0, i));
+    }
+  }
+  const logs: string[] = [];
+  writeFileSync(pendingPath(db), "SQLite format 3\0" + "bad".repeat(2000));
+  assert.equal(await applyPendingRestore(db, (m) => logs.push(m)), null);
+  assert.match(logs.join(" "), /WARNING.*not applied/);
+  assert.ok(!existsSync(pendingPath(db)));
+  assert.equal((new DatabaseSync(db, { readOnly: true }).prepare("SELECT COUNT(*) AS n FROM items").get() as { n: number }).n, 3, "the current database is untouched");
+  const left = readdirSync(home);
+  assert.equal(left.filter((n) => n.includes(".before-restore-")).length, 2);
+  assert.equal(left.filter((n) => n.includes(".restore-rejected-")).length, 2);
+  assert.ok(left.includes("driftnet.db.before-restore-2026-01-04T00-00-00-000Z") && !left.includes("driftnet.db.before-restore-2026-01-01T00-00-00-000Z"));
+  // a valid staged file but a swap that throws half-way (the live path is a folder): set aside, no exception, no exit
+  const odd = join(mkdtempSync(join(tmpdir(), "driftnet-pend2-")), "driftnet.db");
+  mkdirSync(odd);
+  writeFileSync(pendingPath(odd), g.db);
+  const logs2: string[] = [];
+  assert.equal(await applyPendingRestore(odd, (m) => logs2.push(m)), null);
+  assert.match(logs2.join(" "), /WARNING/);
+  assert.ok(!existsSync(pendingPath(odd)) && readdirSync(dirname(odd)).some((n) => n.includes(".restore-rejected-")));
+});
+
+test("restore route: a work-folder failure does not leave the restore lock set", async () => {
+  const b = await boot();
+  const file = join(b.home, "not-a-folder");
+  writeFileSync(file, "x");
+  const bad = await boot();
+  // point this app at a database path below a regular file: the work folder cannot be created
+  bad.env.DRIFTNET_DB = join(file, "sub", "driftnet.db");
+  const status = async () => (await bad.call("POST", "/api/backup/restore", { ...bad.auth, ...zipHeaders() }, Buffer.from("zip"))).status;
+  const first = await status();
+  assert.ok(first >= 400 && first !== 409, `first: ${first}`);
+  assert.notEqual(await status(), 409, "the lock must have been released");
 });

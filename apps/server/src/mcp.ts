@@ -13,6 +13,7 @@ import { agentBrief, DATA_NOTICE } from "./brief.ts";
  * agents feed the same reputation that keeps junk out.
  */
 export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readOnly?: boolean; actor?: string } = {}): McpServer {
+  let profileSent = false; // the reader profile goes out once per agent session
   const mcp = new McpServer({ name: "driftnet", version: process.env.DRIFTNET_VERSION ?? "dev" }, {
     instructions: opts.readOnly
       ? "driftnet: the reader's catalogue of shared AI tools and links. This session is read-only (share key or read token): " +
@@ -165,7 +166,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         category_guess: i.category,
         shared_with: dn.store.notes(i.id),
       }));
-      const brief = agentBrief(dn, rows.length);
+      const brief = agentBrief(dn, rows.length, process.env, !profileSent);
+      if (rows.length) profileSent = true;
       return { content: [{ type: "text" as const, text: `${brief}\n\n${JSON.stringify(rows, null, 1)}` }] };
     },
   );

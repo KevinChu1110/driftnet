@@ -6,7 +6,7 @@ import { normalizeMedia } from "./media.ts";
 import type { Health, Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
 import { migrate } from "./migrations.ts";
 import { ftsMatchQuery, FTS_WEIGHTS, reindexItem } from "./search-index.ts";
-import { VectorIndex } from "./vectors.ts";
+import { VectorIndex, type Hit } from "./vectors.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 import { guard } from "./guard.ts";
 
@@ -133,6 +133,7 @@ export class Store {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec("PRAGMA journal_mode = WAL");
+    this.db.exec("PRAGMA trusted_schema = OFF"); // a trigger or view in a foreign file may not call risky functions
     migrate(this.db, { path });
     // Once per start: forget what is older than the retention (per-card pruning keeps the rest short).
     this.db.prepare("DELETE FROM item_history WHERE at < ?").run(new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString());
@@ -169,6 +170,11 @@ export class Store {
     return (this.db.prepare("SELECT id, at, actor, field_set, before FROM item_history WHERE item_id = ? ORDER BY id DESC LIMIT ?")
       .all(id, HISTORY_KEEP) as { id: number; at: string; actor: string; field_set: string; before: string }[])
       .map((r) => ({ v: r.id, at: r.at, actor: r.actor, fields: r.field_set.split(",") as HistoryField[], before: JSON.parse(r.before) as Record<string, unknown> }));
+  }
+
+  /** Forget every saved version of one card (the card itself is untouched). Returns how many were removed. */
+  forgetHistory(id: number): number {
+    return Number(this.db.prepare("DELETE FROM item_history WHERE item_id = ?").run(id).changes);
   }
 
   /**
@@ -1010,9 +1016,7 @@ export class Store {
   ): Item[] {
     const lex = (this.db.prepare(`SELECT items.id FROM items ${q.join} WHERE ${q.where.join(" AND ")} ORDER BY ${q.order}`)
       .all(...q.joinArgs, ...q.args) as { id: number }[]).map((r) => r.id);
-    const allowed = new Set((this.db.prepare(`SELECT items.id FROM items WHERE ${q.where.slice(0, q.baseWhere).join(" AND ")}`)
-      .all(...q.args.slice(0, q.baseArgs)) as { id: number }[]).map((r) => r.id));
-    const near = this.vectors.nearest(sem.vec, { floor: sem.floor ?? DEFAULT_FLOOR, max: SEMANTIC_MAX, allowed });
+    const near = this.nearestAllowed(sem.vec, sem.floor ?? DEFAULT_FLOOR, SEMANTIC_MAX, q.where.slice(0, q.baseWhere).join(" AND "), q.args.slice(0, q.baseArgs));
     const score = new Map<number, number>();
     const lexRank = new Map<number, number>();
     lex.forEach((id, i) => { lexRank.set(id, i); score.set(id, 1 / (RRF_K + i + 1)); });
@@ -1027,6 +1031,25 @@ export class Store {
   }
 
   /**
+   * The `want` nearest items that also pass `filter` (SQL over items, with `args`). The scan keeps only a
+   * few times `want` candidates and one query checks them, instead of loading every allowed id; when the
+   * filter throws too many away it widens the scan, so the result is the same as filtering first.
+   */
+  private nearestAllowed(vec: Float32Array, floor: number, want: number, filter: string, args: (string | number)[], exclude?: number): Hit[] {
+    const total = this.vectors.count();
+    for (let k = want * 4; ; k *= 4) {
+      const near = this.vectors.nearest(vec, exclude === undefined ? { floor, max: k } : { floor, max: k, exclude });
+      const ok = new Set<number>();
+      for (let i = 0; i < near.length; i += 500) { // chunks stay under SQLite's variable limit
+        const part = near.slice(i, i + 500).map((h) => h.id);
+        for (const r of this.db.prepare(`SELECT id FROM items WHERE id IN (${part.map(() => "?").join(",")}) AND ${filter}`).all(...part, ...args) as { id: number }[]) ok.add(r.id);
+      }
+      const kept = near.filter((h) => ok.has(h.id));
+      if (kept.length >= want || near.length < k || k >= total) return kept.slice(0, want);
+    }
+  }
+
+  /**
    * Cards like this one, as {id, name}: nearest by vector when vectors exist, topped up (or replaced)
    * by shared tags and name words. Never the card itself, trashed, down-voted or injection-flagged ones.
    */
@@ -1035,8 +1058,7 @@ export class Store {
     const picked: number[] = [];
     const vec = this.vectors.count() > 0 ? this.vectors.vectorOf(id) : undefined;
     if (vec) {
-      const allowed = new Set((this.db.prepare(`SELECT id FROM items WHERE id <> ? AND ${clean}`).all(id) as { id: number }[]).map((r) => r.id));
-      picked.push(...this.vectors.nearest(vec, { floor, max: limit, allowed, exclude: id }).map((h) => h.id));
+      picked.push(...this.nearestAllowed(vec, floor, limit, clean, [], id).map((h) => h.id));
     }
     if (picked.length < limit) {
       for (const c of this.relatedByWords(id, clean)) if (picked.length < limit && !picked.includes(c)) picked.push(c);

@@ -32,7 +32,7 @@ const freePort = () => new Promise((r) => { const s = createServer(); s.listen(0
 const home = mkdtempSync(join(tmpdir(), "driftnet-web-e2e-"));
 const port = await freePort();
 // Not for README pictures: an "update available" notice (a pretend old version and a saved "9.9.9 is out") would sit in the header.
-writeFileSync(join(home, ".env"), `PORT=${port}\nDRIFTNET_JUDGE=off\nDRIFTNET_LANGUAGE=${LANG === "zh-TW" ? "Traditional Chinese (Taiwan)" : "English"}\n${SHOTS ? "" : "DRIFTNET_VERSION=0.0.1\n"}`);
+writeFileSync(join(home, ".env"), `PORT=${port}\nDRIFTNET_JUDGE=off\nDRIFTNET_LANGUAGE=${LANG === "zh-TW" ? "Traditional Chinese (Taiwan)" : "English"}\n${SHOTS ? "" : "DRIFTNET_VERSION=0.0.1\nDRIFTNET_UPDATE_CHECK=1\n"}`);
 const seed = `
   import { loadCategories, Store } from "@driftnet/core";
   const items = JSON.parse(process.env.DEMO_ITEMS);

@@ -33,7 +33,7 @@ export const routes: Route[] = [
       }
       let built;
       try {
-        built = buildBackup({ dbPath: dbPathOf(env), envFile: settings.file, version: currentVersion(env), secrets });
+        built = await buildBackup({ dbPath: dbPathOf(env), envFile: settings.file, version: currentVersion(env), secrets });
       } catch (err) {
         if (err instanceof BackupError) return send(400, { error: err.message });
         throw err;
@@ -66,9 +66,10 @@ export const routes: Route[] = [
       if (declared > RESTORE_MAX_BYTES) return send(413, { error: `backup is larger than ${RESTORE_MAX_BYTES / 1024 / 1024} MB` });
       if (restoring) return send(409, { error: "a restore is already running" });
       const dbPath = dbPathOf(env);
-      restoring = true;
-      const dir = workDir(dbPath, "upload");
+      let dir: string | undefined;
       try {
+        dir = workDir(dbPath, "upload"); // may throw (no space, no permission): the flag is not set yet, and always cleared below
+        restoring = true;
         const file = join(dir, "upload.zip");
         let size = 0;
         await pipeline(req, async function* (source: AsyncIterable<Buffer>) {
@@ -93,7 +94,7 @@ export const routes: Route[] = [
         throw err;
       } finally {
         restoring = false;
-        removeDir(dir);
+        if (dir) removeDir(dir);
       }
     },
   },

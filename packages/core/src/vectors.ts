@@ -69,24 +69,41 @@ export class VectorIndex {
     this.load();
     const { dim, mat, ids } = this;
     if (!ids.length || q.length !== dim) return [];
-    const hits: Hit[] = [];
+    const max = Math.max(0, Math.floor(o.max));
+    // Only the best `max` are kept while scanning (a sorted array: max is small), never every hit above the floor.
+    const top: Hit[] = [];
+    if (!max) return top;
     for (let r = 0, off = 0; r < ids.length; r++, off += dim) {
       let dot = 0;
       for (let k = 0; k < dim; k++) dot += mat[off + k]! * q[k]!;
       if (dot < o.floor) continue;
       const id = ids[r]!;
+      if (top.length === max) {
+        const worst = top[max - 1]!;
+        if (dot < worst.sim || (dot === worst.sim && id > worst.id)) continue;
+      }
       if (id === o.exclude || (o.allowed && !o.allowed.has(id))) continue;
-      hits.push({ id, sim: dot });
+      // Binary search for the slot: best first, equal similarity by lower id.
+      let lo = 0, hi = top.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1, m = top[mid]!;
+        if (m.sim > dot || (m.sim === dot && m.id < id)) lo = mid + 1; else hi = mid;
+      }
+      top.splice(lo, 0, { id, sim: dot });
+      if (top.length > max) top.pop();
     }
-    return hits.sort((a, b) => b.sim - a.sim || a.id - b.id).slice(0, o.max);
+    return top;
   }
 
   private load(): void {
     if (this.loaded || !this.model) return;
     this.loaded = true;
+    // Sized once from the row count, so loading never grows (and copies) the matrix.
+    const rows = (this.db.prepare("SELECT COUNT(*) AS n FROM item_vec WHERE model = ?").get(this.model) as { n: number }).n;
     for (const r of this.db.prepare("SELECT item_id, dim, vec FROM item_vec WHERE model = ?").iterate(this.model) as Iterable<{ item_id: number; dim: number; vec: Uint8Array }>) {
       if (r.vec.byteLength !== r.dim * 4) continue;
       if (this.dim && r.dim !== this.dim) continue; // one model, one size; anything else is damage
+      if (!this.dim && r.dim > 0) this.mat = new Float32Array(rows * r.dim);
       // Copy: the driver's buffer is not guaranteed 4-byte aligned.
       this.cachePut(r.item_id, new Float32Array(r.vec.buffer.slice(r.vec.byteOffset, r.vec.byteOffset + r.vec.byteLength)));
     }

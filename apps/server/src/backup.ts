@@ -1,11 +1,12 @@
-import { chmodSync, closeSync, copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { chmodSync, closeSync, copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { crc32, createDeflateRaw, createInflateRaw, deflateRawSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import { parseEnv } from "node:util";
-import { SCHEMA_LATEST, defaultDbPath, migrate, schemaVersion } from "@driftnet/core";
+import { Worker } from "node:worker_threads";
+import { MIGRATIONS, SCHEMA_LATEST, defaultDbPath, migrate, schemaVersion } from "@driftnet/core";
 import { SETTINGS, isSecretSetting, serialize } from "./settings.ts";
 
 /**
@@ -56,15 +57,54 @@ export const removeDir = (dir: string) => { try { rmSync(dir, { recursive: true,
 
 // ── Snapshot ──────────────────────────────────────────────────────────────────
 
-/** VACUUM INTO a new file: consistent even while the server writes (WAL), and never a copy of the live file. */
-export function snapshotTo(dbPath: string, dest: string): void {
-  if (dbPath === ":memory:" || !existsSync(dbPath)) throw new BackupError("there is no database file to back up");
-  const src = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    src.exec(`VACUUM INTO '${quote(dest)}'`);
-  } finally {
-    src.close();
+/**
+ * The slow SQLite work (VACUUM INTO, integrity_check) runs in a worker thread so the server keeps answering
+ * while a big database is copied or checked. Plain JS in a string: it works the same from source, tsx and the bundle.
+ */
+const WORKER = `
+const { parentPort, workerData: w } = require("node:worker_threads");
+const { DatabaseSync } = require("node:sqlite");
+try {
+  if (w.op === "snapshot") {
+    const src = new DatabaseSync(w.src, { readOnly: true });
+    try { src.exec("VACUUM INTO '" + w.dest.replace(/'/g, "''") + "'"); } finally { src.close(); }
+    if (w.drop.length) {
+      const d = new DatabaseSync(w.dest);
+      try {
+        d.exec("PRAGMA secure_delete = ON"); // the removed values must not stay in free pages
+        d.prepare("DELETE FROM state WHERE key IN (" + w.drop.map(() => "?").join(",") + ")").run(...w.drop);
+      } finally { d.close(); }
+    }
+    parentPort.postMessage({ ok: true });
+  } else {
+    const db = new DatabaseSync(w.file, { readOnly: true });
+    try {
+      db.exec("PRAGMA trusted_schema = OFF");
+      parentPort.postMessage({ ok: true, rows: db.prepare("PRAGMA integrity_check").all().map((r) => r.integrity_check) });
+    } finally { db.close(); }
   }
+} catch (e) { parentPort.postMessage({ ok: false, message: String((e && e.message) || e) }); }
+`;
+
+function inWorker<T extends object>(data: object): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(WORKER, { eval: true, workerData: data, execArgv: [] });
+    w.once("message", (m: { ok: boolean; message?: string } & T) => (m.ok ? resolve(m) : reject(new Error(m.message))));
+    w.once("error", reject);
+    w.once("exit", (code) => reject(new Error(`backup worker stopped (${code})`))); // after a reply this is a no-op
+  });
+}
+
+/** State rows that sign things (media links, share packs): never in a default backup; each regenerates on first use. */
+export const SIGNING_STATE_KEYS = ["media_secret", "pack_secret"];
+
+/**
+ * VACUUM INTO a new file: consistent even while the server writes (WAL), and never a copy of the live file.
+ * Without `secrets`, the signing secrets are deleted from the snapshot (agent token hashes stay: they are hashes).
+ */
+export async function snapshotTo(dbPath: string, dest: string, secrets: boolean): Promise<void> {
+  if (dbPath === ":memory:" || !existsSync(dbPath)) throw new BackupError("there is no database file to back up");
+  await inWorker({ op: "snapshot", src: dbPath, dest, drop: secrets ? [] : SIGNING_STATE_KEYS });
   chmodSync(dest, 0o600);
 }
 
@@ -80,11 +120,32 @@ function knownCode(): Set<string> {
 }
 
 /**
- * Is this file a driftnet database we can run? Header, integrity, our tables, a schema
+ * What a backup's tables lack compared with a fresh database migrated to the same schema version:
+ * a missing table or column. Extra tables and columns are fine. Undefined when nothing is missing.
+ */
+function structureGap(db: DatabaseSync, schema: number): string | undefined {
+  const fresh = new DatabaseSync(":memory:");
+  try {
+    migrate(fresh, { migrations: MIGRATIONS.filter((m) => m.version <= Math.max(schema, 1)) });
+    const columns = (d: DatabaseSync, t: string) => new Set((d.prepare(`PRAGMA table_info("${t}")`).all() as { name: string }[]).map((c) => c.name));
+    const have = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name));
+    for (const { name } of fresh.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'").all() as { name: string }[]) {
+      if (!have.has(name)) return `table ${name} is missing`;
+      const got = columns(db, name);
+      for (const c of columns(fresh, name)) if (!got.has(c)) return `${name}.${c} is missing`;
+    }
+    return undefined;
+  } finally {
+    fresh.close();
+  }
+}
+
+/**
+ * Is this file a driftnet database we can run? Header, integrity, our tables and columns, a schema
  * no newer than this code, and no trigger or view that our own schema does not create
  * (a backup is someone else's file: it must not carry code that runs inside our database).
  */
-export function inspectDb(file: string): { schema: number; items: number } {
+export async function inspectDb(file: string): Promise<{ schema: number; items: number }> {
   const fd = openSync(file, "r");
   try {
     const head = Buffer.alloc(16);
@@ -101,12 +162,15 @@ export function inspectDb(file: string): { schema: number; items: number } {
   }
   try {
     db.exec("PRAGMA trusted_schema = OFF");
-    const check = db.prepare("PRAGMA integrity_check").all() as { integrity_check: string }[];
-    if (check.length !== 1 || check[0]!.integrity_check !== "ok") throw new BackupError("the database in this backup is damaged (integrity check failed)");
+    // The long part runs off the event loop; a file that cannot even be checked is "could not be read" below.
+    const check = (await inWorker<{ rows: string[] }>({ op: "check", file })).rows;
+    if (check.length !== 1 || check[0] !== "ok") throw new BackupError("the database in this backup is damaged (integrity check failed)");
     const schema = schemaVersion(db);
     if (schema > SCHEMA_LATEST) throw new BackupError(`this backup was made by a newer driftnet (schema ${schema}); upgrade driftnet first (this version knows schema ${SCHEMA_LATEST})`);
     const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name));
     if (!tables.has("items") || !tables.has("state")) throw new BackupError("this database is not a driftnet database");
+    const gap = structureGap(db, schema);
+    if (gap) throw new BackupError(`the database in this backup does not match driftnet's tables (${gap}); refusing it`);
     const known = knownCode();
     for (const r of db.prepare("SELECT type || ':' || name AS k FROM sqlite_master WHERE type IN ('trigger','view')").all() as { k: string }[]) {
       if (!known.has(r.k)) throw new BackupError(`the database holds code driftnet did not create (${r.k.split(":")[0]}); refusing it`);
@@ -122,6 +186,9 @@ export function inspectDb(file: string): { schema: number; items: number } {
 
 // ── settings.env ──────────────────────────────────────────────────────────────
 
+/** A value that carries a credential whatever its key is called: user:pass@host, or ?key= / ?token= / ?sig= in a URL. */
+const CREDENTIAL_VALUE = /\/\/[^/\s]*:[^/\s]*@|[?&](key|token|api[_-]?key|access_token|sig|signature)=/i;
+
 /**
  * The settings file for a backup. Default: only keys the settings page knows, minus every
  * secret (flagged ones, and anything named like a key, token, secret, password or credential),
@@ -135,7 +202,7 @@ export function settingsForBackup(file: string, secrets: boolean): string {
   try { parsed = parseEnv(raw); } catch { return ""; }
   const known = new Set(SETTINGS.map((s) => s.key));
   const lines = Object.entries(parsed)
-    .filter(([k, v]) => v !== undefined && known.has(k) && !isSecretSetting(k) && !v.includes("`"))
+    .filter(([k, v]) => v !== undefined && known.has(k) && !isSecretSetting(k) && !v.includes("`") && !CREDENTIAL_VALUE.test(v))
     .map(([k, v]) => `${k}=${serialize(v!)}`);
   return lines.length ? `# driftnet settings (secrets removed)\n${lines.join("\n")}\n` : "";
 }
@@ -190,11 +257,11 @@ export interface BackupOptions { dbPath: string; envFile: string; version: strin
 export interface BuiltBackup { manifest: Manifest; stream: () => AsyncGenerator<Buffer>; cleanup: () => void }
 
 /** Snapshot now, stream later; `cleanup` removes the temp folder and must always be called. */
-export function buildBackup(o: BackupOptions): BuiltBackup {
+export async function buildBackup(o: BackupOptions): Promise<BuiltBackup> {
   const dir = workDir(o.dbPath, "backup");
   try {
     const snap = join(dir, "driftnet.db");
-    snapshotTo(o.dbPath, snap);
+    await snapshotTo(o.dbPath, snap, o.secrets);
     const { schema, items } = inspectCounts(snap);
     const manifest: Manifest = { format: BACKUP_FORMAT, driftnet: o.version, schema, created: (o.now ?? new Date()).toISOString(), items, secrets: o.secrets };
     const sources: Source[] = [
@@ -220,7 +287,7 @@ function inspectCounts(file: string): { schema: number; items: number } {
 
 /** Write a whole backup to a file (the CLI, with the server down or up). */
 export async function writeBackupFile(o: BackupOptions, out: string): Promise<Manifest> {
-  const b = buildBackup(o);
+  const b = await buildBackup(o);
   try {
     await pipeline(b.stream, createWriteStream(out, { mode: 0o600 }));
     chmodSync(out, 0o600);
@@ -340,7 +407,7 @@ export async function checkBackupZip(zipFile: string, dir: string): Promise<Chec
   if (manifest?.format !== BACKUP_FORMAT || !Number.isInteger(manifest.schema) || typeof manifest.driftnet !== "string") throw new BackupError("this is not a driftnet backup (the manifest does not say so)");
   if (manifest.schema > SCHEMA_LATEST) throw new BackupError(`this backup was made by a newer driftnet (schema ${manifest.schema}); upgrade driftnet first (this version knows schema ${SCHEMA_LATEST})`);
   await extract(zipFile, d, db, DB_MAX_BYTES);
-  const { schema, items } = inspectDb(db);
+  const { schema, items } = await inspectDb(db);
   if (schema !== manifest.schema) throw new BackupError("the manifest does not match the database");
   let settings = "";
   if (s) { await extract(zipFile, s, sf, TEXT_MAX_BYTES); settings = readFileSync(sf, "utf8"); }
@@ -368,38 +435,73 @@ export async function stageRestore(zipFile: string, dbPath: string): Promise<Che
   }
 }
 
+/** Keep the newest `keep` of each kind of leftover (`.before-restore-*`, `.restore-rejected-*`) next to the database, with their -wal/-shm. */
+export function pruneRestoreLeftovers(dbPath: string, keep = 2): void {
+  if (dbPath === ":memory:") return;
+  try {
+    const dir = dirname(dbPath), base = basename(dbPath);
+    const names = readdirSync(dir);
+    for (const kind of [".before-restore-", ".restore-rejected-"]) {
+      const prefix = base + kind;
+      const groups = new Map<string, string[]>();
+      for (const n of names) {
+        if (!n.startsWith(prefix)) continue;
+        const g = n.replace(/-(wal|shm)$/, "");
+        groups.set(g, [...(groups.get(g) ?? []), n]);
+      }
+      // The timestamp is ISO-like, so the name sorts by time.
+      for (const g of [...groups.keys()].sort().reverse().slice(keep)) for (const n of groups.get(g)!) rmSync(join(dir, n), { force: true });
+    }
+  } catch { /* housekeeping only */ }
+}
+
 /**
  * Call before the store opens. If a staged restore exists and still validates, keep the
  * current database as `<db>.before-restore-<timestamp>` and move the staged one into place.
- * A staged file that fails validation is set aside (`.restore-rejected-…`) and the start goes on.
+ * Whatever goes wrong (an invalid file, a full disk, a permission error) the staged file is set
+ * aside as `.restore-rejected-…`, a warning is logged and the start goes on with the current
+ * database: a bad pending file must never make the server fail to start, again and again.
+ * Only the newest two of each leftover kind are kept.
  */
-export function applyPendingRestore(dbPath: string, log: (m: string) => void = console.log): { before?: string } | null {
+export async function applyPendingRestore(dbPath: string, log: (m: string) => void = console.log): Promise<{ before?: string } | null> {
   const pending = pendingPath(dbPath);
-  if (dbPath === ":memory:" || !existsSync(pending)) return null;
+  if (dbPath === ":memory:") return null;
+  pruneRestoreLeftovers(dbPath);
+  if (!existsSync(pending)) return null;
   const ts = stamp();
+  let before: string | undefined;
   try {
-    inspectDb(pending);
+    try {
+      await inspectDb(pending);
+    } catch (err) {
+      throw new BackupError(`the staged file is not valid: ${(err as Error).message}`);
+    }
+    if (existsSync(dbPath)) {
+      before = `${dbPath}.before-restore-${ts}`;
+      try {
+        const live = new DatabaseSync(dbPath, { readOnly: true });
+        try { live.exec(`VACUUM INTO '${quote(before)}'`); } finally { live.close(); }
+        chmodSync(before, 0o600);
+      } catch {
+        // The live file can't be read as a database: keep its bytes as they are (with their WAL) instead.
+        for (const sfx of ["", "-wal", "-shm"]) if (existsSync(dbPath + sfx)) copyFileSync(dbPath + sfx, before + sfx);
+      }
+      for (const sfx of ["-wal", "-shm", ""]) if (existsSync(dbPath + sfx)) unlinkSync(dbPath + sfx);
+    }
+    renameSync(pending, dbPath);
   } catch (err) {
+    // Half-way (the live file removed, the swap failed): put the kept copy back so the current database survives.
+    if (before && !existsSync(dbPath)) {
+      try { for (const sfx of ["", "-wal", "-shm"]) if (existsSync(before + sfx)) renameSync(before + sfx, dbPath + sfx); } catch { /* best effort */ }
+    }
     const aside = `${dbPath}.restore-rejected-${ts}`;
-    renameSync(pending, aside);
-    log(`[restore] the staged restore was not valid (${(err as Error).message}); kept as ${aside}, starting with the current database`);
+    try { if (existsSync(pending)) renameSync(pending, aside); } catch { try { unlinkSync(pending); } catch { /* nothing more to do */ } }
+    log(`[restore] WARNING: the staged restore was not applied (${(err as Error).message}); kept as ${aside}, starting with the current database`);
+    pruneRestoreLeftovers(dbPath);
     return null;
   }
-  let before: string | undefined;
-  if (existsSync(dbPath)) {
-    before = `${dbPath}.before-restore-${ts}`;
-    try {
-      const live = new DatabaseSync(dbPath, { readOnly: true });
-      try { live.exec(`VACUUM INTO '${quote(before)}'`); } finally { live.close(); }
-      chmodSync(before, 0o600);
-    } catch {
-      // The live file can't be read as a database: keep its bytes as they are (with their WAL) instead.
-      for (const sfx of ["", "-wal", "-shm"]) if (existsSync(dbPath + sfx)) copyFileSync(dbPath + sfx, before + sfx);
-    }
-    for (const sfx of ["-wal", "-shm", ""]) if (existsSync(dbPath + sfx)) unlinkSync(dbPath + sfx);
-  }
-  renameSync(pending, dbPath);
   log(`[restore] restored the database from a backup${before ? `; the previous one is kept as ${before}` : ""}`);
+  pruneRestoreLeftovers(dbPath);
   return before ? { before } : {};
 }
 

@@ -36,7 +36,8 @@ test("history: the read key can list it, only the password can restore, and rest
   assert.equal(list.body.length, 2);
   assert.deepEqual(Object.keys(list.body[0]).sort(), ["actor", "at", "before", "fields", "v"]);
   assert.deepEqual(list.body[0].fields, ["note"]);
-  assert.equal(list.body[0].before.note, "first");
+  assert.equal("note" in list.body[0].before, false, "the read key never sees the private note");
+  assert.equal((await call("GET", `/api/items/${item.id}/history`, PASSWORD)).body[0].before.note, "first", "the admin does");
   assert.equal(list.body[0].actor, "admin");
   const v = list.body[0].v;
   assert.equal((await call("GET", "/api/items/9999/history", READ_KEY)).status, 404);
@@ -46,7 +47,7 @@ test("history: the read key can list it, only the password can restore, and rest
   assert.equal(done.status, 200);
   assert.equal(done.body.note, "first");
   const after = await call("GET", `/api/items/${item.id}/history`, READ_KEY);
-  assert.equal(after.body[0].before.note, "second", "the restore is itself a version, so it can be undone");
+  assert.equal((await call("GET", `/api/items/${item.id}/history`, PASSWORD)).body[0].before.note, "second", "the restore is itself a version, so it can be undone");
   assert.equal((await call("POST", `/api/items/${item.id}/history/99999/restore`, PASSWORD)).status, 404);
 });
 
@@ -58,4 +59,19 @@ test("history: a trashed card refuses a restore that would not bring it back", a
   assert.equal((await call("POST", `/api/items/${it.id}/history/${noteV}/restore`, PASSWORD)).status, 409);
   const trashV = (await call("GET", `/api/items/${it.id}/history`, PASSWORD)).body[0].v;
   assert.equal((await call("POST", `/api/items/${it.id}/history/${trashV}/restore`, PASSWORD)).status, 200);
+});
+
+test("history: forgetting one card's history needs write access and leaves the other cards alone", async () => {
+  const a = dn.store.upsert({ url: "https://hist.test/c", aliases: [], title: "c", judgement, summary: null, flags: [], source: "s" });
+  const b = dn.store.upsert({ url: "https://hist.test/d", aliases: [], title: "d", judgement, summary: null, flags: [], source: "s" });
+  for (const it of [a, b]) await call("PUT", `/api/items/${it.id}/note`, PASSWORD, { note: "secret" });
+  assert.equal((await call("DELETE", `/api/items/${a.id}/history`, READ_KEY)).status, 401);
+  assert.equal((await call("DELETE", `/api/items/${a.id}/history`)).status, 401);
+  assert.equal((await call("DELETE", "/api/items/99999/history", PASSWORD)).status, 404);
+  const done = await call("DELETE", `/api/items/${a.id}/history`, PASSWORD);
+  assert.equal(done.status, 200);
+  assert.equal(done.body.removed, 1);
+  assert.equal((await call("GET", `/api/items/${a.id}/history`, PASSWORD)).body.length, 0);
+  assert.equal((await call("GET", `/api/items/${b.id}/history`, PASSWORD)).body.length, 1);
+  assert.equal(dn.store.get(a.id)?.note, "secret", "the card itself is untouched");
 });

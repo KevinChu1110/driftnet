@@ -34,6 +34,8 @@ export interface SemanticOptions {
   cacheSize?: number;
   /** After a failed call, no query embedding is attempted for this long (default 30 s) so search stays fast. */
   cooldownMs?: number;
+  /** Uncached query embeddings allowed per minute, process-wide (default 30); beyond it search is keyword-only. */
+  queriesPerMinute?: number;
   fetch?: FetchLike;
   log?: (line: string) => void;
 }
@@ -54,9 +56,13 @@ export class Semantic {
   private readonly cache = new Map<string, Float32Array>();
   private readonly opts: Required<Omit<SemanticOptions, "fetch" | "log">> & Pick<SemanticOptions, "fetch" | "log">;
   private generation = 0;
+  private readonly inflight = new Map<string, Promise<{ vec: Float32Array; floor: number } | null>>();
+  private tokens: number;
+  private refilled = Date.now();
 
   constructor(private readonly store: Store, opts: SemanticOptions = {}) {
-    this.opts = { queryTimeoutMs: 1500, batch: 16, cacheSize: 200, cooldownMs: 30_000, ...opts };
+    this.opts = { queryTimeoutMs: 1500, batch: 16, cacheSize: 200, cooldownMs: 30_000, queriesPerMinute: 30, ...opts };
+    this.tokens = this.opts.queriesPerMinute;
     store.onIndexed = (id) => this.enqueue(id);
   }
 
@@ -83,7 +89,8 @@ export class Semantic {
     const f = Number(env.DRIFTNET_EMBED_FLOOR);
     this.floorOverride = env.DRIFTNET_EMBED_FLOOR && f > 0 && f < 1 ? f : undefined;
     // Saving an unrelated setting must not throw away the cache or restart the backfill.
-    if (embedder?.label !== this.embedder?.label || embedder?.model !== this.embedder?.model) this.use(embedder);
+    // A changed key or endpoint counts too (the fingerprint hashes them); label and model alone would miss it.
+    if (embedder?.label !== this.embedder?.label || embedder?.model !== this.embedder?.model || embedder?.fingerprint !== this.embedder?.fingerprint) this.use(embedder);
     return embedder
       ? `semantic search: on (${embedder.label}${embedder.local ? ", local" : ""}); ${this.store.vectors.count()} items embedded, the rest in the background`
       : `semantic search: off${problem ? ` (${problem})` : (env.DRIFTNET_EMBED ?? "auto").toLowerCase() === "off" ? "" : " (no local embedding model found; see README \"Search by meaning\")"}`;
@@ -170,6 +177,26 @@ export class Semantic {
     const hit = this.cache.get(key);
     if (hit) { this.cache.delete(key); this.cache.set(key, hit); return { vec: hit, floor: this.floor }; }
     if (Date.now() < this.coolUntil) return null;
+    // One request per distinct query at a time: concurrent identical searches share it.
+    const running = this.inflight.get(key);
+    if (running) return running;
+    if (!this.takeToken()) return null; // over the budget: keyword-only, no provider call
+    const p = this.fetchQuery(embedder, key, text);
+    this.inflight.set(key, p);
+    try { return await p; } finally { this.inflight.delete(key); }
+  }
+
+  /** Token bucket (queriesPerMinute, refilled continuously) so a loop of searches cannot run up the embedding bill. */
+  private takeToken(): boolean {
+    const cap = this.opts.queriesPerMinute, now = Date.now();
+    this.tokens = Math.min(cap, this.tokens + ((now - this.refilled) / 60_000) * cap);
+    this.refilled = now;
+    if (this.tokens < 1) return false;
+    this.tokens -= 1;
+    return true;
+  }
+
+  private async fetchQuery(embedder: Embedder, key: string, text: string): Promise<{ vec: Float32Array; floor: number } | null> {
     const budget = this.opts.queryTimeoutMs;
     let timer: NodeJS.Timeout | undefined;
     try {

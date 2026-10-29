@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { BlockedUrl, HistoryError, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
 import { agentBrief } from "../brief.ts";
-import { actorOf, token } from "../access.ts";
+import { actorOf, isAdmin, token } from "../access.ts";
 import { loadMedia, MediaError } from "../media.ts";
 import { BadRequest, type Route } from "../route.ts";
 
@@ -158,9 +158,23 @@ export const routes: Route[] = [
   // What this card looked like before each of its last 20 changes (same read rule as the card), and putting one back.
   {
     method: "GET", pattern: /^\/api\/items\/(\d+)\/history$/, example: "/api/items/1/history", access: "read",
+    handler: ({ req, m, send, app: { dn, env } }) => {
+      const id = Number(m[1]);
+      if (!dn.store.get(id)) return send(404, { error: "not found" });
+      // The reader's private note is for admins only; a read key sees what else changed.
+      const admin = isAdmin(req, env, dn.store);
+      return send(200, dn.store.history(id).map((h) => {
+        if (admin || !("note" in h.before)) return h;
+        const { note: _note, ...before } = h.before;
+        return { ...h, before };
+      }));
+    },
+  },
+  {
+    method: "DELETE", pattern: /^\/api\/items\/(\d+)\/history$/, example: "/api/items/1/history", access: "write",
     handler: ({ m, send, app: { dn } }) => {
       const id = Number(m[1]);
-      return dn.store.get(id) ? send(200, dn.store.history(id)) : send(404, { error: "not found" });
+      return dn.store.get(id) ? send(200, { ok: true, removed: dn.store.forgetHistory(id) }) : send(404, { error: "not found" });
     },
   },
   {

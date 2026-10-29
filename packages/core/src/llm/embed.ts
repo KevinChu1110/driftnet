@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /**
  * Embedding providers for optional semantic search. Embeddings are a different call from the
  * summarizer's, with their own (small) settings, and they are OFF unless a local endpoint answers or
@@ -9,6 +11,8 @@
  *   gemini  POST …:batchEmbedContents  Google's Gemini API (key in a header, never in the URL)
  */
 export interface Embedder {
+  /** Hash of (provider, base URL, local flag, model, key hash): lets configure() notice a changed key or endpoint. Never contains the key. */
+  readonly fingerprint?: string;
   /** For the startup line and logs, e.g. "ollama:nomic-embed-text". Never contains a key. */
   readonly label: string;
   /** What the vector table records, so vectors of another model are dropped. */
@@ -45,14 +49,21 @@ export function normalize(v: ArrayLike<number>): Float32Array {
   return out;
 }
 
+/** Exactly this machine: localhost, ::1, or a dotted 127.x.y.z (so 127.0.0.1.evil.com is not local). */
 export function isLocalUrl(url: string): boolean {
   try {
     const h = new URL(url).hostname.replace(/^\[|\]$/g, "");
-    return h === "localhost" || h === "::1" || /^127\./.test(h);
+    if (h === "localhost" || h === "::1") return true;
+    const m = /^127((?:\.\d{1,3}){3})$/.exec(h);
+    return !!m && m[1]!.slice(1).split(".").every((o) => Number(o) <= 255);
   } catch {
     return false;
   }
 }
+
+/** What identifies an embedder's wiring: a change in any part (even the key) means a fresh embedder. The key is only hashed. */
+const fingerprint = (provider: string, base: string, local: boolean, model: string, key = ""): string =>
+  createHash("sha256").update([provider, base, local ? 1 : 0, model, createHash("sha256").update(key).digest("hex")].join("\n")).digest("hex");
 
 /** nomic-embed-text is trained with task prefixes; without them quality drops noticeably. */
 function prompt(model: string, kind: "query" | "document", text: string): string {
@@ -80,7 +91,7 @@ export function openaiEmbedder(o: { baseUrl: string; model: string; apiKey?: str
   const base = o.baseUrl.replace(/\/+$/, "");
   const f = o.fetch ?? fetch;
   return {
-    label: `openai:${o.model} @ ${new URL(base).host}`, model: o.model, floor: defaultFloor(o.model), local: isLocalUrl(base),
+    label: `openai:${o.model} @ ${new URL(base).host}`, model: o.model, fingerprint: fingerprint("openai", base, isLocalUrl(base), o.model, o.apiKey), floor: defaultFloor(o.model), local: isLocalUrl(base),
     async embed(texts, kind, timeoutMs = 30_000) {
       const data = (await post(f, `${base}/embeddings`, o.apiKey ? { authorization: `Bearer ${o.apiKey}` } : {},
         { model: o.model, input: texts.map((t) => prompt(o.model, kind, t)), encoding_format: "float" }, timeoutMs)) as { data?: { index?: number; embedding?: number[] }[] };
@@ -94,7 +105,7 @@ export function ollamaEmbedder(o: { baseUrl: string; model: string; fetch?: Fetc
   const base = o.baseUrl.replace(/\/+$/, "");
   const f = o.fetch ?? fetch;
   return {
-    label: `ollama:${o.model}`, model: o.model, floor: defaultFloor(o.model), local: isLocalUrl(base),
+    label: `ollama:${o.model}`, model: o.model, fingerprint: fingerprint("ollama", base, isLocalUrl(base), o.model), floor: defaultFloor(o.model), local: isLocalUrl(base),
     async embed(texts, kind, timeoutMs = 30_000) {
       const data = (await post(f, `${base}/api/embed`, {}, { model: o.model, input: texts.map((t) => prompt(o.model, kind, t)) }, timeoutMs)) as { embeddings?: number[][] };
       return asVectors(data.embeddings, texts.length);
@@ -105,7 +116,7 @@ export function ollamaEmbedder(o: { baseUrl: string; model: string; fetch?: Fetc
 export function geminiEmbedder(o: { apiKey: string; model: string; fetch?: FetchLike }): Embedder {
   const f = o.fetch ?? fetch;
   return {
-    label: `gemini:${o.model}`, model: o.model, floor: defaultFloor(o.model), local: false,
+    label: `gemini:${o.model}`, model: o.model, fingerprint: fingerprint("gemini", GEMINI_HOST, false, o.model, o.apiKey), floor: defaultFloor(o.model), local: false,
     async embed(texts, kind, timeoutMs = 30_000) {
       const data = (await post(f, `${GEMINI_HOST}/v1beta/models/${encodeURIComponent(o.model)}:batchEmbedContents`, { "x-goog-api-key": o.apiKey }, {
         requests: texts.map((t) => ({

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "../src/store.ts";
 import { Semantic, embedText } from "../src/semantic.ts";
-import { createEmbedder, normalize, type Embedder } from "../src/llm/embed.ts";
+import { createEmbedder, isLocalUrl, normalize, type Embedder } from "../src/llm/embed.ts";
 
 const j = { isAiTool: 1, category: "coding", kind: "repo" as const, worth: "normal" as const, engine: "jev" as const, confidence: 1 };
 const sum = (name: string, extra: Record<string, unknown> = {}) => ({
@@ -342,4 +342,89 @@ test("benchmark: search latency with 2,000 and 10,000 embedded items", { skip: p
     console.log(`bench ${n}: keyword ${keywordMs.toFixed(2)} ms, hybrid ${ms.toFixed(2)} ms (total ${tot.total}), cold vector load ${coldMs.toFixed(1)} ms, related ${time(() => store.related(5, 5)).toFixed(2)} ms`);
   }
   assert.ok(rows[10000]!.ms < 250);
+});
+
+test("isLocalUrl: exactly this machine, never a look-alike host", () => {
+  for (const u of ["http://localhost:11434", "http://127.0.0.1:11434/v1", "http://127.1.2.3", "http://[::1]:8080", "http://LOCALHOST"]) assert.equal(isLocalUrl(u), true, u);
+  for (const u of ["http://127.0.0.1.evil.com", "http://127.0.0.1.evil.com:11434/v1", "http://localhost.evil.com", "http://127.0.0.256", "http://127.evil.com", "http://10.0.0.1", "http://[::2]", "not a url", ""]) assert.equal(isLocalUrl(u), false, u);
+});
+
+test("changing only the API key (same provider, model and URL) builds a fresh embedder", async () => {
+  const auth: string[] = [];
+  const stub = async (url: string, init: RequestInit) => {
+    auth.push((init.headers as Record<string, string>).authorization ?? "");
+    const input = (JSON.parse(init.body as string) as { input: string[] }).input;
+    return Response.json({ data: input.map((t, i) => ({ index: i, embedding: Array.from(vec(t)) })) });
+  };
+  const store = new Store(":memory:");
+  add(store, "https://k.test/1", "x", sum("OAuth kit", { oneLiner: "oauth" }));
+  const sem = new Semantic(store, { fetch: stub });
+  const env = (key: string) => ({ DRIFTNET_EMBED_PROVIDER: "openai", DRIFTNET_EMBED_API_KEY: key, DRIFTNET_EMBED_MODEL: "m" });
+  await sem.configure(env("key-A"));
+  await sem.idle();
+  await sem.queryVec("login one");
+  assert.equal(auth.at(-1), "Bearer key-A");
+  await sem.configure(env("key-B"));
+  await sem.queryVec("login two");
+  assert.equal(auth.at(-1), "Bearer key-B", "the new key is used, not the old embedder");
+  const n = auth.length;
+  await sem.configure(env("key-B")); // unrelated save: nothing is rebuilt, the cache stays
+  await sem.queryVec("login two");
+  assert.equal(auth.length, n);
+});
+
+test("query embeddings are rate limited (token bucket) and identical in-flight queries share one call", async () => {
+  const calls: { texts: string[]; kind: string }[] = [];
+  const { store, sem, embedder } = await setup({ calls }, { queriesPerMinute: 3 });
+  add(store, "https://r.test/1", "x", sum("OAuth kit", { oneLiner: "oauth" }));
+  sem.use(embedder);
+  await sem.idle();
+  const queries = () => calls.filter((c) => c.kind === "query").length;
+  // five identical searches at once: one provider call
+  const same = await Promise.all(Array.from({ length: 5 }, () => sem.queryVec("login")));
+  assert.equal(queries(), 1);
+  assert.ok(same.every((r) => r && r.vec === same[0]!.vec));
+  // distinct queries drain the bucket (2 left), then search is keyword-only (null)
+  const got = [];
+  for (const q of ["sso one", "sso two", "sso three", "sso four"]) got.push(await sem.queryVec(q));
+  assert.deepEqual(got.map((r) => r !== null), [true, true, false, false]);
+  assert.equal(queries(), 3);
+  assert.notEqual(await sem.queryVec("login"), null, "a cached query still costs no token");
+  assert.equal(queries(), 3);
+});
+
+test("nearest keeps only the best few while scanning, same order as sorting everything (ties by id)", () => {
+  const store = new Store(":memory:");
+  const sem = new Semantic(store);
+  sem.use(fake());
+  const r = ((seed) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32))(3);
+  store.transaction(() => { for (let i = 1; i <= 60; i++) { add(store, `https://n.test/${i}`, `t${i}`, null); store.vectors.put(i, "m1", "h", normalize([i % 3, i % 5 === 0 ? 1 : 0, r() < 0.5 ? 0 : 1, 1])); } });
+  const q = normalize([1, 0, 1, 1]);
+  const all = store.vectors.nearest(q, { floor: -1, max: 1000 });
+  assert.equal(all.length, 60);
+  assert.deepEqual(all.map((h) => h.id), [...all].sort((a, b) => b.sim - a.sim || a.id - b.id).map((h) => h.id));
+  for (const k of [1, 5, 17]) assert.deepEqual(store.vectors.nearest(q, { floor: -1, max: k }), all.slice(0, k));
+  assert.deepEqual(store.vectors.nearest(q, { floor: -1, max: 5, exclude: all[0]!.id, allowed: new Set(all.map((h) => h.id)) }).map((h) => h.id), all.slice(1, 6).map((h) => h.id));
+});
+
+test("hybrid and related still exclude trashed and flagged cards when they crowd the nearest list", async () => {
+  const { store, sem, embedder } = await setup();
+  const live: number[] = [];
+  store.transaction(() => {
+    // 250 trashed or flagged cards that are closer to "login" than any live card
+    for (let i = 0; i < 250; i++) {
+      const it = i % 2 ? add(store, `https://c.test/t${i}`, `t${i}`, sum(`Trashed ${i}`, { oneLiner: "oauth login" }))
+        : store.upsert({ url: `https://c.test/f${i}`, aliases: [], title: `f${i}`, judgement: j, summary: sum(`Flagged ${i}`, { oneLiner: "oauth login" }), flags: ["injection"], source: "s" });
+      if (i % 2) store.setTrashed(it.id, true);
+    }
+    for (let i = 0; i < 6; i++) live.push(add(store, `https://c.test/l${i}`, `l${i}`, sum(`Live ${i}`, { oneLiner: "sso and pdf" })).id);
+  });
+  sem.use(embedder);
+  await sem.idle();
+  const q = (await sem.queryVec("login"))!;
+  assert.deepEqual(ids(store, "login", q).sort((a, b) => a - b), [...live].sort((a, b) => a - b));
+  const out: { total?: number } = {};
+  store.list({ q: "login", semantic: q }, out);
+  assert.equal(out.total, 6);
+  assert.deepEqual(store.related(live[0]!, 10).map((r) => r.id).sort((a, b) => a - b), live.slice(1).sort((a, b) => a - b));
 });

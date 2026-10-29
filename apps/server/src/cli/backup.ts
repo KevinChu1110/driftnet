@@ -70,7 +70,9 @@ export async function restoreCmd(ctx: Ctx, argv: string[]): Promise<number> {
   const dbPath = dbFileOf(c.env);
   try {
     const checked = await stageRestore(file, dbPath);
-    const done = applyPendingRestore(dbPath, () => {});
+    const why: string[] = [];
+    const done = await applyPendingRestore(dbPath, (m) => why.push(m));
+    if (!done) { ctx.err(`driftnet: ${why.join(" ") || "the restore could not be applied"}`); return 1; }
     ctx.out(`restored ${checked.items} items (schema ${checked.schema}, made by driftnet ${checked.manifest.driftnet})`);
     if (done?.before) ctx.out(`your previous database is kept as ${done.before}`);
     const keys = settingKeys(checked.settings);

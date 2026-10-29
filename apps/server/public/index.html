@@ -755,7 +755,7 @@
       layoutBoth: "Both sides", layoutRight: "Right side", layoutHelp: "Switch between branches on both sides (XMind) and all to the right",
       zoom: "Zoom", gotIt: "Got it", more: (n) => `+${n} more`, mapSearch: (q) => `Highlighting “${q}”`, openLink: "Open link", mdDemo: "What you'll see", mdWhy: "Why it's here", mdHighlights: "Highlights", mdUse: "Good for", mdTry: "Try it", mdCopy: "Copy", mdCopied: "Copied", mdPrev: "Previous card", mdNext: "Next card", mdPos: (n, m) => `${n} of ${m}`, mdSlide: (n, m) => `Picture ${n} of ${m}`, mdPlay: "Play the video", mdPictures: "Pictures", mdTags: "Tags", mdHasNote: "Has your note", showInList: "Show in the list", close: "Close",
       needPassword: "Changing things needs the admin password.",
-      histBtn: "History", histTitle: "Change history", histNone: "No changes recorded yet.", histRestore: "Restore", histRestored: "Restored an earlier version.", histErr: "Could not load the history.",
+      histBtn: "History", histTitle: "Change history", histNone: "No changes recorded yet.", histRestore: "Restore", histRestored: "Restored an earlier version.", histErr: "Could not load the history.", histForget: "Forget history", histForgot: "History for this card was erased.",
       histField: { note: "Note", summary: "Summary", title: "Title", folder: "Folder", favorite: "Star", trashed: "Trash" }, histEmptyVal: "(empty)", histStarOn: "starred", histStarOff: "not starred", histInTrash: "in the trash", histOutTrash: "not in the trash",
       histActor: (a) => a === "admin" ? "You" : a === "system:refresh" ? "Refresh" : a === "system" ? "System" : a.replace(/^agent:/, "agent "),
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
@@ -879,7 +879,7 @@
           DRIFTNET_SUMMARY_DEPTH: ["Summary detail", "How much each card says. Detailed costs more model tokens and reads twice as much of each page."],
           DRIFTNET_SUMMARY_RULES: ["Extra rules for summaries", "e.g. Say whether it's free. Mention if it needs a GPU."],
           DRIFTNET_PROFILE: ["About you", "Who you are and what you care about (600 characters at most). The model uses it to judge what is worth your time and to write the \"why\" line. e.g. Backend engineer, Odoo and TypeScript; collecting AI coding tools and MCP servers; not interested in crypto."],
-          DRIFTNET_UPDATE_CHECK: ["Check for new versions", "Once a day driftnet asks the npm registry for the latest version number (nothing about you is sent) and shows a small notice. Off = never."],
+          DRIFTNET_UPDATE_CHECK: ["Check for new versions", "Once a day driftnet asks the npm registry for the latest version number (nothing about you is sent) and shows a small notice. Off (the default) = never."],
           DRIFTNET_BLOCK_DOMAINS: ["Never catalogue these domains", "Comma or space separated, e.g. example.com, spam.io"],
           DRIFTNET_WEBHOOK_URL: ["Webhook URL", "driftnet POSTs each new or updated card here (n8n, Zapier, Slack workflows…). Treated as a secret."],
           DRIFTNET_WEBHOOK_SECRET: ["Webhook signing secret", "Optional. Adds X-Driftnet-Signature: sha256=<HMAC of the body>."],
@@ -909,7 +909,7 @@
           DRIFTNET_HEALTH: { "": "Off (default)", off: "Off", weekly: "Weekly (recommended)" },
           DRIFTNET_EMBED: { "": "Automatic (default): on when a local model is found", auto: "Automatic: on when a local model is found", off: "Off" },
           DRIFTNET_EMBED_PROVIDER: { "": "Automatic (local Ollama only)", ollama: "Ollama (on this computer)", openai: "OpenAI", gemini: "Gemini" },
-          DRIFTNET_UPDATE_CHECK: { "": "On (default)", 1: "On", 0: "Off" },
+          DRIFTNET_UPDATE_CHECK: { "": "Off (default)", 1: "On", 0: "Off" },
           DRIFTNET_VIDEO: { "": "Automatic (default)", auto: "Automatic: use the tools found", captions: "Captions only (light on battery: no download, OCR or speech)", off: "Off" },
         },
       },
@@ -948,7 +948,7 @@
       layoutBoth: "兩側展開", layoutRight: "往右展開", layoutHelp: "切換：分支分佈在兩側（XMind 預設）或全部往右",
       zoom: "縮放", gotIt: "知道了", more: (n) => `還有 ${n} 張`, mapSearch: (q) => `標亮「${q}」`, openLink: "開啟連結", mdDemo: "你會看到什麼", mdWhy: "為什麼收進來", mdHighlights: "重點", mdUse: "適合用在", mdTry: "試試看", mdCopy: "複製", mdCopied: "已複製", mdPrev: "上一張卡片", mdNext: "下一張卡片", mdPos: (n, m) => `第 ${n} / ${m} 張`, mdSlide: (n, m) => `第 ${n} 張圖，共 ${m} 張`, mdPlay: "播放影片", mdPictures: "圖片", mdTags: "標籤", mdHasNote: "有你的筆記", showInList: "在清單中查看", close: "關閉",
       needPassword: "要修改需要管理密碼。",
-      histBtn: "修改紀錄", histTitle: "修改紀錄", histNone: "還沒有修改紀錄。", histRestore: "還原", histRestored: "已還原成先前的版本。", histErr: "無法載入修改紀錄。",
+      histBtn: "修改紀錄", histTitle: "修改紀錄", histNone: "還沒有修改紀錄。", histRestore: "還原", histRestored: "已還原成先前的版本。", histErr: "無法載入修改紀錄。", histForget: "清除紀錄", histForgot: "這張卡片的修改紀錄已清除。",
       histField: { note: "筆記", summary: "摘要", title: "標題", folder: "資料夾", favorite: "星號", trashed: "垃圾桶" }, histEmptyVal: "（空白）", histStarOn: "已加星", histStarOff: "未加星", histInTrash: "在垃圾桶", histOutTrash: "不在垃圾桶",
       histActor: (a) => a === "admin" ? "你" : a === "system:refresh" ? "重新整理" : a === "system" ? "系統" : a.replace(/^agent:/, "agent "),
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
@@ -1072,7 +1072,7 @@
           DRIFTNET_SUMMARY_DEPTH: ["摘要詳細程度", "每張卡片寫多少。詳細會用較多模型 token，且每個頁面讀兩倍的內容。"],
           DRIFTNET_SUMMARY_RULES: ["摘要的額外規則", "例如：說明是否免費。需要 GPU 的話要提到。"],
           DRIFTNET_PROFILE: ["關於你", "你是誰、關心什麼（最多 600 字）。模型會用它判斷什麼值得你花時間，並寫「為什麼值得看」那一句。例如：後端工程師，做 Odoo 和 TypeScript；蒐集 AI 寫程式工具和 MCP 伺服器；對加密貨幣沒興趣。"],
-          DRIFTNET_UPDATE_CHECK: ["檢查新版本", "每天向 npm 查一次最新版本號（不會傳送任何與你有關的資料），有新版就顯示小提示。關閉＝完全不查。"],
+          DRIFTNET_UPDATE_CHECK: ["檢查新版本", "每天向 npm 查一次最新版本號（不會傳送任何與你有關的資料），有新版就顯示小提示。關閉（預設）＝完全不查。"],
           DRIFTNET_BLOCK_DOMAINS: ["不要收錄的網域", "用逗號或空白分隔，例如 example.com, spam.io"],
           DRIFTNET_WEBHOOK_URL: ["Webhook 網址", "每張新增或更新的卡片都會 POST 到這裡（n8n、Zapier、Slack 工作流程…）。視為機密。"],
           DRIFTNET_WEBHOOK_SECRET: ["Webhook 簽章密鑰", "選填。會加上 X-Driftnet-Signature: sha256=<內容的 HMAC>。"],
@@ -1102,7 +1102,7 @@
           DRIFTNET_HEALTH: { "": "關閉（預設）", off: "關閉", weekly: "每週（建議）" },
           DRIFTNET_EMBED: { "": "自動（預設）：找到本機模型就開", auto: "自動：找到本機模型就開", off: "關閉" },
           DRIFTNET_EMBED_PROVIDER: { "": "自動（只找本機 Ollama）", ollama: "Ollama（在這台電腦上）", openai: "OpenAI", gemini: "Gemini" },
-          DRIFTNET_UPDATE_CHECK: { "": "開啟（預設）", 1: "開啟", 0: "關閉" },
+          DRIFTNET_UPDATE_CHECK: { "": "關閉（預設）", 1: "開啟", 0: "關閉" },
           DRIFTNET_VIDEO: { "": "自動（預設）", auto: "自動：有找到工具就用", captions: "只抓字幕（省電：不下載影片、不跑文字辨識和語音模型）", off: "關閉" },
         },
       },
@@ -2776,7 +2776,7 @@
     const body = histRows == null ? "…" : !histRows.length ? `<p>${esc(t.histNone)}</p>` :
       `<ul>${histRows.map((r) => `<li><div>${r.fields.map((f) => `<span>${esc(t.histField[f] ?? f)}: ${esc(histPreview(r, f))}</span>`).join("<br>")}<small>${when(r.at)} · ${esc(t.histActor(r.actor))}</small></div>${
         admin ? `<button class="btn" type="button" data-md="hist-restore" data-v="${r.v}">${esc(t.histRestore)}</button>` : ""}</li>`).join("")}</ul>`;
-    sec.innerHTML = `<h4>${esc(t.histTitle)}</h4>${body}`;
+    sec.innerHTML = `<h4>${esc(t.histTitle)}</h4>${body}${admin && histRows?.length ? `<button class="btn" type="button" data-md="hist-forget">${esc(t.histForget)}</button>` : ""}`;
   }
   const when = (iso) => { const d = new Date(iso); return esc(isNaN(d) ? iso : d.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })); };
   async function loadHistory(id) {
@@ -2802,6 +2802,12 @@
     histRows = rows ?? histRows;
     if (modalId === id && mdlDlg.open) paintModal();
     toast(T().histRestored, undoV ? async () => { await restoreVersion(id, undoV); } : undefined);
+  }
+  async function forgetHistory(id) {
+    if (!(await mapWrite(`/api/items/${id}/history`, "DELETE"))) return;
+    histRows = [];
+    if (modalId === id && mdlDlg.open) paintModal();
+    toast(T().histForgot);
   }
   function openModal(id, from = "list") {
     if (!find(id)) return;
@@ -2863,6 +2869,7 @@
       return paintModal();
     }
     if (act1 === "hist-restore") return restoreVersion(id, Number(b.dataset.v));
+    if (act1 === "hist-forget") return forgetHistory(id);
     if (act1 === "move") { mdlDlg.close(); return openMovePicker(id); }
     if (act1 === "refresh") return refreshItem(id);
     if (act1 === "health") return checkLink(id);

@@ -39,7 +39,7 @@ export function compareSemver(a: string, b: string): number | null {
 }
 
 export const currentVersion = (env: NodeJS.ProcessEnv = process.env) => env.DRIFTNET_VERSION ?? "dev";
-export const updateCheckOn = (env: NodeJS.ProcessEnv) => env.DRIFTNET_UPDATE_CHECK?.trim() !== "0";
+export const updateCheckOn = (env: NodeJS.ProcessEnv) => env.DRIFTNET_UPDATE_CHECK?.trim() === "1";
 
 interface Saved { at: number; latest?: string }
 const saved = (store: Store): Saved => {

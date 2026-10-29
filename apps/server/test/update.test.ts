@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { Store } from "@driftnet/core";
 import { checkForUpdate, compareSemver, parseSemver, updateNotice, UPDATE_URL } from "../src/update.ts";
 
-const env = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({ DRIFTNET_VERSION: "0.9.0", ...extra });
+const env = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({ DRIFTNET_VERSION: "0.9.0", DRIFTNET_UPDATE_CHECK: "1", ...extra });
 const reply = (version: unknown, status = 200) => new Response(JSON.stringify({ version, name: "driftnet" }), { status });
 
 test("semver: numeric order, pre-releases below their release, junk is null", () => {
@@ -72,11 +72,12 @@ test("update check: a slow registry is cut off by the timeout", async () => {
   assert.ok(Date.now() - started < 2000);
 });
 
-test("update check: DRIFTNET_UPDATE_CHECK=0 and a checkout ('dev') never touch the network", async () => {
+test("update check: off by default (opt-in), =0 and a checkout ('dev') never touch the network", async () => {
   const store = new Store(":memory:");
   const f = (async () => { throw new Error("must not be called"); }) as unknown as typeof fetch;
   assert.equal(await checkForUpdate(store, env({ DRIFTNET_UPDATE_CHECK: "0" }), { fetch: f }), undefined);
-  assert.equal(await checkForUpdate(store, {}, { fetch: f }), undefined);
+  assert.equal(await checkForUpdate(store, { DRIFTNET_VERSION: "0.9.0" }, { fetch: f }), undefined, "unset = off");
+  assert.equal(await checkForUpdate(store, { DRIFTNET_UPDATE_CHECK: "1" }, { fetch: f }), undefined);
   assert.equal(store.getState("update_check"), undefined);
 });
 
