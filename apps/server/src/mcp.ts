@@ -47,7 +47,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       description:
         "Find items in the reader's catalogue of AI tools, repos, videos and guides that people shared in chats. " +
         "Call it before choosing a tool for a task, since someone may already have vetted one; once you have an id and need the whole card, use driftnet_get_item instead. " +
-        "query is matched word by word (every word must appear) against names, summaries, tags, URLs, the reader's notes and the chat text a link was shared with, so 'pdf markdown' finds 'Convert PDF to Markdown'; omit it to browse. " +
+        "query is matched word by word (every word must appear) against names, summaries, tags, URLs, the reader's notes and the chat text a link was shared with, so 'pdf markdown' finds 'Convert PDF to Markdown' (it also matches by meaning when the reader turned that on); omit it to browse. " +
         "days switches the order to newest first, which is how to ask what's new. view=trash is how to find an id to restore with driftnet_update_item; view=inbox adds each item's suggested folders. folder also covers its sub-folders. " +
         "Dead, archived or stale links are marked in health. Results come best first (must-see, then newest) and never include down-voted or prompt-injection-flagged items. There is no paging: when limit cuts results off, narrow with query, folder, kind or days.",
       inputSchema: {
@@ -64,7 +64,10 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     },
     async ({ query, days, view, folder, kind, min_worth, limit }) => {
       if (folder && !dn.categories[folder]) return unknownFolder(folder);
+      // Newest-first (days) keeps its date order; otherwise a query may also match by meaning when that is on.
+      const semantic = query && !days ? await dn.semantic.queryVec(query) : null;
       return itemsResult(dn, dn.store.list({
+        ...(semantic ? { semantic } : {}),
         ...(view === "needs_review" ? { health: ["dead", "archived", "stale"] as Health[] } : view && view !== "all" ? { view } : {}),
         ...(days ? { since: new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 19) + "Z", sort: "newest" as const } : {}),
         ...(query ? { q: query } : {}),
@@ -81,7 +84,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
     {
       title: "Get one item",
       description:
-        "Fetch one item by id with what search results leave out: use cases, try_it, pictures, the reader's note, what people wrote in chat when sharing it, and tools found inside it (e.g. the repos a post linked). " +
+        "Fetch one item by id with what search results leave out: use cases, try_it, pictures, the reader's note, what people wrote in chat when sharing it, tools found inside it (e.g. the repos a post linked) and up to 5 related cards. " +
         "Use driftnet_search_items first when you don't have an id yet. id is the number shown in search or save results; ids of trashed items work too and come back with trashed: true, so you can look before restoring. " +
         "Fails if no item has that id, or if it was flagged for prompt injection (such items are hidden everywhere).",
       inputSchema: { id: itemId("Item id from driftnet_search_items or driftnet_save_link") },
@@ -102,6 +105,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         try_it: item.summary?.tryIt ?? null,
         note: item.note ?? null,
         shared_with: dn.store.chatNotes([id]).get(id) ?? [],
+        related: dn.semantic.related(id, 5),
         found_inside: found.map((f) => ({ id: f.id, name: f.summary?.name ?? f.title, url: f.summary?.primaryUrl || f.url })),
       };
       return { content: [{ type: "text" as const, text: `${DATA_NOTICE}\n\n${JSON.stringify(detail, null, 1)}` }], structuredContent: { notice: DATA_NOTICE, item: detail } };

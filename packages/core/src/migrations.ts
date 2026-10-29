@@ -165,6 +165,18 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 4,
+    description: "item vectors for optional semantic search",
+    up(db) {
+      // One L2-normalised Float32 vector per item. `model` lets a model change drop stale vectors;
+      // `hash` is of the embedded text, so an unchanged summary is never embedded twice.
+      db.exec(`CREATE TABLE IF NOT EXISTS item_vec (
+        item_id INTEGER PRIMARY KEY, model TEXT NOT NULL, dim INTEGER NOT NULL,
+        hash TEXT NOT NULL DEFAULT '', vec BLOB NOT NULL, updated_at TEXT NOT NULL
+      )`);
+    },
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

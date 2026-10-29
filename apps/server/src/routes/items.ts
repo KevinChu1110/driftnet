@@ -17,12 +17,15 @@ const NEEDS_PASSWORD = "unauthorized (set an admin password)";
 export const routes: Route[] = [
   {
     method: "GET", pattern: "/api/items", access: "read",
-    handler: ({ url, send, app: { dn } }) => {
+    handler: async ({ url, send, app: { dn } }) => {
       const p = url.searchParams;
+      // Time-boxed (1.5 s) and cached; null (off, slow, down) means exactly the keyword search of before.
+      const semantic = p.get("q") && !["newest", "shared"].includes(p.get("sort") ?? "") ? await dn.semantic.queryVec(p.get("q")!) : null;
       const minWorth = p.get("minWorth");
       const healthFilter = (p.get("health") ?? "").split(",").filter((h): h is Health => (HEALTH as readonly string[]).includes(h));
       const counted: { total?: number } = {};
       const list = dn.store.list({
+        ...(semantic ? { semantic } : {}),
         ...(p.get("q") ? { q: p.get("q")! } : {}),
         ...(p.get("category") ? { category: p.get("category")! } : {}),
         ...(p.get("kind") ? { kind: p.get("kind") as Kind } : {}),
@@ -55,7 +58,7 @@ export const routes: Route[] = [
     method: "GET", pattern: /^\/api\/items\/(\d+)$/, example: "/api/items/1", access: "read",
     handler: ({ m, send, app: { dn } }) => {
       const item = dn.store.get(Number(m[1]));
-      return item ? send(200, publicItem(item)) : send(404, { error: "not found" });
+      return item ? send(200, { ...publicItem(item), related: item.flags.includes("injection") ? [] : dn.semantic.related(item.id, 5) }) : send(404, { error: "not found" });
     },
   },
   // A card's picture, through the proxy (same read rule as the card itself). The stored URL never reaches the page.
