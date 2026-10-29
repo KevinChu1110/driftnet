@@ -19,7 +19,7 @@ function isTextual(header: string): boolean {
   return /^text\//.test(type) || /[/+](json|xml|javascript)$/.test(type) || /;\s*charset=/i.test(header);
 }
 
-const UA =
+export const UA =
   "Mozilla/5.0 (compatible; driftnet/0.1; +https://github.com/KevinChu1110/driftnet)";
 const MAX_BYTES = 1_500_000;
 

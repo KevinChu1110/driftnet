@@ -68,7 +68,7 @@ export const routes: Route[] = [
   },
   {
     method: "GET", pattern: "/api/stats", access: "read",
-    handler: ({ send, app: { dn } }) => send(200, { ...dn.store.stats(), inbox: dn.store.inboxCount(), engines: dn.engines }),
+    handler: ({ send, app: { dn } }) => send(200, { ...dn.store.stats(), inbox: dn.store.inboxCount(), review: dn.store.reviewCount(), engines: dn.engines }),
   },
   // Export: one Markdown file, or a zip vault for Obsidian / Notion.
   {

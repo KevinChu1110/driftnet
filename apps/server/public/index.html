@@ -400,6 +400,9 @@
   .plan-op.off { opacity: .5; }
   #plan-body { max-height: 55vh; overflow: auto; }
   .badge.folder { background: color-mix(in srgb, var(--c) 14%, var(--panel)); color: var(--c); font-weight: 600; }
+  .badge.health { background: var(--danger-soft); color: var(--danger); }
+  .badge.health.stale, .badge.health.moved { background: var(--accent-soft); color: var(--muted); }
+  .stars { color: var(--star); }
   .rating { font-size: 12px; color: var(--muted); white-space: nowrap; }
   .rating.must { color: var(--star); font-weight: 600; }
   .rating .ico { width: 13px; height: 13px; fill: currentColor; vertical-align: -2px; margin-right: 2px; }
@@ -736,6 +739,10 @@
       split: "Split", splitHelp: "Cards and mind map side by side", splitCards: "Cards",
       kSelect: "Select or unselect the card", kRange: "Select a range", kHold: "Hold", kLong: "Start selecting on a phone", keysClose: "Close", kClear: "Clear the selection", kUndo: "Undo the last action", kHelp: "This list",
       kQuickNone: "Move a card into a folder first; the nine you use most get a number here.", kQuickN: (f) => `Move into ${f}`,
+      review: "Needs review", emptyReview: "No dead, archived or stale links found.", hintReview: "These links look dead, archived or stale. Refresh to re-read, check the link again from the card, or move them to the trash.",
+      checkLink: "Check link", linkChecked: "Link checked", linkCheckFailed: "Couldn't check the link",
+      health: { dead: ["☠", "dead", "The link no longer works (404 / gone)"], archived: ["🗄", "archived", "The repo is archived (read-only)"], stale: ["💤", "stale", "No pushes for 18 months"], moved: ["↪", "moved", "The repo moved or was renamed"] },
+      stars: (n) => `${n} GitHub stars`,
       inbox: "Inbox", emptyInbox: "Inbox zero — every card has a folder you chose.", hintInbox: "Tap a folder to file the card. Not filed yet: the cards below.",
       chipOther: "Other folder…", chipTitle: (p) => `Confidence ${p}%`,
       keysInbox: "In the Inbox", kChip: "File into the card's suggested folder 1–3", kSkip: "Skip: focus the next card", kQuickInbox: "In the Inbox, 1–3 pick the focused card's suggested folders instead; 4–9 still file into your most-used folders.",
@@ -821,6 +828,7 @@
           DRIFTNET_DIGEST_AT: ["Digest time", "HH:MM in the server's local time zone, e.g. 09:00 (default)."],
           DRIFTNET_DIGEST_DAY: ["Digest day (weekly)", ""],
           DRIFTNET_DIGEST_TO: ["Digest targets", "Comma separated: telegram:<chat id>, discord:<channel id>, slack:<channel id>, line:<user, group or room id>. Uses the bot tokens already set."],
+          DRIFTNET_HEALTH: ["Link health check", "Weekly: a few cards at a time, driftnet checks that links still work and repos aren't archived. Marks dead, archived and stale cards."],
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["Allow a local webhook", "Needed when the receiver is on your own network (n8n on a LAN). Only that exact address is allowed."],
         },
         choices: {
@@ -833,6 +841,7 @@
           DRIFTNET_DIGEST: { "": "Off (default)", off: "Off", daily: "Every day", weekly: "Every week" },
           DRIFTNET_DIGEST_DAY: { "": "Monday (default)", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "No (public addresses only)", 1: "Yes" },
+          DRIFTNET_HEALTH: { "": "Off (default)", off: "Off", weekly: "Weekly (recommended)" },
         },
       },
     },
@@ -884,6 +893,10 @@
       split: "並排", splitHelp: "卡片列表與樹狀圖並排顯示", splitCards: "卡片",
       kSelect: "選取／取消選取這張", kRange: "選取一段範圍", kHold: "長按", kLong: "在手機上開始選取卡片", keysClose: "關閉", kClear: "取消全部選取", kUndo: "復原上一個動作", kHelp: "顯示這份清單",
       kQuickNone: "先把卡片移進某個資料夾；最常用的九個資料夾會在這裡得到數字鍵。", kQuickN: (f) => `移到 ${f}`,
+      review: "需要檢查", emptyReview: "沒有發現失效、封存或久未更新的連結。", hintReview: "這些連結看起來已失效、封存或久未更新。可以重新整理、在卡片上再檢查一次連結，或移到垃圾桶。",
+      checkLink: "檢查連結", linkChecked: "已檢查連結", linkCheckFailed: "無法檢查連結",
+      health: { dead: ["☠", "失效", "連結已經打不開（404／已移除）"], archived: ["🗄", "已封存", "這個儲存庫已封存（唯讀）"], stale: ["💤", "久未更新", "已超過 18 個月沒有更新"], moved: ["↪", "已搬家", "這個儲存庫已搬家或改名"] },
+      stars: (n) => `${n} 顆 GitHub 星`,
       inbox: "收件匣", emptyInbox: "收件匣清空了——每張卡片都有你選的資料夾。", hintInbox: "點一下資料夾就能歸檔。下面是還沒歸檔的卡片。",
       chipOther: "其他資料夾…", chipTitle: (p) => `信心 ${p}%`,
       keysInbox: "在收件匣", kChip: "歸到這張卡片建議的第 1–3 個資料夾", kSkip: "略過：移到下一張卡片", kQuickInbox: "在收件匣裡，1–3 改成選擇目前卡片的建議資料夾；4–9 仍然是放進最常用的資料夾。",
@@ -969,6 +982,7 @@
           DRIFTNET_DIGEST_AT: ["摘要時間", "伺服器所在時區的 HH:MM，例如 09:00（預設）。"],
           DRIFTNET_DIGEST_DAY: ["摘要星期（每週）", ""],
           DRIFTNET_DIGEST_TO: ["摘要送到哪裡", "以逗號分隔：telegram:<聊天室 id>、discord:<頻道 id>、slack:<頻道 id>、line:<使用者、群組或聊天室 id>。使用已設定的機器人金鑰。"],
+          DRIFTNET_HEALTH: ["連結健康檢查", "每週：每次幾張，檢查連結是否還能開、儲存庫是否已封存，並標記失效、封存、久未更新的卡片。"],
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: ["允許本機 Webhook", "接收端在你自己的區域網路時需要（例如內網的 n8n）。只放行你填的那個位址。"],
         },
         choices: {
@@ -981,6 +995,7 @@
           DRIFTNET_DIGEST: { "": "關閉（預設）", off: "關閉", daily: "每天", weekly: "每週" },
           DRIFTNET_DIGEST_DAY: { "": "週一（預設）", mon: "週一", tue: "週二", wed: "週三", thu: "週四", fri: "週五", sat: "週六", sun: "週日" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "否（只允許公開位址）", 1: "是" },
+          DRIFTNET_HEALTH: { "": "關閉（預設）", off: "關閉", weekly: "每週（建議）" },
         },
       },
     },
@@ -1122,7 +1137,7 @@
   /** One line under the header saying what is shown, so a closed drawer hides nothing. */
   function updateCrumb() {
     const t = T();
-    const parts = [state.view === "favorites" ? t.favorites : state.view === "trash" ? t.trash : state.view === "inbox" ? t.inbox
+    const parts = [state.view === "favorites" ? t.favorites : state.view === "trash" ? t.trash : state.view === "inbox" ? t.inbox : state.view === "review" ? t.review
       : state.view === "notes" ? t.notes : state.view === "map" ? t.map : t.all];
     if (state.category) parts.push(catLabel(state.category));
     if (state.kind) parts.push(t.kinds[state.kind] ?? state.kind);
@@ -1161,6 +1176,7 @@
       `<button type="button" class="menu" id="menu-close" aria-label="${esc(T().close)}">✕</button></div>` +
       `<div class="row">` +
       (role === "admin" || stats.inbox ? btn("view", "inbox", T().inbox, stats.inbox || "", "inbox") : "") +
+      (stats.review || state.view === "review" ? btn("view", "review", T().review, stats.review || "", "refresh") : "") +
       btn("view", "all", T().all, stats.items, "all") + btn("view", "favorites", T().favorites, stats.favorites, "star") +
       btn("view", "map", T().map, "", "map") +
       `<button type="button" class="split-btn" data-split aria-pressed="${split}" title="${esc(T().splitHelp)}"><span class="lbl">${ic("split")}<span>${esc(T().split)}</span></span><span class="count"></span></button>` +
@@ -2454,6 +2470,7 @@
       <h3 id="md-title"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(name)}</a></h3>
       <p class="md-sub"><span class="badge folder" style="--c:${folderColor(i.category)}">${esc(folderPath(i.category))}</span>
         <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span>
+        ${healthBadge(i)}${starsHtml(i)}
         <span>#${i.id} · ${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span></p>
       ${s?.oneLiner ? `<p class="md-one">${esc(s.oneLiner)}</p>` : ""}
       ${sec("demo", t.mdDemo, s?.demo ? `<p>${esc(s.demo)}</p>` : "")}
@@ -2471,7 +2488,7 @@
       (admin ? (inTrash ? btn("restore", "undo", t.restore)
         : btn("favorite", "star", i.favorite ? t.unfavorite : t.favorite, i.favorite ? "on" : "") + btn("move", "move", t.moveTo) +
           `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refresh)}</button>` +
-          btn("note", "note", i.note ? t.editNote : t.addNote) + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
+          btn("health", "refresh", t.checkLink) + btn("note", "note", i.note ? t.editNote : t.addNote) + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
       (modalFrom === "map" ? btn("list", "list", t.showInList) : "");
   }
   function openModal(id, from = "list") {
@@ -2529,6 +2546,7 @@
     }
     if (act1 === "move") { mdlDlg.close(); return openMovePicker(id); }
     if (act1 === "refresh") return refreshItem(id);
+    if (act1 === "health") return checkLink(id);
     if (act1 === "note") return openItemNote(id);
     if (act1 === "favorite") {
       if (el) await run(el, "favorite");
@@ -3009,7 +3027,8 @@
   const listParams = () => {
     const p = new URLSearchParams();
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
-    if (state.view !== "all") p.set("view", state.view);
+    if (state.view === "review") p.set("health", "dead,archived,stale");
+    else if (state.view !== "all") p.set("view", state.view);
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
     return p;
   };
@@ -3090,9 +3109,9 @@
     pageBusy = false;
     pageObserver?.disconnect();
     const t = T();
-    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : t.empty;
+    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : state.view === "review" ? t.emptyReview : t.empty;
     $("list").innerHTML = items.length
-      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : t.hint)}</p>` + items.map(card).join("") + moreHtml()
+      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
       : `<div class="empty first"><span>${esc(empty)}</span>${state.view === "all" && !state.q && !state.category && role === "admin"
           ? `<form class="add" id="add-form"><input id="add-url" type="url" inputmode="url" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
              <button class="btn primary" type="submit">${ic("plus")} ${esc(t.addLink)}</button></form>
@@ -3119,6 +3138,17 @@
     if (mdlDlg.open) paintModal();
   }
 
+  /** ☠ dead / 🗄 archived / 💤 stale / ↪ moved: what the last link check found (nothing for ok or unchecked). */
+  function healthBadge(i) {
+    const h = T().health[i.health];
+    return h ? `<span class="badge health ${esc(i.health)}" title="${esc(h[2])}" role="img" aria-label="${esc(h[2])}">${h[0]} ${esc(h[1])}</span>` : "";
+  }
+  /** ★ 1.2k for repos whose star count is known. */
+  function starsHtml(i) {
+    if (typeof i.stars !== "number") return "";
+    const n = i.stars >= 1000 ? `${(i.stars / 1000).toFixed(i.stars >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : String(i.stars);
+    return `<span class="stars" title="${esc(T().stars(i.stars))}">★ ${n}</span>`;
+  }
   function card(i) {
     const s = i.summary;
     const t = T();
@@ -3144,13 +3174,14 @@
               <span class="badge folder" style="--c:${folderColor(i.category)}">${esc(catLabel(i.category))}</span>
               <span class="rating ${i.worth === "must-see" ? "must" : ""}">${i.worth === "must-see" ? ic("star") : ""}${esc(t.worth[i.worth] ?? i.worth)}</span>
               ${i.pending ? `<span class="rating">${esc(summaries ? t.pending : t.noModel)}</span>` : ""}
+              ${healthBadge(i)}
             </div>
             ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
             ${s?.demo ? `<p class="demo">${esc(s.demo)}</p>` : ""}
             ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
             ${state.view === "inbox" ? inboxChips(i) : ""}
             <div class="meta">
-              <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
+              <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${starsHtml(i)}${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
               <span>${esc(i.createdAt.slice(0, 10))}</span>
               ${i.note ? `<span class="has-note" title="${esc(t.mdHasNote)}" role="img" aria-label="${esc(t.mdHasNote)}">${ic("note")}</span>` : ""}
             </div>
@@ -3253,6 +3284,19 @@
     if (mapShown()) drawMap();
     if (modalId === id && mdlDlg.open) paintModal();
   }
+  /** Test one card's link right now (the weekly job does this in batches). */
+  async function checkLink(id) {
+    const item = find(id);
+    if (!item) return;
+    const token = store.get("driftnet-token");
+    const res = await fetch(`/api/items/${id}/health`, { method: "POST", headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
+    if (res?.status === 401) return needAdmin();
+    if (!res?.ok) return toast(T().linkCheckFailed);
+    Object.assign(item, await res.json().catch(() => ({})));
+    toast(T().linkChecked);
+    repaintItem(id);
+    refreshCounts();
+  }
   async function refreshItem(id) {
     const item = find(id);
     if (!item || refreshing.has(id)) return;
@@ -3280,7 +3324,7 @@
     if (!stats) return;
     $("stats").textContent = T().stats(stats.items, stats.shares);
     const set = (v, n) => { const c = $("nav").querySelector(`[data-field="view"][data-value="${v}"] .count`); if (c) c.textContent = n || (v === "all" ? "0" : ""); };
-    set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash); set("inbox", stats.inbox);
+    set("all", stats.items); set("favorites", stats.favorites); set("trash", stats.trash); set("inbox", stats.inbox); set("review", stats.review);
   }
 
   // ── Select several cards: x, Shift-click or a long press; then act on all of them ──

@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { normalizeMedia } from "./media.ts";
-import type { Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
+import type { Health, Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
 import { migrate } from "./migrations.ts";
 import { ftsMatchQuery, FTS_WEIGHTS, reindexItem } from "./search-index.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
@@ -13,6 +13,7 @@ interface ItemRow {
   is_ai_tool: number; summary: string | null; judge_engine: string; enriched_by: string | null;
   trashed_at: string | null; favorite: number; note: string | null; user_placed: number; suggestions: string | null; media: string | null;
   flags: string; source: string; share_count: number; created_at: string; updated_at: string;
+  health: string | null; health_checked_at: string | null; stars: number | null; pushed_at: string | null;
 }
 
 export interface Reputation {
@@ -69,6 +70,8 @@ export interface Note {
 export interface ListQuery {
   /** all (default, trash excluded), favorites, trash, or inbox (not filed by hand yet, newest first). */
   view?: "all" | "favorites" | "trash" | "inbox";
+  /** Only items whose last link check found one of these. */
+  health?: Health[];
   q?: string;
   category?: string;
   kind?: Kind;
@@ -116,16 +119,20 @@ export class Store {
   upsert(input: {
     url: string; aliases: string[]; title: string; judgement: Judgement; summary: Summary | null;
     flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[];
+    /** Repo facts the extractor already fetched: stars, last push, archived (stored as health 'archived'). */
+    repo?: RepoFacts;
   }): Item {
     const { judgement: j } = input;
     const row = this.db
       .prepare(
-        `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source, suggestions, media)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO items (url, title, kind, category, worth, is_ai_tool, summary, judge_engine, flags, source, suggestions, media, stars, pushed_at, health, health_checked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(url) DO UPDATE SET
            title = excluded.title, kind = excluded.kind, category = excluded.category, worth = excluded.worth,
            is_ai_tool = excluded.is_ai_tool, summary = excluded.summary, judge_engine = excluded.judge_engine,
            flags = excluded.flags, source = excluded.source, suggestions = COALESCE(excluded.suggestions, suggestions), media = COALESCE(excluded.media, media),
+           stars = COALESCE(excluded.stars, stars), pushed_at = COALESCE(excluded.pushed_at, pushed_at),
+           health = COALESCE(excluded.health, health), health_checked_at = COALESCE(excluded.health_checked_at, health_checked_at),
            updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
          RETURNING *`,
       )
@@ -134,6 +141,7 @@ export class Store {
         input.summary ? JSON.stringify(input.summary) : null, j.engine, input.flags.join(","), input.source,
         input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
         input.media?.length ? JSON.stringify(input.media) : null,
+        ...repoArgs(input.repo),
       ) as unknown as ItemRow;
     const alias = this.db.prepare("INSERT OR IGNORE INTO aliases (url, item_id) VALUES (?, ?)");
     for (const a of input.aliases) if (a !== input.url) alias.run(a, row.id);
@@ -146,7 +154,7 @@ export class Store {
    * reader owns: shares, note, favorite, trash state, and a folder they placed.
    */
   refreshItem(id: number, input: {
-    title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[];
+    title: string; judgement: Judgement; summary: Summary | null; flags: string[]; source: string; suggestions?: Suggestion[]; media?: MediaRef[]; repo?: RepoFacts;
   }): Item | null {
     const j = input.judgement;
     // No new summary (no model, it failed, source distrusted): the old summary and what came with it stay; only metadata moves.
@@ -158,6 +166,8 @@ export class Store {
            worth = CASE WHEN ? THEN worth ELSE ? END, is_ai_tool = CASE WHEN ? THEN is_ai_tool ELSE ? END,
            summary = COALESCE(?, summary), judge_engine = CASE WHEN ? THEN judge_engine ELSE ? END,
            flags = ?, source = ?, suggestions = CASE WHEN ? THEN suggestions ELSE ? END, media = COALESCE(?, media),
+           stars = COALESCE(?, stars), pushed_at = COALESCE(?, pushed_at),
+           health = COALESCE(?, health), health_checked_at = COALESCE(?, health_checked_at),
            enriched_by = CASE WHEN ? THEN enriched_by ELSE NULL END,
            claimed_at = CASE WHEN ? THEN claimed_at ELSE NULL END, claimed_by = CASE WHEN ? THEN claimed_by ELSE NULL END,
            updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
@@ -167,7 +177,8 @@ export class Store {
         keep, input.title, j.kind, keep, j.category, keep, j.worth, keep, j.isAiTool,
         input.summary ? JSON.stringify(input.summary) : null, keep, j.engine,
         input.flags.join(","), input.source, keep, input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
-        input.media?.length ? JSON.stringify(input.media) : null, keep, keep, keep, id,
+        input.media?.length ? JSON.stringify(input.media) : null,
+        ...repoArgs(input.repo), keep, keep, keep, id,
       ) as unknown as ItemRow | undefined;
     if (row) this.reindex(row.id);
     return row ? toItem(row) : null;
@@ -183,6 +194,23 @@ export class Store {
     if (!media.length) return this.get(id);
     const row = this.db.prepare("UPDATE items SET media = ? WHERE id = ? RETURNING *").get(JSON.stringify(media), id) as ItemRow | undefined;
     return row ? toItem(row) : null;
+  }
+
+  /** Record a link check. `health` null leaves the state as it was (inconclusive); stars/pushedAt only overwrite when given. */
+  setHealth(id: number, r: { health?: Health | null; stars?: number | null; pushedAt?: string | null; checkedAt?: string }): Item | null {
+    const row = this.db.prepare(
+      `UPDATE items SET health = COALESCE(?, health), health_checked_at = ?, stars = COALESCE(?, stars), pushed_at = COALESCE(?, pushed_at)
+       WHERE id = ? RETURNING *`,
+    ).get(r.health ?? null, r.checkedAt ?? new Date().toISOString(), r.stars ?? null, r.pushedAt ?? null, id) as ItemRow | undefined;
+    return row ? toItem(row) : null;
+  }
+
+  /** Items whose link was never checked or last checked before `olderThan` (ISO), never-checked and oldest first. Trash is skipped. */
+  healthDue(limit: number, olderThan: string): Item[] {
+    return (this.db.prepare(
+      `SELECT * FROM items WHERE trashed_at IS NULL AND (health_checked_at IS NULL OR health_checked_at < ?)
+       ORDER BY health_checked_at IS NOT NULL, health_checked_at, id LIMIT ?`,
+    ).all(olderThan, clampInt(limit, 1, 500, 20)) as unknown as ItemRow[]).map(toItem);
   }
 
   recordShare(itemId: number, ctx: ShareContext): void {
@@ -752,6 +780,10 @@ export class Store {
     const args: (string | number)[] = [];
     if (query.view === "favorites") where.push("favorite = 1");
     if (query.view === "inbox") where.push("user_placed = 0");
+    if (query.health?.length) {
+      where.push(`health IN (${query.health.map(() => "?").join(",")})`);
+      args.push(...query.health);
+    }
     if (query.category) {
       // A folder shows everything below it too.
       const ids = this.descendants(query.category);
@@ -811,6 +843,11 @@ export class Store {
       .all(since, min, limit) as { id: number; shares: number }[];
   }
 
+  /** Cards the link check marked dead, archived or stale (the "Needs review" view). */
+  reviewCount(): number {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM items WHERE health IN ('dead','archived','stale') AND trashed_at IS NULL AND flags NOT LIKE '%injection%' AND ${Store.NET_VOTES} > -2`).get() as { n: number }).n;
+  }
+
   /** Cards waiting in the Inbox: not filed by hand, not trashed. */
   inboxCount(): number {
     return (this.db.prepare(`SELECT COUNT(*) AS n FROM items WHERE user_placed = 0 AND trashed_at IS NULL AND flags NOT LIKE '%injection%' AND ${Store.NET_VOTES} > -2`).get() as { n: number }).n;
@@ -844,6 +881,17 @@ const PENDING_SQL =
   "summary IS NULL AND worth <> 'skip' AND flags NOT LIKE '%injection%' AND flags NOT LIKE '%low-reputation%' AND trashed_at IS NULL";
 
 /** Worth reading, not blocked, and nobody has summarised it yet. */
+/** What a repo extractor already knows at ingest time. */
+export interface RepoFacts { stars?: number; pushedAt?: string; archived?: boolean }
+
+/** Bind values for (stars, pushed_at, health, health_checked_at) in that order. */
+function repoArgs(r?: RepoFacts): (string | number | null)[] {
+  return [
+    r?.stars ?? null, r?.pushedAt ?? null,
+    r?.archived ? "archived" : null, r?.archived ? new Date().toISOString() : null,
+  ];
+}
+
 function isPending(r: ItemRow): boolean {
   return r.summary === null && r.worth !== "skip" && !/injection|low-reputation/.test(r.flags) && r.trashed_at === null;
 }
@@ -870,6 +918,10 @@ function toItem(r: ItemRow): Item {
     suggestions: parseSuggestions(r.suggestions),
     media: parseMedia(r.media),
     placed: r.user_placed === 1,
+    health: (r.health as Health | null) ?? null,
+    healthCheckedAt: r.health_checked_at ?? null,
+    stars: r.stars ?? null,
+    pushedAt: r.pushed_at ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

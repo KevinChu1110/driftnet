@@ -169,6 +169,10 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 
 </details>
 
+## 連結健康檢查
+
+連結會失效、儲存庫會被封存。設定 `DRIFTNET_HEALTH=weekly`（建議開啟；預設關閉，因為會對外發送請求），driftnet 就會每週左右重新檢查每張卡片，一次檢查幾張。GitHub 儲存庫走 API（星數、是否封存、最後推送；可設 `GITHUB_TOKEN` 提高上限，遇到速率限制會自動暫停）；其他連結則用同一套私有位址防護發一個輕量的 `HEAD`。卡片會被標成 `dead`（404／已移除，或網域已不存在）、`archived`（已封存）、`stale`（超過 18 個月沒有推送）或 `moved`（儲存庫改名／搬家）；伺服器錯誤和逾時不會改變狀態，之後會再試。被標記的卡片會顯示徽章，出現在網頁的「需要檢查」和 `driftnet_search_items` 的 `view=needs_review`，卡片上的「檢查連結」按鈕（或 `POST /api/items/:id/health`）可以立刻測一個連結。
+
 ## 接法
 
 | | 設定 | 筆電上能用？ | 關機期間的訊息 |
@@ -463,6 +467,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `GITHUB_TOKEN` | — | GitHub API 上限從每小時 60 次提高到 5,000 次 |
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
+| `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 擷取器外掛（`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、管理 agent 金鑰、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
 | `DRIFTNET_READ_KEY` | — | 唯讀分享碼（放 header 或 `?key=`）：只能讀，MCP 也只有讀取類工具 |
@@ -488,7 +493,7 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import` · `GET /api/import/:job` ·
-`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
+`GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
 

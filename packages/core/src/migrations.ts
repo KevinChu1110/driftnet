@@ -156,6 +156,15 @@ export const MIGRATIONS: Migration[] = [
       reindexAll(db);
     },
   },
+  {
+    version: 3,
+    description: "link health (dead / archived / stale / moved) and repo stars",
+    up(db) {
+      for (const [name, type] of [["health", "TEXT"], ["health_checked_at", "TEXT"], ["stars", "INTEGER"], ["pushed_at", "TEXT"]] as const) {
+        if (!hasColumn(db, "items", name)) db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
+      }
+    },
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

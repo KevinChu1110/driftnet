@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createDriftnet, loadPlugins, defaultDbPath, driftnetHome, loadHomeEnv } from "@driftnet/core";
+import { createDriftnet, healthFor, loadPlugins, defaultDbPath, driftnetHome, loadHomeEnv } from "@driftnet/core";
 import { startSlackSocket } from "./adapters/slack.ts";
 import { startTelegram } from "./adapters/telegram.ts";
 import { startDiscord } from "./adapters/discord.ts";
@@ -34,7 +34,7 @@ if (!/^(127\.0\.0\.1|localhost|::1|\[::1\])$/.test(HOST) && !token(env)) {
   );
 }
 const tunnel = new Tunnel(PORT);
-process.on("exit", () => tunnel.stop());
+process.on("exit", () => { tunnel.stop(); healthFor(dn.store).stop(); });
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { tunnel.stop(); process.exit(0); });
 
 const server = createApp({ dn, env, settings, tunnel, plugins, envFile, port: PORT });
@@ -50,6 +50,7 @@ server.listen(PORT, HOST, () => {
   for (const w of dn.warnings) console.warn(`⚠️  ${w}`);
   console.log(`settings: ${envFile ?? `none (create ${driftnetHome(env)}/.env, or open the page's ⚙ Settings)`}  data: ${env.DRIFTNET_DB ?? defaultDbPath(env)}`);
   if (plugins.length) console.log(`plugins: ${plugins.join(", ")}`);
+  healthFor(dn.store).start(env); // does nothing unless DRIFTNET_HEALTH=weekly (read live)
   void suggestLocalModel();
   // First run in a terminal: open the page, where ⚙ Settings walks through the rest.
   if (!envFile && process.stdout.isTTY && env.DRIFTNET_OPEN !== "0" && !env.CI) openBrowser(`http://localhost:${PORT}/`);
