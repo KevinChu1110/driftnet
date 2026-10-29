@@ -487,6 +487,10 @@ with `DRIFTNET_JUDGE=name`. See [`examples/plugins/rainbow-judge.mjs`](examples/
 
 ### Read, save and vote
 
+<a href="https://glama.ai/mcp/servers/KevinChu1110/driftnet"><img src="https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/card.svg" alt="driftnet on Glama: tool definitions rated A, 14 tools, maintenance rated A" width="380"></a>
+
+Rated A on [Glama](https://glama.ai/mcp/servers/KevinChu1110/driftnet) for every tool definition, the tool set as a whole, maintenance and license.
+
 In Claude Code, the plugin brings the skill and a local MCP server in one step:
 
 ```bash

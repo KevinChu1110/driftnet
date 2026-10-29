@@ -447,6 +447,10 @@ contains:酸種             -> cooking       # 標題或內文裡出現這個詞
 
 ### 查詢、收錄、投票
 
+<a href="https://glama.ai/mcp/servers/KevinChu1110/driftnet"><img src="https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/card.svg" alt="driftnet on Glama: tool definitions rated A, 14 tools, maintenance rated A" width="380"></a>
+
+在 [Glama](https://glama.ai/mcp/servers/KevinChu1110/driftnet) 上，每支工具的定義、整體工具組合、維護和授權都拿到 A。
+
 在 Claude Code 裡，裝插件就一次帶入 skill 和本機 MCP：
 
 ```bash
