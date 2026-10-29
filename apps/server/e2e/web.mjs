@@ -956,6 +956,52 @@ try {
     console.log("✓ 🔑 entry: a wrong password is refused, the right one unlocks editing");
   }
 
+  // Paging: 60 cards a page, then "Show more (N left)" appends the next page without rebuilding the first.
+  // Last on purpose: it adds 70 cards that would skew every count above.
+  {
+    const extra = `
+      import { Store } from "@driftnet/core";
+      const items = JSON.parse(process.env.DEMO_ITEMS);
+      const store = new Store(process.env.DEMO_DB);
+      for (let n = 0; n < 70; n++) { const i = items[n % items.length];
+        store.upsert({ url: \`https://paging.example/repo-\${n}\`, aliases: [], title: \`Paging card \${n}\`, flags: [], source: "demo", summary: i.summary,
+          judgement: { isAiTool: 1, category: i.category, kind: i.kind, worth: i.worth, engine: "llm", confidence: 1 } }); }
+    `;
+    await new Promise((resolve, reject) => {
+      const p = spawn(join(SERVER, "../../node_modules/.bin/tsx"), ["--eval", extra], {
+        cwd: SERVER, stdio: "inherit", env: { ...process.env, DEMO_DB: join(home, "driftnet.db"), DEMO_ITEMS: JSON.stringify(demo) },
+      });
+      p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error("paging seeding failed"))));
+    });
+    const more = (n) => (LANG === "zh-TW" ? `再顯示 ${n} 張` : `Show more (${n} left)`);
+    await viewport(1280, 820, false);
+    await open();
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
+    const tok = await evaluate(s, `localStorage.getItem("driftnet-token") || localStorage.getItem("driftnet-key") || ""`);
+    const head = await fetch(`http://127.0.0.1:${port}/api/items?limit=1`, { headers: tok ? { authorization: `Bearer ${tok}` } : {} });
+    const total = Number(head.headers.get("x-total-count"));
+    assert.ok(total > 60 + 1, "more cards than one page");
+    assert.equal((await head.json()).length, 1, "the body stays a plain array");
+    await waitFor(s, `document.querySelectorAll(".swipe").length === 60`, "the first page is 60 cards");
+    assert.equal(await evaluate(s, `document.querySelector("#page-more [data-page-more]").textContent`), more(total - 60), "the button counts what is left");
+    // Mark the first card: appending a page must not rebuild it.
+    await evaluate(s, `document.querySelector(".swipe").dataset.mark = "kept"`);
+    const first = await evaluate(s, `document.querySelector(".swipe").dataset.id`);
+    await evaluate(s, `document.querySelector("#page-more [data-page-more]").click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length === ${Math.min(120, total)}`, "the next page is appended");
+    assert.ok((await evaluate(s, `document.querySelectorAll(".swipe")[60] !== undefined`)), "card 61 is there");
+    assert.equal(await evaluate(s, `document.querySelector(".swipe").dataset.mark`), "kept", "page 1 was not rebuilt");
+    assert.equal(await evaluate(s, `document.querySelector(".swipe").dataset.id`), first);
+    assert.equal(await evaluate(s, `new Set([...document.querySelectorAll(".swipe")].map((e) => e.dataset.id)).size`), Math.min(120, total), "no card twice");
+    if (total > 120) assert.equal(await evaluate(s, `document.querySelector("#page-more [data-page-more]").textContent`), more(total - 120));
+    else assert.equal(await evaluate(s, `!!document.getElementById("page-more")`), false, "nothing left, no button");
+    // A new filter starts again at page 1.
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="favorites"]').click()`);
+    await evaluate(s, `document.querySelector('[data-field="view"][data-value="all"]').click()`);
+    await waitFor(s, `document.querySelectorAll(".swipe").length === 60`, "switching view resets to page 1");
+    console.log("✓ paging: 60 cards a page, Show more appends page 2 in place, a new view starts over");
+  }
+
   console.log("\nall web checks passed");
 } catch (err) {
   failed = true;
