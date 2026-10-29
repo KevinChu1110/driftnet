@@ -39,7 +39,7 @@ export interface Judgement {
   category: string;
   kind: Kind;
   worth: Worth;
-  engine: "jev" | "llm" | "heuristic";
+  engine: "jev" | "llm" | "heuristic" | "pack";
   confidence: number; // 0..1, lowest confidence among the questions
 }
 

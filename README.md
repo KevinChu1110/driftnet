@@ -213,7 +213,7 @@ With driftnet running (`npx driftnet`), the same command talks to it. `search` a
 | `driftnet search [query…] [--folder id] [--kind …] [--view inbox\|favorites\|trash] [--limit N] [--json]` | `npx driftnet search vector database --kind repo --limit 5` |
 | `driftnet open [id]` | `npx driftnet open 12` |
 | `driftnet export [--format json\|md\|vault] [-o file]` | `npx driftnet export --format vault -o links.zip` |
-| `driftnet import <file> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
+| `driftnet import <file or pack link> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
 | `driftnet status` | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 
@@ -278,6 +278,15 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   folders* to mirror them under an **Imported** folder, otherwise the classifier sorts as usual. Links you
   already have, repeats, non-web and private addresses are skipped, up to 5,000 per import. With a model
   set up, each new link is one model call, so hundreds of links mean hundreds of calls.
+- **Share a folder.** A folder's ⋯ menu → *Share as pack…* turns that folder, its sub-folders and the cards
+  in them into one JSON file (`"driftnet_pack": 1`, at most 1,000 cards and 2 MB): links, summaries, tags
+  and original picture URLs. Your notes, chat text, who shared what, counters, tokens and the share key never
+  go in, and neither do trashed or flagged cards. Download it, or copy a link (needs `DRIFTNET_PUBLIC_URL` or a
+  tunnel); on a private catalogue the link is signed for that one pack, so it opens without the share key and
+  shows nothing else. To pull one in, use Settings → Import → *From a pack link* (or `driftnet import <link>`,
+  or import the file): the folders are recreated under a top-level folder named after the pack and the cards
+  are stored as summarised, with no model call. Cards you already have keep your summary, text that looks like
+  instructions to an AI drops the card, and importing the same pack twice adds nothing.
 - **Shared links open read-only.** A card link from a chat bot or an agent carries the read-only share
   key, so it opens on a phone without a password; edit buttons appear after **Unlock** with the admin
   password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
@@ -530,9 +539,9 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
 **HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
-`POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
+`POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack` (`?s=` signed link) · `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` · `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·
 `GET|PUT /api/settings` (this machine, or with the token) · `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]` (revoke, or remove a revoked one; admin password only) · `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>

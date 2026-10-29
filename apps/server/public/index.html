@@ -607,7 +607,26 @@
     <div class="dlg-actions">
       <button class="btn danger" id="fd-delete" type="button"></button><span class="spacer"></span>
       <button class="btn" id="fd-focus" type="button" hidden></button>
+      <button class="btn" id="fd-pack" type="button" hidden></button>
       <button class="btn" id="fd-cancel" type="button"></button><button class="btn primary" id="fd-save" type="submit"></button>
+    </div>
+  </form>
+</dialog>
+<dialog id="pack-dlg" aria-labelledby="pk-title">
+  <form id="pack-form" method="dialog">
+    <h3 id="pk-title"></h3>
+    <p id="pk-help" style="color:var(--muted);font-size:13px;margin:0 0 12px"></p>
+    <p class="dlg-error" id="pk-error"></p>
+    <label><span id="pk-name-l"></span><input id="pk-name" maxlength="60" autocomplete="off"></label>
+    <label><span id="pk-desc-l"></span><textarea id="pk-desc" rows="2" maxlength="300"></textarea></label>
+    <div id="pk-link-box" hidden>
+      <label><span id="pk-link-l"></span><input id="pk-link" readonly></label>
+      <p id="pk-link-note" style="color:var(--muted);font-size:13px;margin:0 0 12px"></p>
+    </div>
+    <p id="pk-nolink" style="color:var(--muted);font-size:13px;margin:0 0 12px" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn" id="pk-copy" type="button" hidden></button><span class="spacer"></span>
+      <button class="btn" id="pk-close" type="button"></button><button class="btn primary" id="pk-download" type="button"></button>
     </div>
   </form>
 </dialog>
@@ -714,6 +733,7 @@
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
+      pkShare: "Share as pack…", pkTitle: "Share as pack", pkHelp: "A pack is this folder, its sub-folders and the cards in them as one file. Someone else imports it with one click. Your notes, chat text and counters are never included.", pkName: "Pack name", pkDesc: "Description", pkDownload: "Download pack", pkLinkL: "Link to share", pkCopy: "Copy link", pkCopied: "Link copied", pkSigned: "Anyone with this link can download this one pack, and nothing else in your catalogue.", pkOpen: "Anyone who can reach this address can download this pack.", pkNoLink: "No public address is set, so there is no link to share yet. Set one in Settings → Access, or start a tunnel. You can still download the file.", pkClose: "Close", pkTooBig: "This folder is too big to share as a pack.",
       mapAll: "All", focusCrumb: "Mind map location", focusUp: "Up one level", focusFolder: "Focus on this folder", mapTree: "Mind map",
       mapHintFocus: "Double-click a folder (or press z on it) to focus on it.",
       kTreeNav: "Mind map: next / previous node", kTreeOpen: "Open a folder, or step into it", kTreeClose: "Close a folder, or step out to its parent", kTreeEnds: "First / last node", kTreeType: "Type a name", kTreeTypeText: "Jump to the node starting with it",
@@ -766,6 +786,7 @@
         locked: "set by the environment driftnet runs in", forbidden: "Server settings can only be changed on the computer running driftnet (or set DRIFTNET_TOKEN). Display settings still work.",
         savedServer: "Saved — already in effect", chat: "Chat replies", webhook: "Outgoing webhook", digest: "Scheduled digest", feed: "Feed (RSS)", genCopied: "New password generated and copied — press Save to keep it",
         tabGeneral: "General", tabAccess: "Access", tabAi: "AI",
+        impPackTitle: "From a pack link", impPackHelp: "Paste the link someone sent you for a folder pack. It comes in already summarised (no model calls), under its own folder.", impPackGo: "Check link", impPackConfirm: (name, n, dup) => `Pack “${name}”: ${n} new cards (${dup} already there). Import it?`, impPackNone: (name, dup) => `Pack “${name}” has nothing new (${dup} already there). Import anyway to file them?`, impPackDone: (name, added, already) => `Imported “${name}”: ${added} added, ${already} already there.`,
         impTitle: "Import bookmarks", impHelp: "Bring in a bookmarks file from your browser (HTML), Pocket, Raindrop (CSV), a driftnet JSON list, or any text with links.",
         impFile: "Choose a file", impKeep: "Keep my bookmark folders (under Imported)", impReading: "Reading the file…",
         impConfirm: (n, dup) => `Import ${n} links (${dup} already there)? With a model set up, each new link is one model call.`,
@@ -868,6 +889,7 @@
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
+      pkShare: "分享成資料夾包…", pkTitle: "分享成資料夾包", pkHelp: "資料夾包把這個資料夾、底下的子資料夾和裡面的卡片包成一個檔案，別人一鍵就能匯入。你的筆記、聊天內容和各種計數都不會放進去。", pkName: "資料夾包名稱", pkDesc: "說明", pkDownload: "下載資料夾包", pkLinkL: "分享連結", pkCopy: "複製連結", pkCopied: "已複製連結", pkSigned: "拿到這個連結的人只能下載這一個資料夾包，看不到你目錄裡的其他內容。", pkOpen: "任何連得到這個位址的人都能下載這個資料夾包。", pkNoLink: "還沒設定公開網址，所以暫時沒有可分享的連結。請到「設定 → 存取」設定，或啟動通道。現在仍可以下載檔案。", pkClose: "關閉", pkTooBig: "這個資料夾太大，無法分享成資料夾包。",
       mapAll: "全部", focusCrumb: "樹狀圖位置", focusUp: "回上一層", focusFolder: "聚焦這個資料夾", mapTree: "樹狀圖",
       mapHintFocus: "連點兩下資料夾（或在資料夾上按 z）可以只看這個資料夾。",
       kTreeNav: "樹狀圖：下一個／上一個節點", kTreeOpen: "展開資料夾，或進入第一個子項", kTreeClose: "收合資料夾，或回到上一層", kTreeEnds: "第一個／最後一個節點", kTreeType: "直接輸入名稱", kTreeTypeText: "跳到名稱開頭相符的節點",
@@ -920,6 +942,7 @@
         locked: "由執行環境設定", forbidden: "伺服器設定只能在執行 driftnet 的那台電腦上改（或設定 DRIFTNET_TOKEN）。顯示設定照常可用。",
         savedServer: "已儲存，馬上生效", chat: "聊天室回覆", webhook: "對外 Webhook", digest: "定時摘要", feed: "訂閱源（RSS）", genCopied: "已產生新密碼並複製，按「儲存」才會生效",
         tabGeneral: "一般", tabAccess: "存取", tabAi: "AI",
+        impPackTitle: "從資料夾包連結匯入", impPackHelp: "貼上別人傳給你的資料夾包連結。卡片已經整理好（不會呼叫模型），會放進它自己的資料夾。", impPackGo: "檢查連結", impPackConfirm: (name, n, dup) => `資料夾包「${name}」：${n} 張新卡片（${dup} 張已經有了）。要匯入嗎？`, impPackNone: (name, dup) => `資料夾包「${name}」沒有新的卡片（${dup} 張已經有了）。仍要匯入把它們歸檔嗎？`, impPackDone: (name, added, already) => `已匯入「${name}」：新增 ${added}、原本就有 ${already}。`,
         impTitle: "匯入書籤", impHelp: "匯入瀏覽器的書籤檔（HTML）、Pocket、Raindrop（CSV）、driftnet 的 JSON 清單，或任何含有連結的文字檔。",
         impFile: "選擇檔案", impKeep: "保留我的書籤資料夾（放在「Imported」底下）", impReading: "讀取檔案中…",
         impConfirm: (n, dup) => `匯入 ${n} 個連結（${dup} 個已經有了）？若已設定模型，每個新連結都會呼叫一次模型。`,
@@ -1278,6 +1301,9 @@
     const fb = $("fd-focus");
     fb.hidden = !id || state.view !== "map" || id === mapFocus;
     fb.textContent = t.focusFolder;
+    const pb = $("fd-pack");
+    pb.hidden = !id;
+    pb.textContent = t.pkShare;
     $("fd-cancel").textContent = t.cancel;
     $("fd-save").textContent = t.save;
     $("fd-error").textContent = "";
@@ -1323,6 +1349,67 @@
       return null;
     }
   }
+
+  // ── Share a folder as a pack: name it, download it, or copy a link ─────────
+  let packFolder = null, packLink = null;
+  /** The link with the name and description the reader typed (the signature covers only the folder). */
+  function packUrl() {
+    if (!packLink?.url) return "";
+    const u = new URL(packLink.url);
+    if ($("pk-name").value.trim()) u.searchParams.set("name", $("pk-name").value.trim());
+    if ($("pk-desc").value.trim()) u.searchParams.set("description", $("pk-desc").value.trim());
+    return u.href;
+  }
+  $("fd-pack").onclick = async () => {
+    const t = T(), id = editing, f = id ? folderById(id) : null;
+    if (!f) return;
+    $("folder-dlg").close();
+    packFolder = id; packLink = null;
+    $("pk-title").textContent = `${t.pkTitle}: ${catLabel(id)}`;
+    $("pk-help").textContent = t.pkHelp;
+    $("pk-name-l").textContent = t.pkName; $("pk-desc-l").textContent = t.pkDesc; $("pk-link-l").textContent = t.pkLinkL;
+    $("pk-name").value = catLabel(id); $("pk-desc").value = f.description ?? "";
+    $("pk-download").textContent = t.pkDownload; $("pk-close").textContent = t.pkClose; $("pk-copy").textContent = t.pkCopy;
+    $("pk-error").textContent = "";
+    $("pk-link-box").hidden = true; $("pk-copy").hidden = true; $("pk-nolink").hidden = true;
+    $("pack-dlg").showModal();
+    try {
+      packLink = await api(`/api/folders/${encodeURIComponent(id)}/pack-link`);
+    } catch { packLink = null; }
+    if (packFolder !== id || !$("pack-dlg").open) return;
+    if (packLink?.url) {
+      $("pk-link-box").hidden = false; $("pk-copy").hidden = false;
+      $("pk-link-note").textContent = packLink.signed ? t.pkSigned : t.pkOpen;
+      $("pk-link").value = packUrl();
+    } else {
+      $("pk-nolink").hidden = false; $("pk-nolink").textContent = t.pkNoLink;
+    }
+  };
+  for (const id of ["pk-name", "pk-desc"]) $(id).addEventListener("input", () => { if (packLink?.url) $("pk-link").value = packUrl(); });
+  $("pk-link").onfocus = () => $("pk-link").select();
+  $("pk-copy").onclick = async () => {
+    await navigator.clipboard?.writeText($("pk-link").value).catch(() => {});
+    toast(T().pkCopied);
+  };
+  $("pk-close").onclick = () => $("pack-dlg").close();
+  $("pk-download").onclick = async () => {
+    const q = new URLSearchParams();
+    if ($("pk-name").value.trim()) q.set("name", $("pk-name").value.trim());
+    if ($("pk-desc").value.trim()) q.set("description", $("pk-desc").value.trim());
+    const token = store.get("driftnet-token") || store.get("driftnet-key");
+    try {
+      const res = await fetch(`/api/folders/${encodeURIComponent(packFolder)}/pack?${q}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+      if (res.status === 401) { $("pk-error").textContent = T().needPassword; return; }
+      if (!res.ok) { $("pk-error").textContent = res.status === 413 ? T().pkTooBig : T().failed; return; }
+      const blob = await res.blob();
+      const m = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = m?.[1] ?? "folder.driftnet-pack.json";
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch { $("pk-error").textContent = T().failed; }
+  };
 
   // ── Move a card: picker (phones) or drag onto the sidebar (desktop) ───────
   let moving = null, movingMany = null;
@@ -1590,14 +1677,17 @@
     $("st-body").querySelector('[data-tab-btn][aria-selected="true"]')?.focus();
   }
   /** Settings › Import bookmarks: pick a file, preview the counts (dry run), confirm, then watch the job. */
-  let importContent = "", importTimer = null;
+  let importContent = "", importUrl = "", importPack = null, importTimer = null;
   function importPanel() {
     const st = T().st;
-    importContent = ""; clearInterval(importTimer);
+    importContent = ""; importUrl = ""; importPack = null; clearInterval(importTimer);
     return `<fieldset class="set-group" id="import-panel"><legend>${esc(st.impTitle)}</legend>
       <small>${esc(st.impHelp)}</small>
       <label class="set-row"><span>${esc(st.impFile)}</span><input type="file" id="im-file" accept=".html,.htm,.csv,.json,.txt,.md"></label>
       <label class="set-row check"><input type="checkbox" id="im-keep"><span>${esc(st.impKeep)}</span></label>
+      <small>${esc(st.impPackHelp)}</small>
+      <label class="set-row"><span>${esc(st.impPackTitle)}</span><input type="url" id="im-url" placeholder="https://…/api/folders/…/pack" autocomplete="off"></label>
+      <div><button class="btn" type="button" id="im-url-go">${esc(st.impPackGo)}</button></div>
       <p class="set-status" id="im-status" role="status" aria-live="polite"></p>
       <div><button class="btn primary" type="button" id="im-start" hidden>${esc(st.impStart)}</button></div></fieldset>`;
   }
@@ -1611,7 +1701,7 @@
   $("st-body").addEventListener("change", async (e) => {
     if (e.target.id !== "im-file") return;
     const st = T().st, out = $("im-status"), go = $("im-start");
-    go.hidden = true; importContent = ""; clearInterval(importTimer);
+    go.hidden = true; importContent = ""; importUrl = ""; importPack = null; clearInterval(importTimer);
     const file = e.target.files?.[0];
     if (!file) { out.textContent = ""; return; }
     out.textContent = st.impReading;
@@ -1631,11 +1721,28 @@
     go.hidden = !d.total;
   });
   $("st-body").addEventListener("click", async (e) => {
+    if (e.target.id !== "im-url-go") return;
+    const st = T().st, out = $("im-status"), go = $("im-start");
+    go.hidden = true; importContent = ""; importUrl = ""; importPack = null; clearInterval(importTimer);
+    const url = $("im-url").value.trim();
+    if (!url) return;
+    out.textContent = st.impReading;
+    const r = await importCall({ url, dryRun: true });
+    if (!r || r.status !== 200) { out.textContent = r?.body?.error ?? T().failed; return; }
+    const d = r.body;
+    importUrl = url; importPack = d.pack ?? null;
+    out.textContent = d.total ? st.impPackConfirm(d.pack?.name ?? "", d.total, d.duplicates) : st.impPackNone(d.pack?.name ?? "", d.duplicates);
+    if (d.skipped) out.textContent += " " + st.impSkipped(d.skipped);
+    go.hidden = false;
+  });
+  $("st-body").addEventListener("click", async (e) => {
     if (e.target.id !== "im-start") return;
     const st = T().st, out = $("im-status"), go = $("im-start");
     go.hidden = true;
-    const r = await importCall({ content: importContent, folders: $("im-keep").checked ? "keep" : "none" });
-    importContent = "";
+    const fromPack = !!importUrl;
+    const r = await importCall(fromPack ? { url: importUrl } : { content: importContent, folders: $("im-keep").checked ? "keep" : "none" });
+    const pack = importPack;
+    importContent = ""; importUrl = ""; importPack = null;
     if (!r) { out.textContent = T().failed; return; }
     if (r.status === 409) { out.textContent = st.impBusy; return; }
     if (r.status !== 202) { out.textContent = r.body?.error ?? T().failed; return; }
@@ -1649,11 +1756,13 @@
       if (p.state === "running") out.textContent = st.impProgress(p.done, p.total, p.added, p.failed);
       else {
         clearInterval(importTimer);
-        out.textContent = p.state === "done" ? st.impDone(p.total, p.added, p.already, p.failed) : st.impFailedRun;
+        out.textContent = p.state !== "done" ? st.impFailedRun : pack ? st.impPackDone(pack.name, p.added, p.already) : st.impDone(p.total, p.added, p.already, p.failed);
         if (p.state === "done" && p.added) load();
       }
     };
     importTimer = setInterval(tick, 2000);
+    // A pack is done by the time the server answers: don't make the reader wait for the first tick.
+    if (fromPack) tick();
   });
   let settingsOpener = null;
   $("settings-dlg").addEventListener("close", () => { if (settingsOpener?.isConnected) settingsOpener.focus(); });

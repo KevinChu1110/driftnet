@@ -219,15 +219,17 @@ interface JobState { state: "running" | "done" | "failed"; total: number; done: 
 export async function importCmd(ctx: Ctx, argv: string[]): Promise<number> {
   return guarded(ctx, async () => {
     const { positional, flags } = parseArgs(argv, { bool: ["keep-folders", "yes"] });
-    if (positional.length !== 1) throw new UsageError("usage: driftnet import <file> [--keep-folders] [--yes]");
-    let content: string;
-    try { content = readFileSync(positional[0]!, "utf8"); } catch (e) {
+    if (positional.length !== 1) throw new UsageError("usage: driftnet import <file or pack link> [--keep-folders] [--yes]");
+    // A link is a folder pack to pull in (the server fetches it); anything else is a file to read.
+    let src: { url: string } | { content: string };
+    if (/^https?:\/\//i.test(positional[0]!)) src = { url: positional[0]! };
+    else try { src = { content: readFileSync(positional[0]!, "utf8") }; } catch (e) {
       ctx.err(`driftnet: cannot read ${positional[0]}: ${(e as NodeJS.ErrnoException).code ?? e}`);
       return 1;
     }
     const c = conn(ctx, flags);
     const folders = flags["keep-folders"] ? "keep" : "none";
-    const preview = ok<Counts>(await call(c, ctx.fetch, "POST", "/api/import", { json: { content, folders, dryRun: true } }));
+    const preview = ok<Counts>(await call(c, ctx.fetch, "POST", "/api/import", { json: { ...src, folders, dryRun: true } }));
     // total is what will be imported: duplicates and skipped links are already left out of it.
     ctx.out(`${preview.total + preview.duplicates + preview.skipped} links found: ${preview.total} new, ${preview.duplicates} already saved, ${preview.skipped} skipped.`);
     if (preview.total <= 0) { ctx.out("nothing new to import."); return 0; }
@@ -235,7 +237,7 @@ export async function importCmd(ctx: Ctx, argv: string[]): Promise<number> {
       if (!ctx.isTTY) { ctx.err("driftnet: not a terminal, so I can't ask. Re-run with --yes to import."); return 1; }
       if (!(await ctx.confirm("Import these links?"))) { ctx.err("cancelled."); return 1; }
     }
-    const started = await call(c, ctx.fetch, "POST", "/api/import", { json: { content, folders } });
+    const started = await call(c, ctx.fetch, "POST", "/api/import", { json: { ...src, folders } });
     if (started.status === 409) { ctx.err("driftnet: an import is already running; wait for it to finish."); return 1; }
     const { job } = ok<{ job: string }>(started, [200, 202]);
     let last = "";

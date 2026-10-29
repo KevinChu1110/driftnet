@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { isPublicAddress } from "./extractors/net.ts";
+import { isPackJson, parsePack, type PackFolder, type PackItem, type ParsedPack } from "./pack.ts";
 import type { Pipeline } from "./pipeline.ts";
 import { FolderError, type Store } from "./store.ts";
 import { canonicalize, extractUrls } from "./url.ts";
@@ -9,8 +10,8 @@ import { canonicalize, extractUrls } from "./url.ts";
  * a browser's bookmarks file (Netscape HTML), Pocket (HTML or CSV), Raindrop (CSV),
  * a JSON list like the one `GET /api/items` returns, or any text with links in it.
  */
-export type ImportFormat = "html" | "pocket" | "raindrop" | "json" | "text";
-export const IMPORT_FORMATS: readonly ImportFormat[] = ["html", "pocket", "raindrop", "json", "text"];
+export type ImportFormat = "html" | "pocket" | "raindrop" | "json" | "text" | "pack";
+export const IMPORT_FORMATS: readonly ImportFormat[] = ["html", "pocket", "raindrop", "json", "text", "pack"];
 /** Most links one import takes; the rest are left out and reported. */
 export const IMPORT_CAP = 5000;
 
@@ -22,6 +23,8 @@ export interface ImportEntry {
   folderPath?: string[];
   /** ISO time the bookmark was made (read from the file; the catalogue stamps its own). */
   addedAt?: string;
+  /** A card from a folder pack: already summarised, so it is stored as given and no model is called. */
+  pack?: PackItem;
 }
 
 // ---------- small helpers ----------
@@ -197,7 +200,7 @@ export function parseText(src: string): ImportEntry[] {
 export function detectFormat(src: string): ImportFormat {
   const head = src.replace(/^﻿/, "").trimStart();
   if (/^[[{]/.test(head)) {
-    try { JSON.parse(head); return "json"; } catch { /* maybe text that starts with a bracket */ }
+    try { return isPackJson(JSON.parse(head)) ? "pack" : "json"; } catch { /* maybe text that starts with a bracket */ }
   }
   if (/<(dt|a)\b[^>]*>/i.test(head.slice(0, 200_000)) && /<a\b[^>]*\bhref\s*=/i.test(head)) return /\btime_added\s*=/i.test(head) ? "pocket" : "html";
   const first = head.split(/\r?\n/, 1)[0]!.toLowerCase().split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
@@ -205,8 +208,12 @@ export function detectFormat(src: string): ImportFormat {
   return "text";
 }
 
-export function parseImport(content: string, format: ImportFormat | "auto" = "auto"): { format: ImportFormat; entries: ImportEntry[] } {
+export function parseImport(content: string, format: ImportFormat | "auto" = "auto"): { format: ImportFormat; entries: ImportEntry[]; pack?: ParsedPack } {
   const f = format === "auto" ? detectFormat(content) : format;
+  if (f === "pack") {
+    const pack = parsePack(content);
+    return { format: f, pack, entries: pack.pack.items.map((p) => ({ url: p.url, title: p.name, folderPath: p.folder, pack: p })) };
+  }
   const entries = f === "json" ? parseJson(content)
     : f === "html" ? parseHtml(content)
     : f === "text" ? parseText(content)
@@ -311,5 +318,85 @@ export async function runImport(
     }
   };
   await Promise.all([worker(), worker()]);
+  return progress;
+}
+
+// ---------- folder packs ----------
+
+/** Finds or makes a folder of this name under `parent` (case-insensitive), so importing a pack twice reuses its folders. */
+function findOrMake(store: Store, parent: string | null, name: string, description: string): string | null {
+  const found = store.folders().find((f) => (f.parent ?? null) === parent && f.name?.toLowerCase() === name.toLowerCase());
+  if (found) return found.id;
+  try {
+    return store.createFolder({ name, description, parent }).id;
+  } catch (err) {
+    // A name the tree refuses (it clashes with a built-in shelf, e.g. "Other"): keep what we have so far.
+    if (!(err instanceof FolderError)) throw err;
+    return null;
+  }
+}
+
+/**
+ * Take a pack in: the folder tree under a top-level folder named after the pack (existing folders of the
+ * same name are reused), the cards stored exactly as the pack summarised them. No page is fetched and no
+ * model is called. A link the catalogue already has keeps its own summary; it is only filed into the pack's
+ * folder if it was never filed anywhere by hand. Importing the same pack again changes nothing.
+ */
+export function runPackImport(store: Store, parsed: ParsedPack, progress: ImportProgress): ImportProgress {
+  const { pack } = parsed;
+  const ids = new Map<string, string>();
+  const root = findOrMake(store, null, pack.name, pack.description) ?? "other";
+  const walk = (f: PackFolder, parent: string, path: string[]) => {
+    for (const c of f.children) {
+      const id = findOrMake(store, parent, c.name, c.description) ?? parent;
+      ids.set([...path, c.name].join("\u0000"), id);
+      walk(c, id, [...path, c.name]);
+    }
+  };
+  ids.set("", root);
+  walk(pack.folders, root, []);
+  const folderFor = (path: string[]): string => {
+    // A path the tree doesn't list (hand-edited pack): make the folders it needs.
+    let id = root;
+    for (let i = 0; i < path.length; i++) {
+      const key = path.slice(0, i + 1).join("\u0000");
+      let next = ids.get(key);
+      if (!next) { next = findOrMake(store, id, path[i]!, "") ?? id; ids.set(key, next); }
+      id = next;
+    }
+    return id;
+  };
+  store.transaction(() => {
+    for (const p of pack.items) {
+      progress.done++;
+      try {
+        const url = canonicalize(p.url);
+        if (!url || privateHost(url)) { progress.failed++; continue; }
+        const folder = folderFor(p.folder);
+        const existing = store.findByUrl(url);
+        if (existing) {
+          progress.already++;
+          if (!existing.placed && !existing.trashedAt) store.moveItems([existing.id], folder, "pack");
+          continue;
+        }
+        const hasSummary = !!(p.one_liner || p.highlights.length);
+        const item = store.upsert({
+          url, aliases: [], title: p.name,
+          judgement: { isAiTool: 0.5, category: folder, kind: p.kind, worth: p.worth, engine: "pack", confidence: 1 },
+          summary: hasSummary ? {
+            name: p.name, oneLiner: p.one_liner, highlights: p.highlights, useCases: [], tags: p.tags,
+            ...(p.demo ? { demo: p.demo } : {}), ...(p.why ? { why: p.why } : {}), ...(p.try_it ? { tryIt: p.try_it } : {}),
+          } : null,
+          flags: [], source: "pack",
+          ...(p.media?.length ? { media: p.media } : {}),
+        });
+        store.moveItems([item.id], folder, "pack");
+        progress.added++;
+      } catch (err) {
+        progress.failed++;
+        if (progress.errors.length < 10) progress.errors.push(`${p.url}: ${(err as Error).message}`.slice(0, 300));
+      }
+    }
+  });
   return progress;
 }

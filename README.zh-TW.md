@@ -208,7 +208,7 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 | `driftnet search [關鍵字…] [--folder id] [--kind …] [--view inbox\|favorites\|trash] [--limit N] [--json]` | `npx driftnet search 向量資料庫 --kind repo --limit 5` |
 | `driftnet open [id]` | `npx driftnet open 12` |
 | `driftnet export [--format json\|md\|vault] [-o 檔案]` | `npx driftnet export --format vault -o links.zip` |
-| `driftnet import <檔案> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
+| `driftnet import <檔案或資料夾包連結> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
 | `driftnet status` | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 
@@ -255,6 +255,12 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
   Raindrop CSV、JSON 連結清單，或任何含連結的文字／Markdown。開始前會先告訴你有多少是新的；勾選「保留我的書籤資料夾」會照原樣放進
   **Imported** 資料夾，不勾就交給分類器照常整理。已經有的、重複的、非網頁與內網位址會略過，一次最多 5,000 個。
   若已設定模型，每個新連結都會呼叫一次模型，幾百個連結就是幾百次。
+- **分享資料夾。**資料夾的 ⋯ 選單 →「分享成資料夾包…」會把該資料夾、底下的子資料夾和裡面的卡片包成一個 JSON 檔
+  （`"driftnet_pack": 1`，最多 1,000 張卡片、2 MB）：連結、摘要、標籤與圖片原始網址。你的筆記、聊天內容、誰分享了什麼、各種計數、
+  token 與分享碼都不會放進去，已丟垃圾桶或被標記的卡片也不會。可以直接下載，或複製連結（需要設定 `DRIFTNET_PUBLIC_URL` 或通道）；
+  私人目錄的連結是針對這一個資料夾包簽名的，不用分享碼就能開，而且看不到其他東西。要匯入別人的，用設定 → 匯入 →「從資料夾包連結匯入」
+  （或 `driftnet import <連結>`，或直接匯入檔案）：資料夾會重建在以包名命名的頂層資料夾底下，卡片照原摘要存入，不會呼叫模型。
+  你已經有的卡片保留你自己的摘要，含有「像在對 AI 下指令」文字的卡片會被丟掉，同一個包匯入兩次不會多出東西。
 - **分享出去的連結是唯讀的。**聊天機器人和 agent 給你的卡片連結帶著唯讀分享碼，手機點開不用密碼；按「解鎖編輯」輸入管理密碼後，
   才會出現編輯按鈕。忘記密碼的話，到跑 driftnet 的那台電腦打開網頁，設定裡可以直接設新的。
 - **鍵盤。**`⌘K`／`Ctrl+K` 開指令面板（跳到資料夾或卡片、切換檢視、匯出、設定……）。`j`／`k` 上下一張、`f` 最愛、`m` 移動（打字找資料夾）、`n` 筆記、`#` 垃圾桶、`x` 選取、`z` 復原、`/` 搜尋、`g m` 樹狀圖、`?` 看全部快捷鍵。
@@ -491,9 +497,9 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
 **HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
-`POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `POST /api/ingest` ·
+`POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack`（`?s=` 簽名連結）· `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
-`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import` · `GET /api/import/:job` ·
+`PUT /api/items/:id/note` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·
 `GET|PUT /api/settings`（限本機，或帶 token）· `GET|POST /api/agent-tokens` · `DELETE /api/agent-tokens/:id[?purge=1]`（撤銷，或移除已撤銷的；限管理密碼）· `GET /api/categories` · `POST /api/items/:id/refresh` · `POST /api/items/:id/health` · `POST /api/folders/template` · `GET /llms.txt` · `GET /feed.xml` · `GET /openapi.json` · `/mcp`
 
 </details>
