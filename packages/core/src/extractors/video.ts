@@ -24,10 +24,13 @@ import { isPublicAddress } from "./net.ts";
  * private/local hosts refused before a URL reaches yt-dlp.
  */
 
-export type VideoMode = "off" | "auto";
+/** off: never; captions: only what yt-dlp reports (no download, no OCR, no speech model: light on a battery); auto: everything installed. */
+export type VideoMode = "off" | "captions" | "auto";
 
-export const videoMode = (env: NodeJS.ProcessEnv = process.env): VideoMode =>
-  env.DRIFTNET_VIDEO?.trim().toLowerCase() === "off" ? "off" : "auto";
+export const videoMode = (env: NodeJS.ProcessEnv = process.env): VideoMode => {
+  const v = env.DRIFTNET_VIDEO?.trim().toLowerCase();
+  return v === "off" || v === "captions" ? v : "auto";
+};
 
 // --- limits ------------------------------------------------------------------------------------
 
@@ -365,7 +368,7 @@ export async function readVideo(url: string, page: string, dir: string, deps: Re
       reading.steps.push("captions");
     }
   }
-  if (have() >= ENOUGH_TOKENS || !tools.ffmpeg) return reading;
+  if (have() >= ENOUGH_TOKENS || !tools.ffmpeg || videoMode(deps.env) === "captions") return reading;
   if (!tools.tesseract && !tools.whisper) return reading;
 
   // 2. the video itself, lowest quality that is still legible (>= 360p when offered), capped in size and length.

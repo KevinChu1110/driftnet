@@ -167,6 +167,15 @@ test("thin captions: OCR runs, then speech; steps and sections recorded in order
   assert.ok(r.digest.text.includes("npm i -g cursor-agent"));
 });
 
+test("DRIFTNET_VIDEO=captions: thin captions still stop after yt-dlp, no download, OCR or speech", async () => {
+  const r = await run(digest(), {
+    info: { title: "x", description: "" }, captions: "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhi\n", video: true,
+    ocr: ["Cursor"], speech: "This tool is called Cursor agent.",
+  }, { env: { DRIFTNET_VIDEO: "captions" } });
+  assert.deepEqual(r.flags, ["video-read", "video-captions"]);
+  assert.deepEqual(r.calls.map((c) => c.bin), ["/t/yt-dlp"]);
+});
+
 test("plenty of on-screen text skips speech", async () => {
   const r = await run(digest(), { info: {}, video: true, ocr: [Array.from({ length: 30 }, (_, i) => `Feature number ${i} of the tool`).join("\n")], speech: "never read" });
   assert.deepEqual(r.flags, ["video-read", "video-ocr"]);

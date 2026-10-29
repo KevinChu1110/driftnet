@@ -52,7 +52,7 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_HEALTH", group: "rules", choices: ["", "off", "weekly"] },
   { key: "DRIFTNET_REPLY_STYLE", group: "chat", choices: ["", "rich", "text"] },
   // Video understanding (captions, on-screen text, speech) with local tools; see README "Reels and shorts".
-  { key: "DRIFTNET_VIDEO", group: "rules", choices: ["", "auto", "off"] },
+  { key: "DRIFTNET_VIDEO", group: "rules", choices: ["", "auto", "captions", "off"] },
   { key: "DRIFTNET_YTDLP", group: "rules", max: 500 },
   { key: "DRIFTNET_FFMPEG", group: "rules", max: 500 },
   { key: "DRIFTNET_TESSERACT", group: "rules", max: 500 },
