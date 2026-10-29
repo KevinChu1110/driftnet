@@ -81,5 +81,11 @@
   },
   "worth_must_see": {
     "message": "★ 必看"
+  },
+  "httpsRequired": {
+    "message": "只有 localhost 可以使用 http，其他伺服器請改用 https:// 網址。"
+  },
+  "tokenRejected": {
+    "message": "伺服器拒絕了這個 token（HTTP 401），請檢查。"
   }
 }

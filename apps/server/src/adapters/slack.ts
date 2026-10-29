@@ -38,7 +38,8 @@ export function onSlackEvent(dn: Driftnet, ev: any, botToken: string): void {
   if (ev?.type !== "message" || ev.subtype || ev.bot_id || !ev.text) return;
   // Slack wraps links as <https://x|label>; unwrap before extracting.
   const text = String(ev.text).replace(/<(https?:\/\/[^|>]+)(?:\|[^>]*)?>/g, "$1");
-  handleChatText(dn, text, { platform: "slack", chatId: ev.channel, userId: ev.user })
+  Promise.resolve()
+    .then(() => handleChatText(dn, text, { platform: "slack", chatId: ev.channel, userId: ev.user }))
     .then(async (reply) => {
       if (!reply) return;
       await fetch(api("chat.postMessage"), {
@@ -72,11 +73,15 @@ export function startSlackSocket(dn: Driftnet, appToken: string, botToken: strin
       if (!res.ok || !res.url) throw new Error(res.error ?? "no socket URL");
       ws = new WebSocket(res.url);
       ws.onmessage = (msg) => {
-        const envelope = JSON.parse(String(msg.data)) as { type: string; envelope_id?: string; payload?: any };
-        // Acknowledge first: Slack redelivers anything not acked within 3 s.
-        if (envelope.envelope_id) ws?.send(JSON.stringify({ envelope_id: envelope.envelope_id }));
-        if (envelope.type === "events_api") onSlackEvent(dn, envelope.payload?.event, botToken);
-        if (envelope.type === "disconnect") ws?.close();
+        try {
+          const envelope = JSON.parse(String(msg.data)) as { type: string; envelope_id?: string; payload?: any };
+          // Acknowledge first: Slack redelivers anything not acked within 3 s.
+          if (envelope.envelope_id) ws?.send(JSON.stringify({ envelope_id: envelope.envelope_id }));
+          if (envelope.type === "events_api") onSlackEvent(dn, envelope.payload?.event, botToken);
+          if (envelope.type === "disconnect") ws?.close();
+        } catch (err) {
+          console.warn("[slack] socket message:", (err as Error).message);
+        }
       };
       ws.onopen = () => console.log("[slack] socket mode connected");
       ws.onclose = () => setTimeout(() => void connect(), 2000);

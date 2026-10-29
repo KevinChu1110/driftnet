@@ -1,8 +1,8 @@
 import { extractUrls, messages, renderLink, renderText, type Driftnet, type ShareContext } from "@driftnet/core";
 import { shareBase } from "../access.ts";
 
-/** "👍 12", "+12", "👎12 太舊了", "-12 spam" */
-const VOTE_RE = /^\s*(👍|👎|\+|-)\s*#?(\d+)\s*(.*)$/su;
+/** "👍 12", "👎#12 太舊了", "+#12", "-#12 wrong tool" — a bare "+1 for this" or "-3 degrees" is just chat. */
+const VOTE_RE = /^\s*(?:(👍|👎)\s*#?|([+-])#)(\d+)(?:\s+(.{0,200}))?\s*$/su;
 
 /**
  * Platform-independent message handling. Returns the reply text, or null to stay
@@ -14,12 +14,12 @@ export async function handleChatText(
   ctx: Omit<ShareContext, "note">,
 ): Promise<string | null> {
   const t = messages();
-  const vote = VOTE_RE.exec(text);
+  const vote = extractUrls(text).length === 0 ? VOTE_RE.exec(text) : null;
   if (vote) {
-    const id = Number(vote[2]);
+    const id = Number(vote[3]);
     if (!dn.store.get(id)) return t.noItem(id);
-    const up = vote[1] === "👍" || vote[1] === "+";
-    dn.store.vote(id, up ? 1 : -1, `${ctx.platform}:${ctx.userId ?? ctx.chatId}`, vote[3]?.trim() || undefined);
+    const up = (vote[1] ?? vote[2]) !== "👎" && vote[2] !== "-";
+    dn.store.vote(id, up ? 1 : -1, `${ctx.platform}:${ctx.userId ?? ctx.chatId}`, vote[4]?.trim() || undefined);
     return up ? t.votedUp(id) : t.votedDown(id);
   }
 

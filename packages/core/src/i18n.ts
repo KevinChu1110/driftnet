@@ -15,7 +15,7 @@ const MESSAGES = {
     footer: (id: number) => `#${id} · reply 👍${id} / 👎${id}`,
     noItem: (id: number) => `No item #${id}.`,
     votedUp: (id: number) => `👍 #${id}`,
-    votedDown: (id: number) => `👎 #${id} — noted, similar items will cost less next time`,
+    votedDown: (id: number) => `👎 #${id} — noted, similar items will be skipped sooner`,
     locale: "en",
   },
   "zh-TW": {
@@ -30,7 +30,7 @@ const MESSAGES = {
     footer: (id: number) => `#${id} · 回覆 👍${id} / 👎${id}`,
     noItem: (id: number) => `找不到 #${id}。`,
     votedUp: (id: number) => `👍 #${id}`,
-    votedDown: (id: number) => `👎 #${id} — 收到，之後類似的內容會少花一點`,
+    votedDown: (id: number) => `👎 #${id} — 收到，之後類似的內容會更早被略過`,
     locale: "zh-TW",
   },
 } as const;
