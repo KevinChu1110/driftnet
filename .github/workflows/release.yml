@@ -50,7 +50,7 @@ jobs:
 
       - name: Wait until npm serves it
         run: |
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             [ "$(npm view driftnet@$VERSION version 2>/dev/null)" = "$VERSION" ] && exit 0
             sleep 10
           done
