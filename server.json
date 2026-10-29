@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.KevinChu1110/driftnet",
   "title": "driftnet",
-  "description": "Search, save and rate AI tools people shared in chats. Local catalogue, any model or none.",
+  "description": "A local catalogue of the links your chats share: search, save and file them. Any model, or none.",
   "repository": { "url": "https://github.com/KevinChu1110/driftnet", "source": "github" },
   "websiteUrl": "https://github.com/KevinChu1110/driftnet",
   "version": "0.8.0",

@@ -129,5 +129,10 @@ function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { jud
 }
 
 function readKeyFile(path: string): string | undefined {
-  return existsSync(path) ? readFileSync(path, "utf8").trim() || undefined : undefined;
+  // A key file we may not read (sandbox, container, wrong owner) means "no key", not a crash at start.
+  try {
+    return readFileSync(path, "utf8").trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }

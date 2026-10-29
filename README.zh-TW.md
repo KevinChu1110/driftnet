@@ -23,12 +23,13 @@
 
 ## 📖 這是什麼
 
-在 Threads、Facebook、X、YouTube 看到好用的 AI 工具，貼到某個地方說「之後再看」。兩百個連結之後，再也沒人看。
+每天，社群動態像浪潮一樣捲過無數好文章、開源專案和好工具。你隨手貼進聊天室說「之後再看」，
+結果它們跟著浪潮漂走，再也沒看過。
 
-**driftnet 幫你接住這些連結。** 動態消息像一條水流，好東西只漂過一次就不見了；driftnet 是你放進水流裡的那張網。
-丟進聊天室（LINE、Slack、Discord、Telegram）、按一下 Chrome 擴充，或交給你的 agent 都可以。driftnet 會追到每個連結
-真正介紹的工具，分類，用你的語言寫一段簡短說明，放到可以搜尋的網頁上。repo、文章和影片也一樣處理。
-它跑在你自己的電腦上，可以接任何模型，也可以完全不接；你的 agent 也能透過 MCP 讀同一份清單。
+**driftnet 是你放進這片資訊海裡的漂流網。** 丟進群組（LINE、Slack、Discord、Telegram）、按一下 Chrome 擴充、
+匯入舊書籤，或用指令列都可以。driftnet 攔下每個漂過的連結，追到貼文真正介紹的專案本體，濾掉雜訊、用你的語言寫成精簡摘要，
+歸進你自己的資料夾，放進支援中文全文搜尋的本機知識庫。你的 AI agent 也能透過 MCP 隨時來收網。
+它跑在你自己的電腦上，可以接任何模型，也可以完全不接。
 
 ## 🎥 實際看看
 
@@ -569,7 +570,6 @@ pnpm demo -- --many --private --password demo-pass-123 --read-key demo-share-key
 
 - [ ] **影片。** 先用字幕和本機 OCR 讀畫面上的字，再用本機語音轉文字；很多 reels 只用講的報工具名稱。
 - [ ] **豐富回覆。** LINE Flex、Slack Block Kit、Discord embed、用表情符號投票。
-- [ ] **每週摘要**推回聊天室。
 - [ ] **擴充打磨。** Threads／X／Instagram 專屬擷取、上架 Chrome 線上應用程式商店。
 - [ ] **更多轉接。** 原生 Gemini、Bedrock、Vertex，以及更多判斷器。
 

@@ -1,6 +1,6 @@
 {
   "name": "driftnet",
-  "description": "driftnet: a catalogue of the AI tools people share in chats, for Claude Code.",
+  "description": "driftnet: a local catalogue of the links people share in chats, for Claude Code.",
   "owner": {
     "name": "Kevin Chu",
     "url": "https://github.com/KevinChu1110"
@@ -9,7 +9,7 @@
     {
       "name": "driftnet",
       "source": "./",
-      "description": "Look up, save and rate AI tools people shared in group chats.",
+      "description": "Search, save and file the links people share in your chats.",
       "version": "0.8.0"
     }
   ]

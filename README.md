@@ -23,15 +23,15 @@
 
 ## 📖 What it is
 
-You see a great AI tool on Threads, Facebook, X or YouTube and paste it somewhere "to look at
-later". Two hundred links later, nobody looks.
+Every day your feed carries great articles, open-source repos and tools past you. You paste them
+into a chat "for later", and like everything else in the current, they drift out of sight.
 
-**driftnet catches those links.** Your feed is a current: good finds drift past once and are gone.
-driftnet is the net you leave in it. Drop links in a chat (LINE, Slack, Discord, Telegram), send
-them with a Chrome button, or hand them to your agent. driftnet follows each one to the actual
-tool, sorts it, writes a short explanation in your language, and puts it on a searchable page.
-Repos, articles and videos get the same treatment. It runs on your own computer, works with any model or none at all, and your agents read the same catalogue
-over MCP.
+**driftnet is the net you leave in that current.** Drop links in a group chat (LINE, Slack, Discord,
+Telegram), click the Chrome button, import your old bookmarks or use the command line. driftnet
+catches each one, follows a post to the project it is really about, boils it down to a short summary
+in your language, and files it in your own folders, in a local catalogue with full-text search
+(Chinese included). Your agents haul in the same catalogue over MCP. It runs on your own computer
+and works with any model, or none.
 
 ## 🎥 See it work
 
@@ -618,7 +618,6 @@ platform (`handleChatText()`), browser capture (`collect.js`), or a bot language
 - [ ] **Video.** Captions and on-screen text with local OCR first, local speech-to-text second; many
       reels only say the tool's name out loud.
 - [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, voting by reaction.
-- [ ] **Weekly digest** posted back to the chat.
 - [ ] **Extension polish.** Threads / X / Instagram capture, a Chrome Web Store build.
 - [ ] **More adapters.** Native Gemini, Bedrock, Vertex; more judges.
 
