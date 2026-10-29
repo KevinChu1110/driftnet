@@ -295,6 +295,6 @@ async function runInit(ctx: InitCtx, argv: string[]): Promise<number> {
     }
   }
   for (const c of changed) ctx.out(`Restart ${LABEL[c]} to load driftnet.`);
-  if (changed.size && !remote) ctx.out("Local setup needs the page running for writes: `npx driftnet` (search works without it).");
+  if (changed.size && !remote) ctx.out("The local MCP server opens ~/.driftnet directly; run `npx driftnet` too for the web page and chat bots.");
   return failed ? 1 : 0;
 }
