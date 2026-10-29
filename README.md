@@ -184,14 +184,30 @@ Links rot and repos get archived. Set `DRIFTNET_HEALTH=weekly` (recommended; it 
 | **Chrome extension** | Load `apps/chrome-extension` | ✅ | — |
 | Telegram | `TELEGRAM_BOT_TOKEN`; privacy mode off for groups (`/setprivacy`) | ✅ | caught up on start (24 h) |
 | Discord | `DISCORD_BOT_TOKEN`; Message Content intent on | ✅ | read back per channel, quietly |
-| Slack | `SLACK_APP_TOKEN` (Socket Mode) + `SLACK_BOT_TOKEN` | ✅ | missed |
+| Slack | `SLACK_APP_TOKEN` (Socket Mode) + `SLACK_BOT_TOKEN` (+ `reactions:read` and the `reaction_added` event for voting) | ✅ | missed |
 | LINE | `LINE_CHANNEL_SECRET` + `LINE_CHANNEL_ACCESS_TOKEN`, webhook `/webhooks/line` | needs a [public URL](#putting-it-online-optional) | missed |
 | Your agent | MCP, OpenAPI or `/llms.txt`, see [Agents](#agents) | ✅ | — |
 | Anything else | `POST /api/chat {"text": "…"}` returns the reply | ✅ | — |
 
-**In a chat**, messages without a link are ignored. Each link gets one line back: what it is and
-where to read it on the web page. Want the summary in the chat instead, or no reply at all? Set
-`DRIFTNET_REPLY=full` or `off`. Vote with `👍12` or `👎12 reason` (`+#12` / `-#12` work too; a message with a link is never a vote).
+**In a chat**, messages without a link are ignored. Each link gets a reply that says what it is and where to read it on the web page,
+shaped for the platform (`DRIFTNET_REPLY_STYLE=rich`, the default): a Discord embed per item, Slack Block Kit, a LINE Flex card (one bubble, or a
+carousel of up to 12) and a Telegram message with links. Pictures appear only when a public `DRIFTNET_PUBLIC_URL` is set (never a localhost or
+private address, and never with the share key). Want the summary in the chat instead, or no reply at all? Set `DRIFTNET_REPLY=full` or `off`;
+`DRIFTNET_REPLY_STYLE=text` brings back plain messages. If a platform refuses the rich message (a missing permission), driftnet sends the plain
+text and logs it once.
+
+**Vote** with `👍12` or `👎12 reason` (`+#12` / `-#12` work too; a message with a link is never a vote), or with one tap:
+
+| | How | Needs |
+|---|---|---|
+| Discord | React 👍 / 👎 on the bot's reply (it adds both for you; 👍 or 👎 votes on every card in that reply) | Message Reactions intent (not privileged; discord.js asks for it); *Embed Links* and *Add Reactions* in the channel |
+| Slack | React 👍 / 👎 (`+1`, `-1`) on the bot's reply | Scope `reactions:read`; event subscription `reaction_added` |
+| Telegram | Tap 👍 / 👎 under a card (a toast confirms), or react to the bot's message | Nothing extra for buttons; for emoji reactions the bot must be an admin of the group |
+| LINE | Tap 👍 / 👎 on the card (LINE has no reactions API) | Rich reply style |
+
+One vote per person per card; voting again changes it. Removing a reaction does **not** take the vote back (react with the other emoji instead).
+Driftnet remembers which cards a Discord, Slack or Telegram reply was about for 30 days.
+
 **Weekly digest.** Set `DRIFTNET_DIGEST=weekly` (or `daily`) and `DRIFTNET_DIGEST_TO` (or use ⚙ Settings → General) and driftnet posts one short
 message at the chosen time: how many cards are new, how many wait in the Inbox, the five best new cards (worth, then shares) and what was shared
 2+ times. Nothing new, nothing sent. Times are the **server's local time** (set `TZ` to change it). If driftnet was off at the scheduled time it
@@ -492,6 +508,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_SUMMARY_DEPTH` | `standard` | How much each card says: `brief`, `standard` or `detailed` |
 | `DRIFTNET_LOCALE` | from `DRIFTNET_LANGUAGE` | Force the bot's own words to `en` or `zh-TW` |
 | `DRIFTNET_REPLY` | `link` | Chat replies: `link` (one line + web link), `full` (the summary in chat) or `off` |
+| `DRIFTNET_REPLY_STYLE` | `rich` | `rich` (embeds, Block Kit, Flex cards, vote buttons) or `text` (plain messages) |
 | `TYPESAFE_API_KEY` | `~/.typesafe/api_key` | Enables the Jev judge; `DRIFTNET_JUDGE=off` disables it |
 | `DRIFTNET_MIN_CONFIDENCE` | `0.4` | Below this, the model classifies instead of Jev |
 | `DRIFTNET_DIGEST_TOKENS` | `350` | Token budget of the page outline |
@@ -617,7 +634,6 @@ platform (`handleChatText()`), browser capture (`collect.js`), or a bot language
 
 - [ ] **Video.** Captions and on-screen text with local OCR first, local speech-to-text second; many
       reels only say the tool's name out loud.
-- [ ] **Rich replies.** LINE Flex, Slack Block Kit, Discord embeds, voting by reaction.
 - [ ] **Extension polish.** Threads / X / Instagram capture, a Chrome Web Store build.
 - [ ] **More adapters.** Native Gemini, Bedrock, Vertex; more judges.
 

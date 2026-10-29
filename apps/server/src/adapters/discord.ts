@@ -1,6 +1,8 @@
-import { Client, Events, GatewayIntentBits, type Message } from "discord.js";
+import { Client, Events, GatewayIntentBits, Partials, type Message } from "discord.js";
 import type { Driftnet } from "@driftnet/core";
-import { handleChatText } from "./handle.ts";
+import { handleChat, type ChatReply } from "./handle.ts";
+import { reactionVote, rememberReply, voteOnReply } from "./reactions.ts";
+import { discordEmbeds, warnOnce } from "./rich.ts";
 
 const LAST = "discord:last:";
 const MAX_CATCH_UP = 1000; // per channel
@@ -28,16 +30,16 @@ export function channelFilter(env: NodeJS.ProcessEnv = process.env): (channelId:
   return (channelId) => ids.size === 0 || ids.has(channelId);
 }
 
-/** Handle one message and remember it as the channel's latest. Returns the reply text, if any. */
-export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage, allowed = channelFilter()): Promise<string | null> {
+/** Handle one message and remember it as the channel's latest. Returns the reply, if any. */
+export async function processDiscordMessage(dn: Driftnet, msg: ChatMessage, allowed = channelFilter()): Promise<ChatReply | null> {
   if (!allowed(msg.channelId)) return null;
-  let reply: string | null = null;
+  let reply: ChatReply | null = null;
   if (!msg.fromBot) {
     // Forwarded messages arrive with empty content; the text is in the snapshot.
     const text = msg.content || (msg.forwardedContent ?? []).filter(Boolean).join("\n");
     if (text) {
       try {
-        reply = await handleChatText(dn, text, { platform: "discord", chatId: msg.channelId, userId: msg.authorId });
+        reply = await handleChat(dn, text, { platform: "discord", chatId: msg.channelId, userId: msg.authorId });
       } catch (err) {
         console.warn("[discord]", (err as Error).message);
         return null; // not remembered as handled: the next catch-up retries it
@@ -46,6 +48,58 @@ export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage, allow
   }
   dn.store.setState(LAST + msg.channelId, msg.id);
   return reply;
+}
+
+/** The plain reply text (catch-up, tests). */
+export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage, allowed = channelFilter()): Promise<string | null> {
+  return (await processDiscordMessage(dn, msg, allowed))?.text ?? null;
+}
+
+/** What discord.js's `message.reply` takes and returns, as far as we use it. */
+export type DiscordSend = (options: Record<string, unknown>) => Promise<{ id: string; react: (emoji: string) => Promise<unknown> }>;
+
+/**
+ * Reply with one embed per item (≤ 10, no mentions); if Discord refuses the
+ * embeds (a missing Embed Links permission), send the plain text instead.
+ * Rich replies get 👍 / 👎 seeded on them so voting is one click.
+ */
+export async function sendDiscordReply(dn: Driftnet, send: DiscordSend, reply: ChatReply): Promise<void> {
+  const allowedMentions = { parse: [] };
+  let sent: Awaited<ReturnType<DiscordSend>> | undefined;
+  let rich = false;
+  if (reply.rich?.items.length) {
+    const { embeds, extra } = discordEmbeds(reply.rich);
+    try {
+      sent = await send({ ...(extra ? { content: reply.rich.t.digest.more(extra) } : {}), embeds, allowedMentions });
+      rich = true;
+    } catch (err) {
+      warnOnce("discord", (err as Error).message);
+    }
+  }
+  sent ??= await send({ content: reply.text.slice(0, 2000), flags: ["SuppressEmbeds"], allowedMentions });
+  rememberReply(dn.store, `discord:${sent.id}`, reply.ids);
+  if (rich) {
+    try {
+      await sent.react("👍");
+      await sent.react("👎");
+    } catch { /* no Add Reactions permission: people can still add their own */ }
+  }
+}
+
+/**
+ * A 👍 / 👎 reaction on one of the bot's replies votes on its items as
+ * `discord:<user id>`. Removing a reaction is ignored: the store keeps one vote
+ * per person and has no "unvote", so react with the other emoji to change it.
+ */
+export function onDiscordReaction(
+  dn: Driftnet,
+  r: { messageId: string; channelId: string; emoji: string | null; userId: string; fromBot: boolean },
+  allowed = channelFilter(),
+): number[] {
+  if (r.fromBot || !allowed(r.channelId)) return [];
+  const vote = reactionVote(r.emoji);
+  if (!vote) return [];
+  return voteOnReply(dn, `discord:${r.messageId}`, `discord:${r.userId}`, vote);
 }
 
 /**
@@ -105,18 +159,40 @@ const toChatMessage = (m: Message): ChatMessage => ({
  */
 export function startDiscord(dn: Driftnet, token: string): () => void {
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.DirectMessages,
+      // Voting by reaction (enable nothing extra in the portal: these are not privileged).
+      GatewayIntentBits.GuildMessageReactions,
+      GatewayIntentBits.DirectMessageReactions,
+    ],
+    // Reactions on messages the bot hasn't cached (after a restart) still arrive.
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
   });
 
   client.on(Events.MessageCreate, async (msg) => {
-    const reply = await handleDiscordMessage(dn, toChatMessage(msg)).catch((err) => {
+    const reply = await processDiscordMessage(dn, toChatMessage(msg)).catch((err) => {
       console.warn("[discord]", (err as Error).message);
       return null;
     });
     if (reply) {
-      await msg
-        .reply({ content: reply.slice(0, 2000), flags: ["SuppressEmbeds"], allowedMentions: { parse: [] } })
-        .catch((err) => console.warn("[discord]", (err as Error).message));
+      await sendDiscordReply(dn, (o) => msg.reply(o as any), reply).catch((err) => console.warn("[discord]", (err as Error).message));
+    }
+  });
+  client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    try {
+      if (user.bot || user.id === client.user?.id) return;
+      onDiscordReaction(dn, {
+        messageId: reaction.message.id,
+        channelId: reaction.message.channelId,
+        emoji: reaction.emoji.name,
+        userId: user.id,
+        fromBot: !!user.bot,
+      });
+    } catch (err) {
+      console.warn("[discord]", (err as Error).message);
     }
   });
   client.once(Events.ClientReady, async (c) => {
