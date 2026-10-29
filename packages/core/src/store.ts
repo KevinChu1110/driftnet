@@ -4,6 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { normalizeMedia } from "./media.ts";
 import type { Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
+import { migrate } from "./migrations.ts";
+import { ftsMatchQuery, FTS_WEIGHTS, reindexItem } from "./search-index.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 
 interface ItemRow {
@@ -93,126 +95,8 @@ export class Store {
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
-    this.db.exec(`
-      PRAGMA journal_mode = WAL;
-      CREATE TABLE IF NOT EXISTS items (
-        id INTEGER PRIMARY KEY,
-        url TEXT NOT NULL UNIQUE,
-        title TEXT NOT NULL,
-        kind TEXT NOT NULL,
-        category TEXT NOT NULL,
-        worth TEXT NOT NULL,
-        is_ai_tool REAL NOT NULL,
-        summary TEXT,
-        judge_engine TEXT NOT NULL,
-        flags TEXT NOT NULL DEFAULT '',
-        source TEXT NOT NULL DEFAULT '',
-        share_count INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-      );
-      CREATE TABLE IF NOT EXISTS aliases (
-        url TEXT PRIMARY KEY,
-        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE
-      );
-      CREATE TABLE IF NOT EXISTS shares (
-        id INTEGER PRIMARY KEY,
-        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-        platform TEXT NOT NULL, chat_id TEXT NOT NULL, user_id TEXT, note TEXT,
-        at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-      );
-      CREATE TABLE IF NOT EXISTS feedback (
-        id INTEGER PRIMARY KEY,
-        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-        vote INTEGER NOT NULL CHECK (vote IN (-1, 1)),
-        reason TEXT,
-        voter TEXT NOT NULL,
-        at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-        UNIQUE (item_id, voter)
-      );
-      CREATE TABLE IF NOT EXISTS state (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );
-      -- The reader's own tree of shelves. Items point at a folder through items.category.
-      -- name NULL = a built-in shelf still showing its translated label.
-      CREATE TABLE IF NOT EXISTS folders (
-        id TEXT PRIMARY KEY,
-        parent_id TEXT REFERENCES folders(id),
-        name TEXT,
-        description TEXT NOT NULL DEFAULT '',
-        position INTEGER NOT NULL DEFAULT 0
-      );
-      -- "child was found inside parent": repos named or linked in a post.
-      CREATE TABLE IF NOT EXISTS found_in (
-        parent_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-        child_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-        PRIMARY KEY (parent_id, child_id)
-      );
-      CREATE TABLE IF NOT EXISTS notes (
-        id INTEGER PRIMARY KEY,
-        title TEXT NOT NULL DEFAULT '',
-        body TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
-      );
-      -- One key per agent, so a leaked config is one revoke away and the admin password stays private.
-      CREATE TABLE IF NOT EXISTS agent_tokens (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        scope TEXT NOT NULL CHECK (scope IN ('read', 'write')),
-        hash TEXT NOT NULL UNIQUE,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-        last_used_at TEXT,
-        revoked_at TEXT
-      );
-      -- One-time codes that turn a QR scan into a device token. Only the hash is kept.
-      CREATE TABLE IF NOT EXISTS pair_codes (
-        hash TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        scope TEXT NOT NULL CHECK (scope IN ('read', 'write')),
-        expires_at TEXT NOT NULL,
-        used_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS items_category ON items(category);
-      CREATE INDEX IF NOT EXISTS shares_item ON shares(item_id);
-      CREATE INDEX IF NOT EXISTS aliases_item ON aliases(item_id);
-      CREATE INDEX IF NOT EXISTS items_source ON items(source);
-    `);
-    // Columns added after the first release.
-    const cols = new Set((this.db.prepare("PRAGMA table_info(items)").all() as { name: string }[]).map((c) => c.name));
-    // Links recorded before found_in existed live in share notes; recover them once.
-    if (this.getState("found_in_recovered") !== "1") {
-      this.db.exec(`
-        INSERT OR IGNORE INTO found_in (parent_id, child_id)
-        SELECT p.id, s.item_id FROM shares s
-        JOIN items p ON p.url = substr(s.note, CASE WHEN s.note LIKE 'Mentioned in %' THEN 14 ELSE 13 END)
-        WHERE (s.note LIKE 'Mentioned in %' OR s.note LIKE 'Linked from %') AND p.id <> s.item_id`);
-      this.setState("found_in_recovered", "1");
-    }
-    for (const [name, type] of [
-      ["claimed_at", "TEXT"], ["claimed_by", "TEXT"], ["enriched_by", "TEXT"],
-      ["trashed_at", "TEXT"], ["favorite", "INTEGER NOT NULL DEFAULT 0"],
-      // 1 once the reader moved the item: nobody re-classifies it after that.
-      ["user_placed", "INTEGER NOT NULL DEFAULT 0"],
-      // The reader's own words about the item.
-      ["note", "TEXT"],
-      // Who acted, when known: "admin" or "agent:<token id>".
-      ["claimed_actor", "TEXT"], ["moved_by", "TEXT"],
-      // The classifier's top folders as JSON [{folder, score}]: what the Inbox offers as one-tap chips.
-      ["suggestions", "TEXT"],
-      // Candidate pictures as JSON [{url, kind, alt}] (original URLs; the server proxies them).
-      ["media", "TEXT"],
-    ] as const) {
-      if (!cols.has(name)) this.db.exec(`ALTER TABLE items ADD COLUMN ${name} ${type}`);
-    }
-    // Which folders came from the seed (the reader didn't make them): an AI plan may rename or merge only those.
-    const folderCols = new Set((this.db.prepare("PRAGMA table_info(folders)").all() as { name: string }[]).map((c) => c.name));
-    if (!folderCols.has("builtin")) {
-      this.db.exec("ALTER TABLE folders ADD COLUMN builtin INTEGER NOT NULL DEFAULT 0");
-      // Folders made before the marker existed: a never-renamed shelf is certainly a built-in one.
-      this.db.exec("UPDATE folders SET builtin = 1 WHERE name IS NULL");
-    }
+    this.db.exec("PRAGMA journal_mode = WAL");
+    migrate(this.db, { path });
   }
 
   /** Looks up by canonical URL or any URL that previously resolved to the same item. */
@@ -251,6 +135,7 @@ export class Store {
       ) as unknown as ItemRow;
     const alias = this.db.prepare("INSERT OR IGNORE INTO aliases (url, item_id) VALUES (?, ?)");
     for (const a of input.aliases) if (a !== input.url) alias.run(a, row.id);
+    this.reindex(row.id);
     return toItem(row);
   }
 
@@ -282,7 +167,13 @@ export class Store {
         input.flags.join(","), input.source, keep, input.suggestions?.length ? JSON.stringify(input.suggestions) : null,
         input.media?.length ? JSON.stringify(input.media) : null, keep, keep, keep, id,
       ) as unknown as ItemRow | undefined;
+    if (row) this.reindex(row.id);
     return row ? toItem(row) : null;
+  }
+
+  /** Rebuild one item's search row; every writer of an indexed field (title, summary, note, share notes) calls this. */
+  private reindex(id: number): void {
+    reindexItem(this.db, id);
   }
 
   /** Replace an item's pictures (empty list keeps what is there: a page that is down must not wipe them). */
@@ -298,6 +189,7 @@ export class Store {
       .run(itemId, ctx.platform, ctx.chatId, ctx.userId ?? null, ctx.note?.slice(0, 1000) ?? null);
     // Shared again after being trashed: someone wants it, so it comes back.
     this.db.prepare("UPDATE items SET share_count = share_count + 1, trashed_at = NULL WHERE id = ?").run(itemId);
+    this.reindex(itemId);
   }
 
   // ── Folders ──────────────────────────────────────────────────────────────
@@ -600,7 +492,9 @@ export class Store {
   /** The reader's note on an item; empty text clears it. */
   setNote(id: number, note: string): boolean {
     const text = note.trim().slice(0, 5000);
-    return this.db.prepare("UPDATE items SET note = ? WHERE id = ?").run(text || null, id).changes > 0;
+    const changed = this.db.prepare("UPDATE items SET note = ? WHERE id = ?").run(text || null, id).changes > 0;
+    if (changed) this.reindex(id);
+    return changed;
   }
 
   /**
@@ -843,6 +737,7 @@ export class Store {
          WHERE id = ? RETURNING *`,
       )
       .get(JSON.stringify(summary), summary.name, by, classify?.category ?? null, classify?.worth ?? null, id) as unknown as ItemRow;
+    this.reindex(id);
     return toItem(row);
   }
 
@@ -868,8 +763,18 @@ export class Store {
     if (query.clean !== false) {
       where.push("flags NOT LIKE '%injection%'", `${Store.NET_VOTES} > -2`);
     }
-    const terms = (query.q ?? "").slice(0, 200).split(/\s+/).filter(Boolean).slice(0, 8);
-    for (const term of terms) {
+    const terms = (query.q ?? "").slice(0, 200).split(/\s+/).map((t) => t.replace(/"/g, "")).filter(Boolean).slice(0, 8);
+    // Terms of 3+ characters go to the trigram index (substring match, CJK included); shorter ones
+    // cannot be looked up there and keep the LIKE scan.
+    const ftsTerms = terms.filter((t) => [...t].length >= 3);
+    const likeTerms = terms.filter((t) => [...t].length < 3);
+    const joinArgs: string[] = [];
+    let join = "";
+    if (ftsTerms.length) {
+      join = "JOIN (SELECT rowid, bm25(item_fts, " + FTS_WEIGHTS.join(", ") + ") AS rank FROM item_fts WHERE item_fts MATCH ?) f ON f.rowid = items.id";
+      joinArgs.push(ftsMatchQuery(ftsTerms));
+    }
+    for (const term of likeTerms) {
       // The reader's note and what people said in chat are searchable too. Summary fields are read
       // one by one: matching the raw JSON would make "tags" or "name" hit every item.
       const f = (path: string) => `json_extract(summary, '$.${path}')`;
@@ -888,10 +793,11 @@ export class Store {
       : query.view === "inbox" ? "created_at DESC, id DESC"
       : query.sort === "newest" ? "created_at DESC, id DESC"
       : query.sort === "shared" ? `share_count DESC, ${WORTH_ORDER} DESC, updated_at DESC`
+      : join ? `f.rank, ${WORTH_ORDER} DESC, updated_at DESC`
       : `${WORTH_ORDER} DESC, updated_at DESC`;
-    const sql = `SELECT * FROM items WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`;
+    const sql = `SELECT items.* FROM items ${join} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`;
     args.push(clampInt(query.limit, 1, 500, 50));
-    return (this.db.prepare(sql).all(...args) as unknown as ItemRow[]).map(toItem);
+    return (this.db.prepare(sql).all(...joinArgs, ...args) as unknown as ItemRow[]).map(toItem);
   }
 
   /** Cards waiting in the Inbox: not filed by hand, not trashed. */
