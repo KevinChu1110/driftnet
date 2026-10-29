@@ -118,6 +118,18 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   -d '{"text": "看這個 https://github.com/paperclipai/paperclip"}'
 ```
 
+5～30 秒後會收到 JSON，內容就是聊天室會收到的回覆；卡片已經出現在網頁上。
+
+<details>
+<summary><b>沒反應？</b></summary>
+
+- **8787 埠被占用**：多半是已經有一個 driftnet 在跑；直接開 http://localhost:8787，或用 `PORT=8788` 啟動這一個。
+- **`driftnet needs Node 22.13 or newer`**：用 `nvm install 22` 或從 [nodejs.org](https://nodejs.org) 安裝。
+- **卡片一直是 ⏳、沒有摘要**：還沒設定模型。到 ⚙ 設定 → AI 選一個，或交給你的 agent 整理佇列（見 [Agent](#agent)）。
+- **從別台電腦打開得到 `421`**：沒設密碼時 driftnet 只回應本機。設一組密碼（`DRIFTNET_TOKEN`），或把網址加進 `DRIFTNET_ALLOWED_HOSTS`。
+
+</details>
+
 ### 哪種用法適合你
 
 | 你是 | 從這裡開始 | 模型 |
@@ -170,7 +182,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 | 其他 | `POST /api/chat {"text": "…"}` 會回傳回覆 | ✅ | — |
 
 **在聊天室裡**，沒有連結的訊息一律忽略。每個連結只回一行：它是什麼，以及在網頁上的哪裡看。想在聊天室直接看摘要，
-或完全不回？設 `DRIFTNET_REPLY=full` 或 `off`。用 `👍12` 或 `👎12 原因` 投票。
+或完全不回？設 `DRIFTNET_REPLY=full` 或 `off`。用 `👍12` 或 `👎12 原因` 投票（也可用 `+#12`／`-#12`；含連結的訊息一定不會被當成投票）。
+聊天機器人的 token 在 driftnet 啟動時讀取：寫進 `~/.driftnet/.env` 後，把 driftnet 關掉再重新啟動。
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
 <sub>Discord 實測畫面：一則訊息兩個連結，各回一行。使用者名稱和伺服器網址已隱藏。</sub>
@@ -317,8 +330,21 @@ Claude Desktop、pi、Hermes、OpenClaw 或任何 MCP 用戶端連 `/mcp`（Stre
 （Atom 格式，最新 50 則，加 `?folder=<id>` 只看某一支）；**🔌 連接 AI** 裡有已經帶好分享碼的連結。想主動推送的話，
 設定下面的對外 Webhook：每張新增或更新的卡片都會以 JSON POST 過去，有設密鑰時會附 `X-Driftnet-Signature` 簽章。
 
+在同一台電腦上，stdio 伺服器不需要密碼，讀的就是網頁上那一份清單。
+Claude Code：`claude mcp add driftnet -- npx -y driftnet mcp`。Claude Desktop 寫在 `claude_desktop_config.json`：
+
+```json
+{
+  "mcpServers": {
+    "driftnet": { "command": "npx", "args": ["-y", "driftnet", "mcp"], "env": { "DRIFTNET_AGENT": "claude-desktop" } }
+  }
+}
+```
+
+driftnet 在別台機器上時，用 HTTP 加金鑰連線：
+
 ```bash
-claude mcp add --transport http driftnet http://localhost:8787/mcp \
+claude mcp add --transport http driftnet https://your-driftnet.example/mcp \
   --header "Authorization: Bearer $DRIFTNET_TOKEN" --header "X-Driftnet-Agent: claude-code"
 ```
 
@@ -416,11 +442,15 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_PUBLIC_URL` | — | 回覆裡附上網頁連結 |
 | `DRIFTNET_HOME` | `~/.driftnet` | 放 `.env`、資料庫和服務日誌的資料夾 |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite 檔案位置 |
-| `DRIFTNET_HOST`／`PORT` | `127.0.0.1`／`8787` | 監聽位址 |
+| `DRIFTNET_HOST`／`PORT` | `127.0.0.1`／`8787` | 監聽位址。設成非本機位址卻沒有 `DRIFTNET_TOKEN` 時會顯示警告：連得到這個埠的人都能改動清單 |
+| `DRIFTNET_ALLOWED_HOSTS` | — | 沒設密碼時，driftnet 只回應發給本機（或 `DRIFTNET_PUBLIC_URL`）的請求，避免網頁透過 DNS 手法連進來。其他主機名稱加在這裡，以逗號分隔 |
+| `DRIFTNET_OPEN` | `1` | 設 `0`：`npx driftnet` 啟動時不自動開瀏覽器 |
+| `DRIFTNET_MEDIA_CACHE_MB` | `300` | 卡片圖片快取可用的磁碟空間 |
 | `DRIFTNET_ALLOW_PRIVATE_URLS` | — | 設 `1` 允許抓取私有或本機位址的連結（內網頁面）。預設關閉，否則分享進來的連結可能讀到你電腦或內網上的服務 |
 | `DRIFTNET_AGENT` | `local` | stdio MCP 伺服器記錄的 agent 名稱 |
 | `TYPESAFE_ENDPOINT` | TypeSafe API | 覆寫 Jev 的端點 |
 | `TELEGRAM_BOT_TOKEN` · `DISCORD_BOT_TOKEN` | — | 聊天平台 |
+| `DRIFTNET_TELEGRAM_CHATS` | — | Telegram 機器人只回應這些聊天室（以逗號分隔的 chat id）。不設：任何聊天室都可以（每個新聊天室會在紀錄裡印出 id） |
 | `DISCORD_CHANNELS` | — | driftnet 只聽這些頻道（以逗號分隔的頻道 id）。和其他 bot 共用 token 時使用 |
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack（Socket Mode 或 webhook） |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |

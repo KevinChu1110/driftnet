@@ -121,6 +121,18 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
   -d '{"text": "look at this https://github.com/paperclipai/paperclip"}'
 ```
 
+You get the reply a chat would get, as JSON, after 5–30 seconds; the card is already on the page.
+
+<details>
+<summary><b>Not working?</b></summary>
+
+- **Port 8787 is in use**: another driftnet is probably running; open http://localhost:8787, or start this one with `PORT=8788`.
+- **`driftnet needs Node 22.13 or newer`**: install it with `nvm install 22` or from [nodejs.org](https://nodejs.org).
+- **Cards stay ⏳ with no summary**: no model is set up yet. Choose one in ⚙ Settings → AI, or let your agent work the queue ([Agents](#agents)).
+- **Opened from another computer and got `421`**: without a password driftnet only answers on this machine. Set a password (`DRIFTNET_TOKEN`), or list the address in `DRIFTNET_ALLOWED_HOSTS`.
+
+</details>
+
 ### Which setup is yours?
 
 | You are | Start with | Model |
@@ -175,7 +187,8 @@ without running one: on real links, a Chinese article went from 831 to 404 token
 
 **In a chat**, messages without a link are ignored. Each link gets one line back: what it is and
 where to read it on the web page. Want the summary in the chat instead, or no reply at all? Set
-`DRIFTNET_REPLY=full` or `off`. Vote with `👍12` or `👎12 reason`.
+`DRIFTNET_REPLY=full` or `off`. Vote with `👍12` or `👎12 reason` (`+#12` / `-#12` work too; a message with a link is never a vote).
+Bot tokens are read when driftnet starts: put them in `~/.driftnet/.env`, then stop and start it again.
 
 <p align="center"><img src="assets/discord-zh-TW.jpg" alt="driftnet answering a Discord message with two links: one line per link, each pointing to its page" width="80%"></p>
 <sub>A real run in Discord (<code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>): two links in one message, one line back for each. Name and server address hidden.</sub>
@@ -350,8 +363,21 @@ Claude Desktop, pi, Hermes, OpenClaw or any MCP client connects to `/mcp` (Strea
 share key filled in. To push instead, set an outgoing webhook (below): every new or updated card is POSTed
 as JSON, signed with `X-Driftnet-Signature` when a secret is set.
 
+On the same computer, the stdio server needs no password and reads the same catalogue as the page.
+Claude Code: `claude mcp add driftnet -- npx -y driftnet mcp`. Claude Desktop, in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "driftnet": { "command": "npx", "args": ["-y", "driftnet", "mcp"], "env": { "DRIFTNET_AGENT": "claude-desktop" } }
+  }
+}
+```
+
+For a driftnet on another machine, connect over HTTP with a token:
+
 ```bash
-claude mcp add --transport http driftnet http://localhost:8787/mcp \
+claude mcp add --transport http driftnet https://your-driftnet.example/mcp \
   --header "Authorization: Bearer $DRIFTNET_TOKEN" --header "X-Driftnet-Agent: claude-code"
 ```
 
@@ -453,11 +479,15 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_PUBLIC_URL` | — | Replies link to the item on the web page |
 | `DRIFTNET_HOME` | `~/.driftnet` | Folder for `.env`, the database and the service log |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite file |
-| `DRIFTNET_HOST` / `PORT` | `127.0.0.1` / `8787` | Listen address |
+| `DRIFTNET_HOST` / `PORT` | `127.0.0.1` / `8787` | Listen address. A non-local address without `DRIFTNET_TOKEN` prints a warning: anyone who reaches the port could change the catalogue |
+| `DRIFTNET_ALLOWED_HOSTS` | — | Without a password, driftnet only answers requests addressed to this machine (or `DRIFTNET_PUBLIC_URL`), which stops web pages from reaching it through DNS tricks. Add other host names here, comma-separated |
+| `DRIFTNET_OPEN` | `1` | `0` stops `npx driftnet` from opening the page in your browser |
+| `DRIFTNET_MEDIA_CACHE_MB` | `300` | Disk space for cached card pictures |
 | `DRIFTNET_ALLOW_PRIVATE_URLS` | — | `1` lets links to private or local addresses be fetched (intranet pages). Off by default: a shared link could otherwise read services on your machine or network |
 | `DRIFTNET_AGENT` | `local` | Agent name recorded by the stdio MCP server |
 | `TYPESAFE_ENDPOINT` | TypeSafe API | Jev endpoint override |
 | `TELEGRAM_BOT_TOKEN` · `DISCORD_BOT_TOKEN` | — | Chat platforms |
+| `DRIFTNET_TELEGRAM_CHATS` | — | Comma-separated chat ids the Telegram bot answers. Unset: any chat (each new one is logged with its id) |
 | `DISCORD_CHANNELS` | — | Comma-separated channel ids driftnet listens to. Use it when the bot token is shared with another bot |
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack (Socket Mode, or webhook) |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
