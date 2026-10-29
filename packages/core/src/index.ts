@@ -20,6 +20,7 @@ export { Pipeline, RefreshBusy, RefreshTooSoon } from "./pipeline.ts";
 export { DEFAULT_CATEGORIES, FOLDER_TEMPLATES, TEMPLATE_NAMES, isTemplate, loadCategories, applyFolderTemplate, TemplateError, type FolderTemplate } from "./categories.ts";
 export { mediaSigOk, normalizeMedia, publicItem, publicMedia, setMediaSecret, type PublicMedia } from "./media.ts";
 export { safeFetch } from "./extractors/net.ts";
+export { videoTools, describeVideoTools, type VideoTools } from "./extractors/video.ts";
 export { HealthChecker, healthFor, isPrivateTarget } from "./health.ts";
 export { cardLink } from "./render.ts";
 export { loadPlugins, type PluginApi } from "./plugins.ts";

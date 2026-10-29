@@ -152,6 +152,8 @@ curl -X POST localhost:8787/api/chat -H 'content-type: application/json' \
 6. **放進你的資料夾。** AI 照資料夾的路徑和說明分類；新連結會放在收件匣，附兩、三個建議資料夾，點一下就歸檔。
 7. **顯示在網頁上，也提供給 agent。** 網頁上看得到，agent 可以走 MCP、`/llms.txt`、`/feed.xml` 或對外 Webhook 取得。匯出可以整包帶走。
 
+**Reels 與 Shorts。** 很多分享的 reels 只用講的報工具名稱。當 Instagram、Facebook、Threads、TikTok、YouTube Shorts 或 X 的連結是影片，而頁面文字幾乎沒內容時，driftnet 會用你機器上已有的工具讀影片本身，由便宜到貴，文字夠了就停：（1）用 `yt-dlp` 取字幕、標題和說明，不下載影片；（2）以低畫質下載影片（最多 60 MB、前 3 分鐘），每 2 秒取一張畫面，用 `tesseract` 辨識（有裝的話支援英文與中文）；（3）還是太少才把音訊交給 `whisper`（也可用 whisper.cpp 的 `whisper-cli`，需設定 `DRIFTNET_WHISPER_MODEL`）。讀到的內容會加上 `[captions]`、`[on-screen text]`、`[speech]` 標籤附在文字後面（最多 6,000 字元），並和頁面文字一樣先過防護；卡片會標示「已從影片讀取」。每個工具都是選配：沒裝的就跳過，`DRIFTNET_VIDEO=off` 可全部關閉。工具不經過 shell、在一定會刪除的私有暫存資料夾裡執行、環境變數中拿掉 driftnet 的機密、每個步驟都有時間上限、拒絕私有或本機位址的連結，而且一次只處理一支影片。
+
 <details>
 <summary><b>八個步驟的完整說明</b></summary>
 
@@ -469,6 +471,8 @@ agent 寫回來的內容跟其他不可信的輸入一樣要檢查：格式、�
 | `DRIFTNET_SUMMARY_RULES` | — | 每次摘要都要遵守的自訂規則，例如「說明是否免費」；agent 也會收到 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
 | `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
+| `DRIFTNET_VIDEO` | `auto` | `off` 完全不讀影片；`auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`（見「Reels 與 Shorts」） |
+| `DRIFTNET_YTDLP`、`DRIFTNET_FFMPEG`、`DRIFTNET_TESSERACT`、`DRIFTNET_WHISPER` | 從 `PATH` 找 | 不在 `PATH` 的工具的完整路徑（`whisper` 也可指向 `whisper-cli`；whisper.cpp 還需要 `DRIFTNET_WHISPER_MODEL`，指向模型檔） |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 擷取器外掛（`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](examples/plugins) |
 | `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、管理 agent 金鑰、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
 | `DRIFTNET_READ_KEY` | — | 唯讀分享碼（放 header 或 `?key=`）：只能讀，MCP 也只有讀取類工具 |
@@ -568,7 +572,6 @@ pnpm demo -- --many --private --password demo-pass-123 --read-key demo-share-key
 
 **適合第一次貢獻**，都是拿大家真正會分享的連結實測後發現的：
 
-- [ ] **影片。** 先用字幕和本機 OCR 讀畫面上的字，再用本機語音轉文字；很多 reels 只用講的報工具名稱。
 - [ ] **豐富回覆。** LINE Flex、Slack Block Kit、Discord embed、用表情符號投票。
 - [ ] **擴充打磨。** Threads／X／Instagram 專屬擷取、上架 Chrome 線上應用程式商店。
 - [ ] **更多轉接。** 原生 Gemini、Bedrock、Vertex，以及更多判斷器。

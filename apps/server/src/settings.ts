@@ -50,6 +50,12 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_READ_KEY", group: "access", min: 16, max: 200 },
   { key: "DRIFTNET_ACCESS", group: "access", choices: ["", "public", "private"] },
   { key: "DRIFTNET_HEALTH", group: "rules", choices: ["", "off", "weekly"] },
+  // Video understanding (captions, on-screen text, speech) with local tools; see README "Reels and shorts".
+  { key: "DRIFTNET_VIDEO", group: "rules", choices: ["", "auto", "off"] },
+  { key: "DRIFTNET_YTDLP", group: "rules", max: 500 },
+  { key: "DRIFTNET_FFMPEG", group: "rules", max: 500 },
+  { key: "DRIFTNET_TESSERACT", group: "rules", max: 500 },
+  { key: "DRIFTNET_WHISPER", group: "rules", max: 500 },
 ];
 
 export class SettingsError extends Error {}
