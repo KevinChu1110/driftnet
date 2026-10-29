@@ -5,12 +5,12 @@
   "description": "A local catalogue of the links your chats share: search, save and file them. Any model, or none.",
   "repository": { "url": "https://github.com/KevinChu1110/driftnet", "source": "github" },
   "websiteUrl": "https://github.com/KevinChu1110/driftnet",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "driftnet",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "transport": { "type": "stdio" },
       "packageArguments": [{ "type": "positional", "value": "mcp" }],
       "environmentVariables": [
