@@ -413,6 +413,7 @@
   .meta .tags { font-size: 12px; color: color-mix(in srgb, var(--muted) 80%, transparent); }
   .meta { color: var(--muted); font-size: 13px; display: flex; gap: 4px 12px; flex-wrap: wrap; }
   .flag { color: var(--warn); font-size: 13px; }
+  .vflag { color: var(--muted); font-size: 13px; }
   .tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; }
   /* Desktop: the tools appear on hover / focus; a starred card keeps its star. */
   @media (hover: hover) and (pointer: fine) {
@@ -1064,6 +1065,14 @@
     return (paneLock = paneLock.catch(() => {}).then(go));
   }
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  // Warnings (injection, hidden characters, low reputation) keep ⚠; "read from video" is good news, not a warning.
+  function flagLines(i, t) {
+    const flags = i.flags ?? [];
+    const warn = flags.filter((f) => !f.startsWith("video-"));
+    const steps = flags.filter((f) => f.startsWith("video-") && f !== "video-read");
+    return (warn.length ? `<div class="flag">⚠ ${esc(warn.map((f) => t.flags[f] ?? f).join(", "))}</div>` : "")
+      + (flags.includes("video-read") ? `<div class="vflag">🎬 ${esc(t.flags["video-read"])}${steps.length ? ` · ${esc(steps.map((f) => t.flags[f] ?? f).join(", "))}` : ""}</div>` : "");
+  }
   const safeUrl = (u) => (/^https?:\/\//.test(u) ? u : "#");
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
@@ -2621,7 +2630,7 @@
       ${sec("try", t.mdTry, s?.tryIt ? `<div class="md-try"><pre><code>${esc(s.tryIt)}</code></pre><button class="btn" type="button" data-md="copy">${esc(t.mdCopy)}</button></div>` : "")}
       ${sec("tags", t.mdTags, s?.tags?.length ? `<div class="md-tags tags">${s.tags.map((x) => `<span class="tag">#${esc(x)}</span>`).join(" ")}</div>` : "")}
       ${i.found?.length ? `<div class="found"><span>${esc(t.foundIn)}</span>${i.found.map((c) => `<a href="#item-${c.id}" data-open="${c.id}">${esc(c.name)}</a>`).join("")}</div>` : ""}
-      ${i.flags?.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
+      ${flagLines(i, t)}
       <div class="md-fine">${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}<span>${esc(i.createdAt.slice(0, 10))}</span>${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}</div>`;
     const busy = refreshing.has(i.id);
     const btn = (act, icon, label, extra = "") => `<button class="btn ${extra}" type="button" data-md="${act}">${ic(icon)} ${esc(label)}</button>`;
@@ -3319,7 +3328,7 @@
             </div>
             ${s ? `<p>${esc(s.oneLiner)}</p>` : ""}
             ${s?.demo ? `<p class="demo">${esc(s.demo)}</p>` : ""}
-            ${i.flags.length ? `<div class="flag">⚠ ${esc(i.flags.map((f) => t.flags[f] ?? f).join(", "))}</div>` : ""}
+            ${flagLines(i, t)}
             ${state.view === "inbox" ? inboxChips(i) : ""}
             <div class="meta">
               <span>#${i.id}</span><span>${esc(t.kind1?.[i.kind] ?? t.kinds[i.kind] ?? i.kind)}</span>${starsHtml(i)}${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}
