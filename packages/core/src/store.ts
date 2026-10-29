@@ -79,6 +79,8 @@ export interface ListQuery {
   /** best (worth, then recent; the default) | newest | shared (most shared first). */
   sort?: "best" | "newest" | "shared";
   limit?: number;
+  /** Skip this many rows (paging). */
+  offset?: number;
 }
 
 /** Untrusted numbers (query strings, JSON bodies) → an integer in range, never NaN. */
@@ -744,7 +746,8 @@ export class Store {
   /** Net votes per item, for hiding items the community voted down. */
   private static readonly NET_VOTES = "(SELECT COALESCE(SUM(vote), 0) FROM feedback f WHERE f.item_id = items.id)";
 
-  list(query: ListQuery = {}): Item[] {
+  /** `out.total` receives how many rows match, ignoring limit/offset (for paging). */
+  list(query: ListQuery = {}, out?: { total?: number }): Item[] {
     const where: string[] = [query.view === "trash" ? "trashed_at IS NOT NULL" : "trashed_at IS NULL"];
     const args: (string | number)[] = [];
     if (query.view === "favorites") where.push("favorite = 1");
@@ -795,8 +798,9 @@ export class Store {
       : query.sort === "shared" ? `share_count DESC, ${WORTH_ORDER} DESC, updated_at DESC`
       : join ? `f.rank, ${WORTH_ORDER} DESC, updated_at DESC`
       : `${WORTH_ORDER} DESC, updated_at DESC`;
-    const sql = `SELECT items.* FROM items ${join} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`;
-    args.push(clampInt(query.limit, 1, 500, 50));
+    if (out) out.total = (this.db.prepare(`SELECT COUNT(*) AS n FROM items ${join} WHERE ${where.join(" AND ")}`).get(...joinArgs, ...args) as { n: number }).n;
+    const sql = `SELECT items.* FROM items ${join} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ? OFFSET ?`;
+    args.push(clampInt(query.limit, 1, 500, 50), clampInt(query.offset, 0, 1_000_000, 0));
     return (this.db.prepare(sql).all(...joinArgs, ...args) as unknown as ItemRow[]).map(toItem);
   }
 

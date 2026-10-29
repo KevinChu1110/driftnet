@@ -361,8 +361,9 @@
   .hint { color: var(--muted); font-size: 13px; margin: -4px 2px 0; }
 
   /* A card sits on top of two action strips that show while it is dragged. */
-  .swipe { position: relative; border-radius: 12px; overflow: hidden; scroll-margin-top: 90px; transition: height .25s ease, margin .25s ease, opacity .25s ease; }
+  .swipe { content-visibility: auto; contain-intrinsic-size: auto 150px; position: relative; border-radius: 12px; overflow: hidden; scroll-margin-top: 90px; transition: height .25s ease, margin .25s ease, opacity .25s ease; }
   .swipe.gone { opacity: 0; }
+  .page-more { display: flex; justify-content: center; padding: 8px 0 24px; }
   /* Inside the card (the swipe wrapper clips anything outside it). */
   .swipe.flash .card { animation: flash 2s ease; }
   @keyframes flash { 0%, 55% { outline: 3px solid var(--accent); outline-offset: -3px; background: var(--accent-soft); } 100% { outline-color: transparent; } }
@@ -691,7 +692,7 @@
       kind: "Kind", switchTo: "中文", nav: "Views and categories",
       stats: (n, s) => `${n} ${n === 1 ? "item" : "items"} · shared ${s}×`, shared: (n) => `shared ${n}×`,
       empty: "Nothing here yet — drop a link in your chat.", emptyFav: "No favorites yet — swipe a card right, or tap the star.",
-      emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
+      pageMore: (n) => `Show more (${n} left)`, emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
       kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
       kind1: { repo: "Repo", product: "Product", video: "Video", article: "Article", post: "Post", other: "Other" },
       worth: { skip: "skip", low: "low", normal: "worth a look", "must-see": "must-see" },
@@ -826,7 +827,7 @@
       kind: "類型", switchTo: "EN", nav: "檢視與分類",
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
       empty: "還沒有內容，把連結丟進聊天室吧。", emptyFav: "還沒有最愛，把卡片往右滑或按星號。",
-      emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
+      pageMore: (n) => `再顯示 ${n} 張`, emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
       worth: { skip: "略過", low: "次要", normal: "值得看", "must-see": "必看" },
       flags: { injection: "提示詞注入", "hidden-chars": "隱藏字元", "low-reputation": "低信譽來源" },
@@ -1018,7 +1019,7 @@
     history.replaceState(null, "", u.pathname + u.search + u.hash);
   })();
 
-  async function api(path, init = {}) {
+  async function api(path, init = {}, meta = null) {
     // Reads work with the admin password or the share key; writes go through other helpers with the password.
     const token = store.get("driftnet-token") || store.get("driftnet-key");
     let res = await fetch(path, { ...init, headers: { ...(init.headers ?? {}), ...(token ? { authorization: `Bearer ${token}` } : {}) } });
@@ -1029,6 +1030,7 @@
     }
     if (res.status === 401) throw Object.assign(new Error("unauthorized"), { unauthorized: true });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (meta) meta.total = Number(res.headers.get("x-total-count"));
     return res.json();
   }
 
@@ -1403,6 +1405,7 @@
     if (el && !visible) {
       if (el.contains(document.activeElement)) (el.nextElementSibling ?? el.previousElementSibling)?.querySelector?.(".card")?.focus();
       dismiss(el);
+      forgetItem(id);
     }
     else if (el) { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); }
     refreshTree();
@@ -1411,7 +1414,7 @@
     if (onMap && onMap !== item) onMap.category = to;
     if (mapShown()) drawMap();
     bumpUse(to);
-    if (!quiet) { toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); render(); }); }
+    if (!quiet) { toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); renderKeep(); }); }
   }
   const subtreeOf = (id) => { const out = new Set([id]); for (const q = [id]; q.length;) for (const k of kids(q.pop())) { out.add(k.id); q.push(k.id); } return out; };
   /** Re-draw just the tree's counts after a move. */
@@ -1840,10 +1843,13 @@
   /** Cards shown per folder before the rest fold into a "+N" node. */
   const MAP_CAP = 15;
 
+  let mapTotal = 0;
   async function renderMap() {
     const t = T();
     try {
-      mapItems = await api("/api/items?limit=500&minWorth=skip");
+      const meta = {};
+      mapItems = await api("/api/items?limit=500&minWorth=skip", {}, meta);
+      mapTotal = meta.total;
     } catch (err) {
       if (err.unauthorized) return askToken();
       throw err;
@@ -2903,20 +2909,102 @@
     folders = await api("/api/folders").catch(() => folders);
     await load();
   }
-  async function renderCards() {
-    const p = new URLSearchParams({ limit: "300" });
+  /** Cards fetched per page; the rest come as the reader reaches the end of the list. */
+  const PAGE = 60;
+  let pageTotal = 0, pageGen = 0, pageBusy = false, pageObserver = null, pageHost = null, keepPages = false;
+  const listParams = () => {
+    const p = new URLSearchParams();
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
     if (state.view !== "all") p.set("view", state.view);
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
-    items = await api(`/api/items?${p}`);
+    return p;
+  };
+  const moreHtml = () => items.length < pageTotal
+    ? `<div class="page-more" id="page-more"><button type="button" class="btn" data-page-more>${esc(T().pageMore(pageTotal - items.length))}</button></div>` : "";
+  /** Redo the list after a change, keeping the pages already loaded (and the scroll position). */
+  function renderKeep() { keepPages = true; return render(); }
+  /** A card left the list for good: later pages must not skip or repeat one. */
+  function forgetItem(id) {
+    const i = items.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    extraItems.set(id, items[i]);
+    items.splice(i, 1);
+    pageTotal = Math.max(0, pageTotal - 1);
+    syncMore();
+  }
+  function syncMore() {
+    const host = pageHost, old = host?.querySelector("#page-more");
+    if (!host) return;
+    if (items.length >= pageTotal) { pageObserver?.disconnect(); old?.remove(); return; }
+    if (old) { old.querySelector("[data-page-more]").textContent = T().pageMore(pageTotal - items.length); return; }
+    host.insertAdjacentHTML("beforeend", moreHtml());
+    watchMore();
+  }
+  function watchMore() {
+    pageObserver?.disconnect();
+    const el = pageHost?.querySelector("#page-more");
+    if (!el) return;
+    el.querySelector("[data-page-more]").onclick = () => loadMore();
+    if ("IntersectionObserver" in window) {
+      pageObserver = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) loadMore(); }, { rootMargin: "600px 0px" });
+      pageObserver.observe(el);
+    }
+  }
+  async function loadMore() {
+    if (pageBusy || !pageHost || items.length >= pageTotal) return;
+    const gen = pageGen, host = pageHost;
+    pageBusy = true;
+    try {
+      const p = listParams();
+      p.set("limit", String(PAGE)); p.set("offset", String(items.length));
+      const meta = {};
+      const more = await api(`/api/items?${p}`, {}, meta);
+      if (gen !== pageGen) return;
+      if (Number.isFinite(meta.total)) pageTotal = meta.total;
+      const seen = new Set(items.map((i) => i.id));
+      const fresh = more.filter((i) => !seen.has(i.id));
+      items.push(...fresh);
+      if (!more.length) pageTotal = items.length;
+      host.querySelector("#page-more")?.remove();
+      host.insertAdjacentHTML("beforeend", fresh.map(card).join(""));
+      for (const i of fresh) attachSwipe(document.getElementById(`item-${i.id}`));
+      host.insertAdjacentHTML("beforeend", moreHtml());
+      watchMore();
+      syncSelection();
+    } catch (err) {
+      if (err.unauthorized) askToken(); else toast(T().failed);
+    } finally {
+      pageBusy = false;
+    }
+  }
+  async function renderCards() {
+    const gen = ++pageGen;
+    const keep = keepPages && items.length > PAGE; keepPages = false;
+    const y = keep ? scrollY : 0;
+    const p = listParams();
+    p.set("limit", String(keep ? Math.min(500, items.length) : PAGE));
+    const meta = {};
+    // Split view with the map's own unfiltered fetch in hand: the first page is already there.
+    const shared = !keep && splitOn() && state.view === "all" && !state.q && !state.category && !state.kind && prefs.sort === "best" && mapItems.length && Number.isFinite(mapTotal);
+    let got;
+    if (shared) { got = mapItems.slice(0, PAGE).map((i) => ({ ...i })); meta.total = mapTotal; }
+    else got = await api(`/api/items?${p}`, {}, meta);
+    if (gen !== pageGen) return;
+    items = got;
+    pageTotal = Number.isFinite(meta.total) ? meta.total : items.length;
+    pageHost = $("list");
+    pageBusy = false;
+    pageObserver?.disconnect();
     const t = T();
     const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : t.empty;
     $("list").innerHTML = items.length
-      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : t.hint)}</p>` + items.map(card).join("")
+      ? `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : t.hint)}</p>` + items.map(card).join("") + moreHtml()
       : `<div class="empty first"><span>${esc(empty)}</span>${state.view === "all" && !state.q && !state.category && role === "admin"
           ? `<form class="add" id="add-form"><input id="add-url" type="url" inputmode="url" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
              <button class="btn primary" type="submit">${ic("plus")} ${esc(t.addLink)}</button></form>
              <button class="btn" type="button" data-connect-empty>${ic("plug")} ${esc(t.st.connect)}</button>${templateChooser(t)}` : ""}</div>`;
+    watchMore();
+    if (keep) scrollTo({ top: y });
     $("add-form")?.addEventListener("submit", addLink);
     for (const b of $("list").querySelectorAll("[data-template]")) b.addEventListener("click", () => pickTemplate(b.dataset.template));
     $("list").querySelector("[data-connect-empty]")?.addEventListener("click", () => openConnect());
@@ -3048,14 +3136,15 @@
       if (el.contains(document.activeElement)) (el.nextElementSibling ?? el.previousElementSibling)?.querySelector?.(".card")?.focus();
       el.querySelector(".card").style.transform = `translateX(${action === "trash" ? "-110%" : "110%"})`;
       dismiss(el);
+      forgetItem(id);
       const back = action === "trash" ? "restore" : "trash";
-      toast(action === "trash" ? t.removed(nameOf(item)) : t.restored(nameOf(item)), async () => { await act(id, back); load(); });
+      toast(action === "trash" ? t.removed(nameOf(item)) : t.restored(nameOf(item)), async () => { await act(id, back); keepPages = true; load(); });
     } else {
       const on = !item.favorite;
       if (!(await act(id, on ? "favorite" : "unfavorite"))) return;
       item.favorite = on;
       const hadFocus = el.contains(document.activeElement);
-      if (state.view === "favorites" && !on) dismiss(el);
+      if (state.view === "favorites" && !on) { dismiss(el); forgetItem(id); }
       else { el.outerHTML = card(item); attachSwipe(document.getElementById(`item-${id}`)); if (hadFocus) document.querySelector(`#item-${id} .card`)?.focus(); }
       if (on) toast(t.faved(nameOf(item)));
     }
@@ -3163,7 +3252,7 @@
     if (!r) return;
     clearSelection();
     await refreshFolders();
-    await render();
+    await renderKeep();
     refreshCounts();
     if (action === "move" && state.view === "map") pulse(`f:${folder}`);
     const text = { move: () => t.bulkMoved(n, folderPath(folder)), trash: () => t.bulkRemoved(n), restore: () => t.bulkRestored(n),
@@ -3171,7 +3260,7 @@
     toast(text, async () => {
       if (!(await mapWrite("/api/items/bulk/undo", "POST", { undo: r.undo }))) return;
       await refreshFolders();
-      await render();
+      await renderKeep();
       refreshCounts();
     });
   }

@@ -319,6 +319,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/api/items") {
       const p = url.searchParams;
       const minWorth = p.get("minWorth");
+      const counted: { total?: number } = {};
       const list = dn.store.list({
         ...(p.get("q") ? { q: p.get("q")! } : {}),
         ...(p.get("category") ? { category: p.get("category")! } : {}),
@@ -329,7 +330,8 @@ const server = createServer(async (req, res) => {
         ...(["best", "newest", "shared"].includes(p.get("sort") ?? "") ? { sort: p.get("sort") as "best" | "newest" | "shared" } : {}),
         clean: p.get("all") !== "1",
         limit: Number(p.get("limit") ?? 200),
-      });
+        offset: Number(p.get("offset") ?? 0),
+      }, counted);
       // Tools found inside each item (repos a post named or linked), by name.
       const names = new Map(list.map((i) => [i.id, i.summary?.name ?? i.title]));
       const found = new Map<number, { id: number; name: string }[]>();
@@ -342,6 +344,7 @@ const server = createServer(async (req, res) => {
       const said = dn.store.chatNotes(list.map((i) => i.id));
       // The Inbox offers each card its best folders (the stored picks, or keyword overlap when there are none).
       const choices = p.get("view") === "inbox" ? dn.categories : null;
+      res.setHeader("X-Total-Count", String(counted.total ?? list.length));
       return send(res, 200, list.map((i) => ({ ...publicItem(i), ...(choices ? { suggestions: suggestionsFor(i, choices) } : {}), found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })));
     }
     const noteMatch = /^\/api\/items\/(\d+)\/note$/.exec(path);

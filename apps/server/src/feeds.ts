@@ -89,6 +89,7 @@ export function openApi(serverUrl: string) {
             { name: "minWorth", in: "query", schema: { type: "string", enum: ["skip", "low", "normal", "must-see"] } },
             { name: "since", in: "query", schema: { type: "string", format: "date-time" } },
             { name: "limit", in: "query", schema: { type: "integer", maximum: 500 } },
+            { name: "offset", in: "query", description: "Skip this many items (paging); the X-Total-Count response header holds how many match in all.", schema: { type: "integer", minimum: 0 } },
           ],
           responses: { "200": { description: "Items" } },
         },
