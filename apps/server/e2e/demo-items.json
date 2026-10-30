@@ -94,7 +94,7 @@
    "title": "ai-design-skills",
    "kind": "repo",
    "category": "design-frontend",
-   "worth": "normal",
+   "worth": "must-see",
    "summary": {
     "name": "ai-design-skills",
     "oneLiner": "一組給 AI 寫碼工具用的設計技能（skills）合集，以 markdown 規則檔形式提供。",
@@ -187,6 +187,90 @@
      "launcher"
     ],
     "primaryUrl": "https://github.com/gathin23/cleanyourtv"
+   }
+  },
+  {
+   "url": "https://www.threads.com/@driftnet.demo/post/DEMO0001",
+   "title": "出國前先把 Google 地圖下載成離線地圖",
+   "kind": "post",
+   "category": "everyday",
+   "worth": "normal",
+   "summary": {
+    "name": "離線地圖小技巧",
+    "oneLiner": "出國前在 Google 地圖把要去的區域下載下來，沒網路也能導航、查店家。",
+    "highlights": [
+     "在地圖上搜尋城市 → 點頭像 → 離線地圖 → 選取自己的地圖，框出範圍後下載",
+     "下載後沒有網路也能看地圖、開車導航，省下漫遊流量",
+     "離線地圖會過期，出發前一天記得更新一次"
+    ],
+    "useCases": [
+     "出國旅行、網卡還沒開通的時候",
+     "去山區或訊號不好的地方"
+    ],
+    "tags": [
+     "旅行",
+     "google-地圖",
+     "省流量",
+     "手機技巧"
+    ],
+    "demo": "一則 Threads 貼文，四張截圖一步一步示範怎麼框選範圍、下載離線地圖。",
+    "why": "朋友在群組裡分享，說下個月去日本前要先設定好。"
+   }
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=driftnetDm1",
+   "title": "15 分鐘一鍋到底：番茄雞肉義大利麵",
+   "kind": "video",
+   "category": "everyday",
+   "worth": "normal",
+   "summary": {
+    "name": "一鍋到底番茄雞肉義大利麵",
+    "oneLiner": "一支 YouTube 料理教學：只用一個平底鍋，15 分鐘做好晚餐。",
+    "highlights": [
+     "麵條直接下在番茄醬汁裡煮，不用另外燒一鍋水",
+     "材料只要雞腿肉、番茄罐頭、洋蔥、蒜頭和義大利麵",
+     "影片最後教怎麼把剩下的做成隔天的便當"
+    ],
+    "useCases": [
+     "下班後想快速煮一頓、又不想洗很多鍋子",
+     "剛開始學做菜，想找步驟簡單的食譜"
+    ],
+    "tags": [
+     "食譜",
+     "料理教學",
+     "youtube",
+     "晚餐"
+    ],
+    "demo": "一支約 8 分鐘的影片，從切菜到上桌全程示範，畫面上有每個步驟的時間。",
+    "why": "家人傳到群組說「這週來試試」。"
+   }
+  },
+  {
+   "url": "https://www.example.com/articles/apps-for-parents",
+   "title": "讓爸媽手機更好用的 5 個免費 App",
+   "kind": "article",
+   "category": "productivity",
+   "worth": "must-see",
+   "summary": {
+    "name": "讓爸媽手機更好用的 5 個免費 App",
+    "oneLiner": "一篇文章，推薦 5 個免費 App，幫長輩把手機字放大、防詐騙、找回手機。",
+    "highlights": [
+     "教你把手機字體和圖示放大，設定簡易模式",
+     "推薦來電辨識 App，陌生電話會先標出可能的詐騙",
+     "開啟「尋找我的手機」和家人共享位置，手機掉了找得回來"
+    ],
+    "useCases": [
+     "幫爸媽換新手機、想一次設定好的時候",
+     "家裡長輩常接到可疑電話"
+    ],
+    "tags": [
+     "手機",
+     "長輩",
+     "防詐騙",
+     "app 推薦"
+    ],
+    "demo": "一篇圖文文章，每個 App 附一張設定畫面截圖和下載連結。",
+    "why": "過年回家要幫爸媽設定手機，先存起來。"
    }
   }
  ],
@@ -302,7 +386,51 @@
      "cursor",
      "rules-file"
     ],
+    "mentions": [
+     {
+      "name": "Leonxlnx/taste-skill",
+      "openSource": true
+     }
+    ],
     "primaryUrl": "https://github.com/elayadesign/ai-design-skills"
+   }
+  },
+  {
+   "url": "https://github.com/sufyanimtiaz/leonxlnx-taste-skill",
+   "title": "Taste Skill",
+   "kind": "repo",
+   "category": "agent-framework",
+   "worth": "normal",
+   "summary": {
+    "name": "Taste Skill",
+    "oneLiner": "Front-end design skills for AI agents, built to avoid the same generic AI look.",
+    "highlights": [
+     "Code skills that have an AI agent write the front-end code",
+     "Separate image-generation skills that only produce design reference pictures, no code",
+     "Installs with npx skills add; start with taste-skill"
+    ],
+    "useCases": [
+     "Keeping an AI agent from falling back on the usual generic AI design when it builds a page",
+     "Making design reference pictures first in tools like ChatGPT Images or Codex"
+    ],
+    "tags": [
+     "ai-agent",
+     "frontend",
+     "design",
+     "skills",
+     "image-generation"
+    ],
+    "mentions": [
+     {
+      "name": "ChatGPT Images",
+      "openSource": false
+     },
+     {
+      "name": "Codex",
+      "openSource": false
+     }
+    ],
+    "primaryUrl": "https://github.com/sufyanimtiaz/leonxlnx-taste-skill"
    }
   },
   {
@@ -331,6 +459,90 @@
      "privacy"
     ],
     "primaryUrl": "https://github.com/gathin23/cleanyourtv"
+   }
+  },
+  {
+   "url": "https://www.threads.com/@driftnet.demo/post/DEMO0001",
+   "title": "Download Google Maps for offline use before a trip",
+   "kind": "post",
+   "category": "everyday",
+   "worth": "normal",
+   "summary": {
+    "name": "Offline maps tip",
+    "oneLiner": "Before you travel, download the area in Google Maps so directions and place search work without data.",
+    "highlights": [
+     "Search the city → tap your profile picture → Offline maps → Select your own map, frame the area and download",
+     "Once downloaded, maps and driving directions work with no connection, so no roaming charges",
+     "Offline maps expire: update them the day before you leave"
+    ],
+    "useCases": [
+     "Travelling abroad before your SIM is working",
+     "Heading to the mountains or anywhere with weak signal"
+    ],
+    "tags": [
+     "travel",
+     "google-maps",
+     "save-data",
+     "phone-tips"
+    ],
+    "demo": "A Threads post with four screenshots showing, step by step, how to frame an area and download it.",
+    "why": "A friend shared it in the group chat to set up before next month's trip to Japan."
+   }
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=driftnetDm1",
+   "title": "15-minute one-pan tomato chicken pasta",
+   "kind": "video",
+   "category": "everyday",
+   "worth": "normal",
+   "summary": {
+    "name": "One-pan tomato chicken pasta",
+    "oneLiner": "A YouTube cooking tutorial: dinner in 15 minutes using a single pan.",
+    "highlights": [
+     "The pasta cooks right in the tomato sauce, no separate pot of water",
+     "Only needs chicken thighs, canned tomatoes, an onion, garlic and pasta",
+     "The end of the video shows how to turn leftovers into the next day's lunch"
+    ],
+    "useCases": [
+     "A quick dinner after work without a pile of pots to wash",
+     "Learning to cook and looking for a recipe with simple steps"
+    ],
+    "tags": [
+     "recipe",
+     "cooking",
+     "youtube",
+     "dinner"
+    ],
+    "demo": "An 8-minute video that goes from chopping to plating, with the time for each step on screen.",
+    "why": "A family member posted it to the group: “let's try this one this week.”"
+   }
+  },
+  {
+   "url": "https://www.example.com/articles/apps-for-parents",
+   "title": "5 free apps that make your parents' phone easier to use",
+   "kind": "article",
+   "category": "productivity",
+   "worth": "must-see",
+   "summary": {
+    "name": "5 free apps that make your parents' phone easier",
+    "oneLiner": "An article recommending five free apps that enlarge text, flag scam calls and help find a lost phone.",
+    "highlights": [
+     "Shows how to make text and icons bigger and turn on a simple mode",
+     "Recommends a caller-ID app that marks likely scam calls before you pick up",
+     "Turns on Find My Phone and location sharing with family, so a lost phone can be found"
+    ],
+    "useCases": [
+     "Setting up a new phone for your parents in one go",
+     "Older family members who keep getting suspicious calls"
+    ],
+    "tags": [
+     "phone",
+     "parents",
+     "scam-protection",
+     "apps"
+    ],
+    "demo": "An illustrated article with a screenshot of each app's settings and a download link.",
+    "why": "Saved to set up Mom and Dad's phones on the next visit home."
    }
   }
  ]

@@ -6,10 +6,19 @@
 (() => {
   "use strict";
   const DATA = window.DRIFTNET_DEMO_DATA;
-  const REPO = "https://github.com/KevinChu1110/driftnet#-quick-start";
+  // Where "install" points: the quick start of the README in the visitor's language.
+  const INSTALL = {
+    en: "https://github.com/KevinChu1110/driftnet/blob/main/README.md#-quick-start",
+    "zh-TW": "https://github.com/KevinChu1110/driftnet/blob/main/README.zh-TW.md#-開始使用",
+  };
+  // [what happened, link text]: the toast shows both (the second links to INSTALL); an API error carries the first.
   const MSG = {
-    en: "This is a demo — run `npx driftnet` to use it for real.",
-    "zh-TW": "這是線上展示，要實際使用請執行 `npx driftnet`。",
+    en: ["This demo can't change settings or do this.", "See how to install →"],
+    "zh-TW": ["展示版不能改設定，也不能做這個動作。", "看怎麼安裝 →"],
+  };
+  const ADD_MSG = {
+    en: ["Adding your own links needs driftnet running on your computer (free).", "See how to install →"],
+    "zh-TW": ["要加入自己的連結，得在你的電腦上執行 driftnet（免費）。", "看怎麼安裝 →"],
   };
   const BANNER = {
     en: ["Demo: changes stay in your browser", "Install →"],
@@ -31,7 +40,8 @@
   };
 
   // ── State ──────────────────────────────────────────────────────────────
-  // ov: what the visitor changed per card (shared by both languages, cards have the same ids in each);
+  // ov: what the visitor changed per card (shared by both languages: the demo data has the same cards, with the same
+  // ids and folder ids, in each; only the text is translated, so a move or a star survives a language switch);
   // folders: the tree per language (a created or renamed folder has one name, in the language it was made in).
   let st;
   try { st = JSON.parse(ssGet(SAVE) ?? "null"); } catch { st = null; }
@@ -259,20 +269,26 @@
       throw err;
     } finally { save(); }
     // Everything else needs a real server: adding a link, settings, tokens, pairing, import, export, refresh, AI tidy ...
-    return { status: 501, data: { error: MSG[lang()] }, unsupported: true };
+    const adding = p === "/api/ingest";
+    return { status: 501, data: { error: (adding ? ADD_MSG : MSG)[lang()][0] }, unsupported: adding ? "add" : true };
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────
   let hideTimer;
   /** The page's own toast element, so the message looks like any other the page shows. */
-  function demoToast() {
+  function demoToast(kind) {
     const t = document.getElementById("toast"), text = document.getElementById("toast-text");
     if (!t || !text) return;
-    text.textContent = MSG[lang()];
+    const [msg, more] = (kind === "add" ? ADD_MSG : MSG)[lang()];
+    const a = document.createElement("a");
+    a.href = INSTALL[lang()]; a.target = "_blank"; a.rel = "noopener"; a.textContent = more;
+    a.style.cssText = "color:inherit;text-decoration:underline;white-space:nowrap";
+    text.replaceChildren(`${msg} `, a);
+    const shown = text.textContent;
     const u = document.getElementById("toast-undo"); if (u) u.hidden = true;
     t.classList.add("show");
     clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => { if (text.textContent === MSG[lang()]) t.classList.remove("show"); }, 6000);
+    hideTimer = setTimeout(() => { if (text.textContent === shown) t.classList.remove("show"); }, 8000);
   }
 
   // ── fetch ──────────────────────────────────────────────────────────────
@@ -286,7 +302,7 @@
     const clean_ = new URL(url.href); clean_.pathname = url.pathname.slice(at);
     let body; try { body = init.body ? JSON.parse(init.body) : undefined; } catch { body = undefined; }
     const r = handle((init.method ?? "GET").toUpperCase(), clean_, body);
-    if (r.unsupported && toastOnUnsupported) setTimeout(demoToast, 60);
+    if (r.unsupported && toastOnUnsupported) setTimeout(() => demoToast(r.unsupported), 60);
     return new Response(JSON.stringify(r.data), { status: r.status, headers: { "content-type": "application/json", ...(r.headers ?? {}) } });
   };
 
@@ -299,7 +315,7 @@
     demoToast();
   }, true);
   document.addEventListener("submit", (e) => {
-    if (e.target instanceof Element && e.target.id === "add-form") { e.preventDefault(); e.stopImmediatePropagation(); demoToast(); }
+    if (e.target instanceof Element && e.target.id === "add-form") { e.preventDefault(); e.stopImmediatePropagation(); demoToast("add"); }
   }, true);
 
   // ── Banner ─────────────────────────────────────────────────────────────
@@ -310,10 +326,10 @@
     bar.style.cssText = "display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;padding:6px 16px;font:600 13px/1.4 system-ui,sans-serif;background:#2459e0;color:#fff;text-align:center";
     const span = document.createElement("span");
     const a = document.createElement("a");
-    a.href = REPO; a.target = "_blank"; a.rel = "noopener";
+    a.target = "_blank"; a.rel = "noopener";
     a.style.cssText = "color:#fff;text-decoration:underline;white-space:nowrap";
     bar.append(span, a);
-    const paint = () => { const [t, l] = BANNER[lang()]; span.textContent = t; a.textContent = l; };
+    const paint = () => { const [t, l] = BANNER[lang()]; span.textContent = t; a.textContent = l; a.href = INSTALL[lang()]; };
     paint();
     document.body.prepend(bar);
     new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
