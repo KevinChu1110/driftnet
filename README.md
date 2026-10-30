@@ -15,6 +15,7 @@
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
 [![CI](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml)
+[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/kevinchu1110/driftnet)
 [![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
 ![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
 ![Runs locally](https://img.shields.io/badge/runs-locally-0f9f8f.svg)
