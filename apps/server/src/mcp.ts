@@ -48,7 +48,8 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       description:
         "Find items in the reader's catalogue of AI tools, repos, videos and guides that people shared in chats. " +
         "Call it before choosing a tool for a task, since someone may already have vetted one; once you have an id and need the whole card, use driftnet_get_item instead. " +
-        "query is matched word by word (every word must appear) against names, summaries, tags, URLs, the reader's notes and the chat text a link was shared with, so 'pdf markdown' finds 'Convert PDF to Markdown' (it also matches by meaning when the reader turned that on); omit it to browse. " +
+        "query is matched word by word (every word must appear) against names, summaries, tags, URLs, folder names, the reader's notes and the chat text a link was shared with, so 'pdf markdown' finds 'Convert PDF to Markdown' (it also matches by meaning when the reader turned that on); omit it to browse. " +
+        "If nothing matches, misspelt words are corrected and corrected says what was searched instead. " +
         "days switches the order to newest first, which is how to ask what's new. view=trash is how to find an id to restore with driftnet_update_item; view=inbox adds each item's suggested folders. folder also covers its sub-folders. " +
         "Dead, archived or stale links are marked in health. Results come best first (must-see, then newest) and never include down-voted or prompt-injection-flagged items. There is no paging: when limit cuts results off, narrow with query, folder, kind or days.",
       inputSchema: {
@@ -67,6 +68,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       if (folder && !dn.categories[folder]) return unknownFolder(folder);
       // Newest-first (days) keeps its date order; otherwise a query may also match by meaning when that is on.
       const semantic = query && !days ? await dn.semantic.queryVec(query) : null;
+      const out: { corrected?: string } = {};
       return itemsResult(dn, dn.store.list({
         ...(semantic ? { semantic } : {}),
         ...(view === "needs_review" ? { health: ["dead", "archived", "stale"] as Health[] } : view && view !== "all" ? { view } : {}),
@@ -76,7 +78,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
         ...(kind ? { kind } : {}),
         minWorth: min_worth ?? "normal",
         limit: limit ?? 10,
-      }));
+      }, out), out.corrected);
     },
   );
 
@@ -508,7 +510,7 @@ const ITEM = z.object({
   stars: z.number().nullable(),
   suggested_folders: z.array(z.object({ folder: z.string(), score: z.number() })),
 });
-const ITEMS_OUTPUT = { notice: z.string(), items: z.array(ITEM) };
+const ITEMS_OUTPUT = { notice: z.string(), corrected: z.string().optional(), items: z.array(ITEM) };
 
 function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
   return {
@@ -539,11 +541,13 @@ function pageUrl(id: number): string | null {
   return base ? cardLink(base, id) : null;
 }
 
-function itemsResult(dn: Driftnet, items: Item[]) {
+/** `corrected`: the query searched instead, when the one given matched nothing (a typo). */
+function itemsResult(dn: Driftnet, items: Item[], corrected?: string) {
   const choices = dn.categories;
   const rows = items.map((i) => row(i, choices));
+  const fixed = corrected ? `Nothing matched the query as written; showing results for "${corrected}".\n\n` : "";
   return {
-    content: [{ type: "text" as const, text: `${DATA_NOTICE}\n\n${JSON.stringify(rows, null, 1)}` }],
-    structuredContent: { notice: DATA_NOTICE, items: rows },
+    content: [{ type: "text" as const, text: `${DATA_NOTICE}\n\n${fixed}${JSON.stringify(rows, null, 1)}` }],
+    structuredContent: { notice: DATA_NOTICE, ...(corrected ? { corrected } : {}), items: rows },
   };
 }

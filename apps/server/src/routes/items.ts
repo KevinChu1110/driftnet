@@ -23,7 +23,7 @@ export const routes: Route[] = [
       const semantic = p.get("q") && !["newest", "shared"].includes(p.get("sort") ?? "") ? await dn.semantic.queryVec(p.get("q")!) : null;
       const minWorth = p.get("minWorth");
       const healthFilter = (p.get("health") ?? "").split(",").filter((h): h is Health => (HEALTH as readonly string[]).includes(h));
-      const counted: { total?: number } = {};
+      const counted: { total?: number; corrected?: string } = {};
       const list = dn.store.list({
         ...(semantic ? { semantic } : {}),
         ...(p.get("q") ? { q: p.get("q")! } : {}),
@@ -35,6 +35,7 @@ export const routes: Route[] = [
         ...(healthFilter.length ? { health: healthFilter } : {}),
         ...(["best", "newest", "shared"].includes(p.get("sort") ?? "") ? { sort: p.get("sort") as "best" | "newest" | "shared" } : {}),
         clean: p.get("all") !== "1",
+        ...(p.get("fuzzy") === "0" ? { fuzzy: false } : {}),
         limit: Number(p.get("limit") ?? 200),
         offset: Number(p.get("offset") ?? 0),
       }, counted);
@@ -51,7 +52,8 @@ export const routes: Route[] = [
       // The Inbox offers each card its best folders (the stored picks, or keyword overlap when there are none).
       const choices = p.get("view") === "inbox" ? dn.categories : null;
       return send(200, list.map((i) => ({ ...publicItem(i), ...(choices ? { suggestions: suggestionsFor(i, choices) } : {}), found: found.get(i.id) ?? [], said: said.get(i.id) ?? [] })),
-        undefined, { "X-Total-Count": String(counted.total ?? list.length) });
+        // A misspelt query that matched nothing was searched as X-Search-Corrected instead (URI-encoded: it may hold CJK).
+        undefined, { "X-Total-Count": String(counted.total ?? list.length), ...(counted.corrected ? { "X-Search-Corrected": encodeURIComponent(counted.corrected) } : {}) });
     },
   },
   {

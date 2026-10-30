@@ -386,6 +386,8 @@
   .crumb b { color: var(--accent); font-weight: 600; }
   main { padding: 16px 20px 48px; display: grid; gap: 12px; align-content: start; }
   .hint { color: var(--muted); font-size: 13px; margin: -4px 2px 0; }
+  .hint.corrected button { all: unset; color: var(--accent); text-decoration: underline; cursor: pointer; }
+  .hint.corrected button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* A card sits on top of two action strips that show while it is dragged. */
   .swipe { content-visibility: auto; contain-intrinsic-size: auto 150px; position: relative; border-radius: 12px; overflow: hidden; scroll-margin-top: 90px; transition: height .25s ease, margin .25s ease, opacity .25s ease; }
@@ -763,6 +765,7 @@
       stats: (n, s) => `${n} ${n === 1 ? "item" : "items"} · shared ${s}×`, shared: (n) => `shared ${n}×`,
       empty: "Nothing here yet.", emptyStart: "Nothing here yet. Paste a link below to start — or save one with the Chrome extension, or run npx driftnet add <link>.",
       noMatch: (q, v) => `No cards match “${q}” in ${v}.`, searchAll: "Search everything", searchIn: (v) => `Search ${v}…`,
+      showingFor: (c) => `Showing results for “${c}”`, searchInstead: (q) => `search for “${q}” instead`,
       addTitle: "Add a link", addHelp: "A link to a tool, post or video (example.com works too)", addThis: (u) => `Add this link: ${u}`, kAdd: "Add a link",
       addedAlready: "Already saved — here it is", addNothing: "No link found in that.", noSuggestion: "No suggestion for this card — press m to pick a folder", emptyFav: "No favorites yet — swipe a card right, or tap the star.",
       pageMore: (n) => `Show more (${n} left)`, emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
@@ -983,6 +986,7 @@
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
       empty: "這裡還沒有內容。", emptyStart: "還沒有內容。在下面貼一個連結開始，或用 Chrome 擴充功能收錄，也可以執行 npx driftnet add <連結>。",
       noMatch: (q, v) => `「${v}」裡沒有符合「${q}」的卡片。`, searchAll: "搜尋全部", searchIn: (v) => `在「${v}」裡搜尋…`,
+      showingFor: (c) => `顯示「${c}」的搜尋結果`, searchInstead: (q) => `改搜尋「${q}」`,
       addTitle: "收錄連結", addHelp: "工具、貼文或影片的連結（只打 example.com 也可以）", addThis: (u) => `收錄這個連結：${u}`, kAdd: "收錄連結",
       addedAlready: "已經收過了，就是這張", addNothing: "裡面找不到連結。", noSuggestion: "這張卡片沒有建議的資料夾，按 m 自己選", emptyFav: "還沒有最愛，把卡片往右滑或按星號。",
       pageMore: (n) => `再顯示 ${n} 張`, emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
@@ -1280,7 +1284,11 @@
     }
     if (res.status === 401) throw Object.assign(new Error("unauthorized"), { unauthorized: true });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    if (meta) meta.total = Number(res.headers.get("x-total-count"));
+    if (meta) {
+      meta.total = Number(res.headers.get("x-total-count"));
+      // A search that matched nothing as typed was run with its misspelt words corrected.
+      try { meta.corrected = decodeURIComponent(res.headers.get("x-search-corrected") ?? ""); } catch { meta.corrected = ""; }
+    }
     return res.json();
   }
 
@@ -3695,12 +3703,15 @@
   /** Cards fetched per page; the rest come as the reader reaches the end of the list. */
   const PAGE = 60;
   let pageTotal = 0, pageGen = 0, pageBusy = false, pageObserver = null, pageHost = null, keepPages = false;
+  /** The query the reader asked to search exactly as typed (no spelling correction). */
+  let exactQ = "";
   const listParams = () => {
     const p = new URLSearchParams();
     if (prefs.sort !== "best") p.set("sort", prefs.sort);
     if (state.view === "review") p.set("health", "dead,archived,stale");
     else if (state.view !== "all") p.set("view", state.view);
     for (const k of ["category", "kind", "q"]) if (state[k]) p.set(k, state[k]);
+    if (state.q && state.q === exactQ) p.set("fuzzy", "0");
     return p;
   };
   const moreHtml = () => items.length < pageTotal
@@ -3786,8 +3797,11 @@
     const addQ = role === "admin" && state.q && linkLike(state.q) && (!items.length || /^(https?:\/\/|www\.)/i.test(state.q))
       ? `<div class="add-q"><button class="btn primary" type="button" data-add-q>${ic("plus")} ${esc(t.addThis(state.q))}</button></div>` : "";
     const scoped = state.view !== "all" || state.category || state.kind;
+    // Nothing matched the words as typed: say which spelling was searched, and offer the original.
+    const fixed = items.length && state.q && meta.corrected
+      ? `<p class="hint corrected">${esc(t.showingFor(meta.corrected))} — <button type="button" data-search-exact>${esc(t.searchInstead(state.q))}</button></p>` : "";
     $("list").innerHTML = items.length
-      ? addQ + (state.view === "trash" ? `<div class="trash-bar"><button class="btn danger" type="button" id="trash-empty">${ic("trash")} ${esc(t.emptyTrashBtn)}</button></div>` : "") + `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
+      ? fixed + addQ + (state.view === "trash" ? `<div class="trash-bar"><button class="btn danger" type="button" id="trash-empty">${ic("trash")} ${esc(t.emptyTrashBtn)}</button></div>` : "") + `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
       : state.q
         // Searching found nothing: say so (not "Inbox zero"), and offer the whole catalogue when only part of it was searched.
         ? `<div class="empty nomatch"><span>${esc(t.noMatch(state.q, viewName()))}</span>${scoped ? `<button class="btn" type="button" data-search-all>${esc(t.searchAll)}</button>` : ""}${addQ}</div>`
@@ -3797,6 +3811,7 @@
              <button class="btn" type="button" data-connect-empty>${ic("plug")} ${esc(t.st.connect)}</button>${templateChooser(t)}` : ""}</div>`;
     $("list").querySelector("[data-add-q]")?.addEventListener("click", (e) => { const b = e.currentTarget; b.disabled = true; addUrl(state.q).then(() => { if (b.isConnected) b.disabled = false; }); });
     $("list").querySelector("[data-search-all]")?.addEventListener("click", () => { Object.assign(state, { view: "all", category: "", kind: "" }); load(); });
+    $("list").querySelector("[data-search-exact]")?.addEventListener("click", () => { exactQ = state.q; render(); });
     watchMore();
     if (keep) scrollTo({ top: y });
     $("add-form")?.addEventListener("submit", addLink);

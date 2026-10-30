@@ -12,7 +12,7 @@
  */
 import { existsSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
-import { FTS_COLUMNS, reindexAll } from "./search-index.ts";
+import { FTS_COLUMNS, reindexAll, WORDS_DDL } from "./search-index.ts";
 
 export interface Migration {
   version: number;
@@ -152,8 +152,8 @@ export const MIGRATIONS: Migration[] = [
     version: 2,
     description: "full-text search index",
     up(db) {
-      db.exec(`CREATE VIRTUAL TABLE item_fts USING fts5(${FTS_COLUMNS.join(", ")}, tokenize='trigram')`);
-      reindexAll(db);
+      // The 0.8 columns, frozen: migration 6 rebuilds the table with today's columns and fills it.
+      db.exec("CREATE VIRTUAL TABLE item_fts USING fts5(name, one_liner, highlights, tags, use_cases, demo, why, title, url, note, chat, tokenize='trigram')");
     },
   },
   {
@@ -186,6 +186,18 @@ export const MIGRATIONS: Migration[] = [
         field_set TEXT NOT NULL, before TEXT NOT NULL
       )`);
       db.exec("CREATE INDEX IF NOT EXISTS idx_item_history_item ON item_history (item_id, id)");
+    },
+  },
+  {
+    version: 6,
+    description: "search matches folder names and must-see; word vocabulary for typo correction",
+    up(db) {
+      // FTS5 tables can't gain columns: rebuild the index (every row) with the folder and worth columns,
+      // plus the word-level twin whose vocabulary corrects misspelt terms.
+      db.exec("DROP TABLE IF EXISTS item_fts; DROP TABLE IF EXISTS item_words_vocab; DROP TABLE IF EXISTS item_words");
+      db.exec(`CREATE VIRTUAL TABLE item_fts USING fts5(${FTS_COLUMNS.join(", ")}, tokenize='trigram')`);
+      for (const sql of WORDS_DDL) db.exec(sql);
+      reindexAll(db);
     },
   },
 ];

@@ -384,6 +384,15 @@ try {
     assert.ok((await api("/api/items?q=license")).some((i) => i.id === id), "notes are searchable");
     assert.ok((await api("/api/items")).find((i) => i.id === 1).said.length, "chat text comes with the item");
     console.log("✓ a note on a card is saved, shown in the modal and searchable");
+    // A typo that matches nothing is searched corrected, with a way back to the words as typed.
+    const typeQ = (v) => evaluate(s, `(() => { const q = document.getElementById("q"); q.value = ${JSON.stringify(v)}; q.dispatchEvent(new Event("input")); return 1; })()`);
+    await typeQ("licnese");
+    await waitFor(s, `document.querySelector(".hint.corrected")?.textContent.includes("license") && !!document.getElementById("item-${id}")`, "results for the corrected word, said so");
+    await evaluate(s, `document.querySelector("[data-search-exact]").click()`);
+    await waitFor(s, `!!document.querySelector(".empty.nomatch") && !document.querySelector(".hint.corrected")`, "the words as typed: nothing");
+    await typeQ("");
+    await waitFor(s, `!document.querySelector(".empty.nomatch") && document.querySelectorAll("#list .swipe").length > 1`, "back to every card");
+    console.log("✓ a misspelt search shows the corrected results and can search the words as typed");
 
     await evaluate(s, `document.querySelector('[data-field="view"][data-value="notes"]').click()`);
     await waitFor(s, `document.querySelector(".note-card a[data-card]")`, "notes page with card links");

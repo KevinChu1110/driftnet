@@ -48,7 +48,7 @@ Give each agent its own key instead of the admin password: **Settings → Access
 
 | MCP tool | Use |
 |---|---|
-| `driftnet_search_items` | Search before picking a tool; `days` for what's new; `view` for the inbox, favorites or trash; filter by folder or kind |
+| `driftnet_search_items` | Search before picking a tool; `days` for what's new; `view` for the inbox, favorites or trash; filter by folder or kind. When nothing matches, misspelt words are corrected and `corrected` says what was searched |
 | `driftnet_save_link` | Catalogue a link |
 | `driftnet_lease_items` / `driftnet_enrich_item` | Work the queue, below |
 | `driftnet_get_item` | One card in full: summary, use cases, your note, what people said in chat, tools found inside |

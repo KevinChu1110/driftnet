@@ -73,7 +73,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack (Socket Mode, or webhook) |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
-**HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`) · `POST /api/items/:id/feedback` ·
+**HTTP:** `GET /` · `GET /api/items[/:id]` (`?view=favorites|trash`; a search corrected for a typo answers with `X-Search-Corrected`, URI-encoded; `?fuzzy=0` turns that off) · `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack` (`?s=` signed link) · `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send` (`{"dryRun": true}` shows the text) · `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `PUT /api/items/:id/tags` · `DELETE /api/items/:id` (trashed only) · `DELETE /api/trash` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export` (`?format=vault`) · `POST /api/import` (`{content}` or `{url}` of a pack) · `GET /api/import/:job` ·

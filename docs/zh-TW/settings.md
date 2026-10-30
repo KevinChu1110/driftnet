@@ -72,7 +72,7 @@
 | `SLACK_APP_TOKEN` · `SLACK_BOT_TOKEN` · `SLACK_SIGNING_SECRET` | — | Slack（Socket Mode 或 webhook） |
 | `LINE_CHANNEL_SECRET` · `LINE_CHANNEL_ACCESS_TOKEN` | — | LINE |
 
-**HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`）· `POST /api/items/:id/feedback` ·
+**HTTP：** `GET /` · `GET /api/items[/:id]`（`?view=favorites|trash`；更正過拼字的搜尋會帶 `X-Search-Corrected` 標頭（URI 編碼），`?fuzzy=0` 可關閉）· `POST /api/items/:id/feedback` ·
 `POST /api/items/:id/{trash,restore,favorite,unfavorite,move}` · `GET|POST /api/folders` · `PATCH|DELETE /api/folders/:id` · `GET /api/folders/:id/pack`（`?s=` 簽名連結）· `GET /api/folders/:id/pack-link` · `POST /api/ingest` ·
 `POST /api/chat` · `POST /api/digest/send`（`{"dryRun": true}` 只顯示內容）· `POST /api/pending` · `POST /api/items/:id/enrich` · `GET /api/stats` ·
 `PUT /api/items/:id/note` · `PUT /api/items/:id/tags` · `DELETE /api/items/:id`（限垃圾桶內）· `DELETE /api/trash` · `GET|DELETE /api/items/:id/history` · `POST /api/items/:id/history/:v/restore` · `GET|POST /api/notes` · `PUT|DELETE /api/notes/:id` · `GET /api/export`（`?format=vault`）· `POST /api/import`（`{content}` 或資料夾包的 `{url}`）· `GET /api/import/:job` ·

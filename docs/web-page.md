@@ -54,6 +54,11 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
 - **Notes.** 📝 on any card for your own note (tried it? needs a GPU?). What people wrote with the link
   in chat shows on the card too (💬), and both are searchable. **📝 Notes** in the sidebar holds
   free-standing Markdown notes; `#12` links card 12.
+- **Search.** Every word must appear somewhere on the card: its name, summary, tags, link, your note, the
+  chat text, or the name of the folder it sits in (“Coding agents” finds the whole shelf, in either language).
+  `must-see` (or `必看`) finds the must-see cards, `#47` card 47. When nothing matches, a misspelt word is
+  corrected to the closest word in your catalogue (“desgin” → “design”); the page says
+  *Showing results for “design”* with a link to search the words as typed. Chinese is never “corrected”.
 - **⚙ Settings** on the page: model, Jev, summary language, chat replies, your own summary rules and
   blocked domains, saved to `~/.driftnet/.env` and applied without a restart. Per browser: order (best,
   newest, most shared), compact cards, tags, chat text, light or dark.
