@@ -87,5 +87,22 @@
   },
   "tokenRejected": {
     "message": "伺服器拒絕了這個 token（HTTP 401），請檢查。"
+  },
+  "unreachableLocal": {
+    "message": "連不到這台電腦上的 driftnet。請在終端機執行 npx driftnet 啟動它，並讓那個視窗一直開著。"
+  },
+  "unreachableRemote": {
+    "message": "連不到 $URL$ 上的 driftnet。它有在執行嗎？網址對嗎？",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "helpLink": {
+    "message": "怎麼做？"
+  },
+  "helpUrl": {
+    "message": "https://github.com/KevinChu1110/driftnet/blob/main/README.zh-TW.md#-開始使用"
   }
 }

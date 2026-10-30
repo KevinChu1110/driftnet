@@ -24,7 +24,10 @@ $("save").addEventListener("click", async () => {
       if (!granted) return void (result.textContent = t("permissionDenied"));
     }
     const token = $("token").value.trim();
-    const res = await fetch(`${serverUrl}/api/stats`, token ? { headers: { authorization: `Bearer ${token}` } } : {});
+    const res = await fetch(`${serverUrl}/api/stats`, token ? { headers: { authorization: `Bearer ${token}` } } : {}).catch(() => {
+      // Nothing answered: say what to do instead of "Failed to fetch".
+      throw new Error(LOOPBACK.has(hostname) ? t("unreachableLocal") : t("unreachableRemote", serverUrl));
+    });
     if (res.status === 401) throw new Error(t("tokenRejected"));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const stats = await res.json();
