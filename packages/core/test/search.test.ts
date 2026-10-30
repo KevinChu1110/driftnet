@@ -99,3 +99,12 @@ test("quotes, wildcards, dashes and parentheses are plain text, never syntax", (
   assert.deepEqual(ids(s, "(fast)"), [a.id]);
   assert.equal(s.itemCount(), 1);
 });
+
+test("“#47” finds card 47 by its number; a bare number is still a text search", () => {
+  const s = new Store(":memory:");
+  add(s, "https://n.test/1", "First", sum("First"));
+  const b = add(s, "https://n.test/2", "Tool 1", sum("Tool 1"));
+  assert.deepEqual(ids(s, `#${b.id}`), [b.id]);
+  assert.deepEqual(ids(s, " #999 "), []);
+  assert.deepEqual(ids(s, "#2", { view: "trash" }), [], "filters still apply");
+});

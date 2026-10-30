@@ -1023,7 +1023,10 @@ export class Store {
     if (query.clean !== false) {
       where.push("flags NOT LIKE '%injection%'", `${Store.NET_VOTES} > -2`);
     }
-    const terms = (query.q ?? "").slice(0, 200).split(/\s+/).map((t) => t.replace(/"/g, "")).filter(Boolean).slice(0, 8);
+    // "#47" is a card number, as printed on every card and used in notes.
+    const byId = /^#(\d{1,9})$/.exec((query.q ?? "").trim());
+    if (byId) { where.push("items.id = ?"); args.push(Number(byId[1])); }
+    const terms = byId ? [] : (query.q ?? "").slice(0, 200).split(/\s+/).map((t) => t.replace(/"/g, "")).filter(Boolean).slice(0, 8);
     // Terms of 3+ characters go to the trigram index (substring match, CJK included); shorter ones
     // cannot be looked up there and keep the LIKE scan.
     const ftsTerms = terms.filter((t) => [...t].length >= 3);
