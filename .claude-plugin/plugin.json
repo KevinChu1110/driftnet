@@ -1,6 +1,6 @@
 {
   "name": "driftnet",
-  "version": "0.11.0",
+  "version": "1.0.0",
   "description": "Search, save and file the links people share in your chats (tools, repos, articles): a local catalogue your agent checks before picking a tool, and helps keep tidy.",
   "author": {
     "name": "Kevin Chu",

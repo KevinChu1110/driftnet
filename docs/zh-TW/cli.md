@@ -26,7 +26,7 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 
 - **macOS：** LaunchAgent，`~/Library/LaunchAgents/io.github.kevinchu1110.driftnet.plist`（當掉會自動重開，最快 10 秒一次）。
 - **Linux：** systemd 使用者服務，`~/.config/systemd/user/driftnet.service`。想在沒人登入時也繼續跑（伺服器），執行一次 `loginctl enable-linger $USER`。
-- **Windows：** 「啟動」資料夾裡一個隱藏視窗的腳本（`driftnet.vbs`）。不用排程工作，因為建立登入時執行的排程要系統管理員權限，「啟動」資料夾不用。
+- **Windows：** 「啟動」資料夾裡一個隱藏視窗的腳本（`driftnet.vbs`）。不用排程工作，因為建立登入時執行的排程要系統管理員權限，「啟動」資料夾不用。*實驗性*：目前只有自動測試，還沒在真的 Windows 電腦上跑過，用了請[回報](https://github.com/KevinChu1110/driftnet/issues)結果。
 
 服務跑的是什麼：用 npm 在 `~/.driftnet/service/` 裝一份同版本的 driftnet，再用你執行指令時的那個 `node` 啟動它。不直接跑 `npx driftnet`，因為 npx 的快取隨時可能被清掉，登入時重新下載要有網路（還可能抓到別的版本）；也不用全域安裝，因為那可能要 `sudo`。整個過程都不需要 `sudo` 或系統管理員。
 

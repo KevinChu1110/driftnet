@@ -26,7 +26,7 @@ For a server elsewhere, add `--url http://host:8787 --token <password>` (or set 
 
 - **macOS:** a LaunchAgent, `~/Library/LaunchAgents/io.github.kevinchu1110.driftnet.plist` (restarted after a crash, at most every 10 s).
 - **Linux:** a systemd user unit, `~/.config/systemd/user/driftnet.service`. To keep it running when nobody is logged in (a server), run `loginctl enable-linger $USER` once.
-- **Windows:** a hidden script in your Startup folder (`driftnet.vbs`). Not a scheduled task: making a logon task needs an administrator prompt, the Startup folder does not.
+- **Windows:** a hidden script in your Startup folder (`driftnet.vbs`). Not a scheduled task: making a logon task needs an administrator prompt, the Startup folder does not. *Experimental:* tested by the test suite, not yet on a real Windows machine; please [report](https://github.com/KevinChu1110/driftnet/issues) how it goes.
 
 What the service runs: a private copy of the same driftnet version, installed with npm into `~/.driftnet/service/` and started with the `node` you ran the command with. Not `npx driftnet` itself, because npx's cache can be cleaned at any time and fetching again at login needs the network (and might pick up another version); not a global install, which can need `sudo`. Nothing here needs `sudo` or an administrator.
 
