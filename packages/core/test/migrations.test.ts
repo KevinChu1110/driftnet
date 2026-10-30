@@ -62,6 +62,33 @@ test("a pre-versioning database is caught up and stamped without losing data, af
   assert.equal(version(dir), LATEST_VERSION);
 });
 
+test("migration 6 rebuilds a v5 search index with folder names, must-see and the word vocabulary", () => {
+  const path = tmp();
+  const s = new Store(path);
+  s.seedFolders({ "coding-agent": "c", other: "o" });
+  const judgement = { isAiTool: 1, category: "coding-agent", kind: "repo" as const, worth: "must-see" as const, engine: "jev" as const, confidence: 1 };
+  const id = s.upsert({ url: "https://m6.test/a", aliases: [], title: "Aider", judgement, flags: [], source: "s",
+    summary: { name: "Aider", oneLiner: "design helper in the terminal", highlights: [], useCases: [], tags: [], primaryUrl: "https://m6.test/a" } }).id;
+  // What a 0.11 (schema 5) database holds: the 11-column index and no word table.
+  const raw = new DatabaseSync(path);
+  raw.exec(`DROP TABLE item_fts; DROP TABLE item_words_vocab; DROP TABLE item_words;
+    CREATE VIRTUAL TABLE item_fts USING fts5(name, one_liner, highlights, tags, use_cases, demo, why, title, url, note, chat, tokenize='trigram');
+    INSERT INTO item_fts (rowid, name, one_liner, title) VALUES (${id}, 'Aider', 'design helper in the terminal', 'Aider');
+    PRAGMA user_version = 5`);
+  raw.close();
+
+  const store = new Store(path);
+  assert.equal(version(path), LATEST_VERSION);
+  assert.equal(existsSync(`${path}.bak-v5`), true, "backed up before the index is rebuilt");
+  assert.deepEqual(store.list({ q: "aider" }).map((i) => i.id), [id], "existing rows are still found");
+  assert.deepEqual(store.list({ q: "coding agents" }).map((i) => i.id), [id], "by the folder's label");
+  assert.deepEqual(store.list({ q: "寫程式" }).map((i) => i.id), [id], "by its zh-TW label");
+  assert.deepEqual(store.list({ q: "必看" }).map((i) => i.id), [id]);
+  const out: { corrected?: string } = {};
+  assert.deepEqual(store.list({ q: "desgin" }, out).map((i) => i.id), [id], "the vocabulary is filled");
+  assert.equal(out.corrected, "design");
+});
+
 test("a database from a newer driftnet is refused", () => {
   const path = tmp();
   new Store(path);

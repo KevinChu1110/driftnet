@@ -5,7 +5,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { normalizeMedia } from "./media.ts";
 import type { Health, Item, Judgement, Kind, MediaRef, ShareContext, Suggestion, Summary, Worth } from "./types.ts";
 import { migrate } from "./migrations.ts";
-import { ftsMatchQuery, FTS_WEIGHTS, reindexItem } from "./search-index.ts";
+import { correctTerm, folderNames, ftsMatchQuery, FTS_WEIGHTS, refreshFolderText, refreshItemFolders, reindexItem, unindexItem } from "./search-index.ts";
 import { VectorIndex, type Hit } from "./vectors.ts";
 import { categoryLabel, LOCALES } from "./i18n.ts";
 import { guard } from "./guard.ts";
@@ -106,6 +106,12 @@ export interface ListQuery {
    * the trash, the inbox and explicit sorts, and when no vectors are stored.
    */
   semantic?: { vec: Float32Array; floor?: number };
+  /**
+   * When a text search matches nothing, retry once with each misspelt word (4+ Latin letters, matching
+   * nothing on its own) replaced by the closest word in the catalogue; `out.corrected` then says what was
+   * searched instead. Default true. CJK terms are never changed.
+   */
+  fuzzy?: boolean;
 }
 
 /** RRF constant (Cormack et al.): flattens the head of each ranking so neither one dominates. */
@@ -217,6 +223,7 @@ export class Store {
         .get(...(cols.map((c) => patch[c]) as (string | number | null)[]), id) as Record<string, unknown>;
       this.log(id, actor, cur, row);
       if (patch.note !== undefined || patch.summary !== undefined || patch.title !== undefined) this.reindex(id);
+      else if (patch.category !== undefined) refreshItemFolders(this.db, [id]);
     });
     if ("trashed_at" in patch && (patch.trashed_at === null) !== (cur.trashed_at === null)) {
       const trashed = patch.trashed_at !== null;
@@ -456,17 +463,21 @@ export class Store {
       if (this.descendants(id).includes(patch.parent)) throw new FolderError("a folder can't go inside itself");
     }
     if (patch.name !== undefined && (!patch.name.trim() || /^\.+$/.test(patch.name.trim()))) throw new FolderError("a folder needs a name");
-    this.db
-      .prepare(
-        `UPDATE folders SET
-           name = COALESCE(?, name), description = COALESCE(?, description),
-           parent_id = CASE WHEN ? THEN ? ELSE parent_id END, position = COALESCE(?, position)
-         WHERE id = ?`,
-      )
-      .run(
-        patch.name?.trim().slice(0, 60) ?? null, patch.description?.trim().slice(0, 300) ?? null,
-        patch.parent !== undefined ? 1 : 0, patch.parent ?? null, patch.position ?? null, id,
-      );
+    this.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE folders SET
+             name = COALESCE(?, name), description = COALESCE(?, description),
+             parent_id = CASE WHEN ? THEN ? ELSE parent_id END, position = COALESCE(?, position)
+           WHERE id = ?`,
+        )
+        .run(
+          patch.name?.trim().slice(0, 60) ?? null, patch.description?.trim().slice(0, 300) ?? null,
+          patch.parent !== undefined ? 1 : 0, patch.parent ?? null, patch.position ?? null, id,
+        );
+      // A new name or place changes the folder path of every card below it, which search matches.
+      if (patch.name !== undefined || patch.parent !== undefined) refreshFolderText(this.db, this.descendants(id));
+    });
     return this.folders().find((f) => f.id === id)!;
   }
 
@@ -476,9 +487,11 @@ export class Store {
     const row = this.db.prepare("SELECT parent_id AS parent FROM folders WHERE id = ?").get(id) as { parent: string | null } | undefined;
     if (!row) throw new FolderError(`no folder ${id}`);
     this.transaction(() => {
+      const below = this.descendants(id).slice(1);
       this.db.prepare("UPDATE items SET category = ? WHERE category = ?").run(row.parent ?? "other", id);
       this.db.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ?").run(row.parent, id);
       this.db.prepare("DELETE FROM folders WHERE id = ?").run(id);
+      refreshFolderText(this.db, [...below, row.parent ?? "other"]);
       if (this.folderUses()[id]) this.bumpFolderUse(id, -Infinity);
     });
   }
@@ -489,7 +502,7 @@ export class Store {
     const moved = this.transaction(() => {
       const old = this.db.prepare("SELECT category, user_placed FROM items WHERE id = ?").get(itemId) as Record<string, unknown> | undefined;
       const did = this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, itemId).changes > 0;
-      if (did) this.log(itemId, actor, old!, { category: folderId, user_placed: 1 });
+      if (did) { this.log(itemId, actor, old!, { category: folderId, user_placed: 1 }); refreshItemFolders(this.db, [itemId]); }
       return did;
     });
     if (moved) this.bumpFolderUse(folderId);
@@ -502,6 +515,7 @@ export class Store {
     const before = this.inTransaction(ids, "category, user_placed", (id, before) => {
       this.db.prepare("UPDATE items SET category = ?, user_placed = 1, moved_by = ? WHERE id = ?").run(folderId, actor ?? null, id);
       this.log(id, actor, before, { category: folderId, user_placed: 1 });
+      refreshItemFolders(this.db, [id]);
       return { id, category: String(before.category), user_placed: Number(before.user_placed) };
     });
     this.bumpFolderUse(folderId, ids.length);
@@ -520,7 +534,10 @@ export class Store {
         trashed_at: r.trashed_at !== undefined ? r.trashed_at : before.trashed_at, favorite: r.favorite !== undefined ? (r.favorite ? 1 : 0) : before.favorite };
       this.log(id, actor, before, after);
       if (r.category !== undefined) undone.set(String(before.category), (undone.get(String(before.category)) ?? 0) + 1);
-      if (r.category !== undefined) this.db.prepare("UPDATE items SET category = ?, user_placed = ? WHERE id = ?").run(r.category, r.user_placed ?? 0, id);
+      if (r.category !== undefined) {
+        this.db.prepare("UPDATE items SET category = ?, user_placed = ? WHERE id = ?").run(r.category, r.user_placed ?? 0, id);
+        refreshItemFolders(this.db, [id]);
+      }
       if (r.trashed_at !== undefined) this.db.prepare("UPDATE items SET trashed_at = ? WHERE id = ?").run(r.trashed_at, id);
       if (r.favorite !== undefined) this.db.prepare("UPDATE items SET favorite = ? WHERE id = ?").run(r.favorite ? 1 : 0, id);
       return undefined;
@@ -585,6 +602,7 @@ export class Store {
       }
       if (!done.has("other")) this.db.prepare("INSERT INTO folders (id, description, position, builtin) VALUES ('other', 'Anything that fits none of the above', 9999, 1)").run();
       this.db.prepare("UPDATE items SET category = 'other' WHERE category NOT IN (SELECT id FROM folders)").run();
+      refreshFolderText(this.db, (this.db.prepare("SELECT id FROM folders").all() as { id: string }[]).map((f) => f.id));
     });
   }
 
@@ -625,6 +643,7 @@ export class Store {
       this.db.prepare("UPDATE items SET category = ? WHERE category = ?").run(into, from);
       this.db.prepare("UPDATE folders SET parent_id = ? WHERE parent_id = ?").run(into, from);
       this.db.prepare("DELETE FROM folders WHERE id = ?").run(from);
+      refreshFolderText(this.db, this.descendants(into));
     });
     const n = this.folderUses()[from] ?? 0;
     if (n) { this.bumpFolderUse(from, -Infinity); this.bumpFolderUse(into, n); }
@@ -800,9 +819,9 @@ export class Store {
   private dropItem(id: number): void {
     for (const sql of [
       "DELETE FROM aliases WHERE item_id = ?", "DELETE FROM shares WHERE item_id = ?", "DELETE FROM feedback WHERE item_id = ?",
-      "DELETE FROM found_in WHERE parent_id = ? OR child_id = ?", "DELETE FROM item_fts WHERE rowid = ?",
-      "DELETE FROM item_history WHERE item_id = ?", "DELETE FROM items WHERE id = ?",
+      "DELETE FROM found_in WHERE parent_id = ? OR child_id = ?", "DELETE FROM item_history WHERE item_id = ?", "DELETE FROM items WHERE id = ?",
     ]) this.db.prepare(sql).run(...(sql.includes("OR") ? [id, id] : [id]));
+    unindexItem(this.db, id);
     this.vectors.remove(id);
   }
 
@@ -999,8 +1018,51 @@ export class Store {
   /** Net votes per item, for hiding items the community voted down. */
   private static readonly NET_VOTES = "(SELECT COALESCE(SUM(vote), 0) FROM feedback f WHERE f.item_id = items.id)";
 
-  /** `out.total` receives how many rows match, ignoring limit/offset (for paging). */
-  list(query: ListQuery = {}, out?: { total?: number }): Item[] {
+  /**
+   * `out.total` receives how many rows match, ignoring limit/offset (for paging); `out.corrected` the
+   * query actually searched when the typed one matched nothing and a spelling correction did.
+   */
+  list(query: ListQuery = {}, out?: { total?: number; corrected?: string }): Item[] {
+    const items = this.listOnce(query, out);
+    if (items.length || query.fuzzy === false || !query.q?.trim()) return items;
+    // An empty page past the end is not "nothing matched".
+    if (out ? out.total : query.offset && this.listOnce({ ...query, offset: 0, limit: 1 }).length) return items;
+    const corrected = this.correctQuery(query.q);
+    if (!corrected) return items;
+    const counted: { total?: number } = {};
+    const again = this.listOnce({ ...query, q: corrected }, counted);
+    if (!counted.total) return items;
+    if (out) { out.total = counted.total; out.corrected = corrected; }
+    return again;
+  }
+
+  /**
+   * `q` with every misspelt word swapped for its closest catalogue word, or null when nothing changed.
+   * A word is misspelt when it matches no card on its own; short, CJK and non-Latin words are left alone.
+   */
+  private correctQuery(q: string): string | null {
+    if (/^\s*#\d{1,9}\s*$/.test(q)) return null;
+    const terms = q.slice(0, 200).split(/\s+/).map((t) => t.replace(/"/g, "")).filter(Boolean).slice(0, 8);
+    const hits = this.db.prepare("SELECT 1 FROM item_fts WHERE item_fts MATCH ? LIMIT 1");
+    let folderWords: string[] | undefined;
+    let changed = false;
+    const out = terms.map((t) => {
+      if ([...t].length < 4 || hits.get(ftsMatchQuery([t]))) return t;
+      folderWords ??= this.folderWords();
+      const c = correctTerm(this.db, t, folderWords);
+      if (c) changed = true;
+      return c ?? t;
+    });
+    return changed ? out.join(" ") : null;
+  }
+
+  /** Every word of every folder name (labels in all languages for built-in ones): part of the vocabulary. */
+  private folderWords(): string[] {
+    const rows = this.db.prepare("SELECT id, name FROM folders").all() as { id: string; name: string | null }[];
+    return [...new Set(rows.flatMap((r) => folderNames(r.id, r.name).join(" ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []))];
+  }
+
+  private listOnce(query: ListQuery, out?: { total?: number }): Item[] {
     const where: string[] = [query.view === "trash" ? "trashed_at IS NOT NULL" : "trashed_at IS NULL"];
     const args: (string | number)[] = [];
     if (query.view === "favorites") where.push("favorite = 1");
@@ -1049,9 +1111,11 @@ export class Store {
         `EXISTS (SELECT 1 FROM shares s WHERE s.item_id = items.id AND ${like("s.note")})`,
         ...["name", "oneLiner", "demo", "why"].map((k) => like(f(k))),
         ...["highlights", "tags", "useCases"].map((k) => `EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(summary) THEN summary ELSE '{}' END, '$.${k}') e WHERE ${like("e.value")})`),
+        // The folder path and "must-see" live only in the index row ("必看" is too short for the trigrams).
+        `EXISTS (SELECT 1 FROM item_fts x WHERE x.rowid = items.id AND (${like("x.folder")} OR ${like("x.worth")}))`,
       ].join(" OR ")})`);
       const pat = `%${term.replace(/[\\%_]/g, "\\$&")}%`;
-      args.push(...Array<string>(11).fill(pat));
+      args.push(...Array<string>(13).fill(pat));
     }
     // The trash lists what was removed last first; elsewhere the best comes first.
     const order = query.view === "trash" ? "trashed_at DESC"
