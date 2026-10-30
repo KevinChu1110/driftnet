@@ -15,7 +15,7 @@
 <style>
   :root {
     --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
-    --accent: #2f6fdb; --accent-soft: #e8effc; --warn: #b4540a; --star: #c58a00; --star-soft: #fff4d6;
+    --accent: #2f6fdb; --accent-soft: #e8effc; --warn: #b4540a; --star: #8a6100; --star-soft: #fff4d6;
     --danger: #c62828; --danger-soft: #fde8e8; --ok: #2e7d32; --ok-soft: #e6f4ea;
     font-family: ui-sans-serif, system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
     /* Branch colours for folders (map, badges, sidebar dots). */
@@ -71,6 +71,15 @@
   body.readonly .tools, body.readonly .link-btn[data-act="note"], body.readonly nav .more, body.readonly nav [data-new],
   body.readonly .trash-bar, body.readonly .map-bar [data-map="new"], body.readonly #new-note, body.readonly .hint.swipe-hint { display: none !important; }
   .lang { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; min-height: 40px; }
+  .hbtn { display: inline-grid; place-items: center; padding: 8px 10px; min-width: 40px; }
+  body.readonly #add-btn { display: none; }
+  .add-q { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 2px; font-size: 13px; color: var(--muted); }
+  .add-q .btn { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; overflow-wrap: anywhere; text-align: left; }
+  .empty .btn { display: inline-flex; align-items: center; gap: 6px; }
+  .empty.first, .empty.nomatch { display: grid; gap: 14px; justify-items: center; }
+  .set-adv { margin: 0 0 16px; }
+  .set-adv > summary { cursor: pointer; font-weight: 650; font-size: 14px; padding: 6px 0; }
+  .set-adv > small { display: block; margin: 0 0 10px; color: var(--muted); }
 
   .layout { display: grid; grid-template-columns: 256px 1fr; max-width: 1200px; margin: 0 auto; }
   nav { padding: 16px 12px; border-right: 1px solid var(--line); position: sticky; top: 65px; align-self: start; max-height: calc(100vh - 65px); overflow: auto; }
@@ -266,6 +275,8 @@
   body.map-view.selecting .toast { top: calc(env(safe-area-inset-top) + 136px); bottom: auto; }
   .pick .qk, .keys kbd { font: 600 12px/1 ui-monospace, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 3px 6px; color: var(--muted); background: var(--bg); }
   .pick .qk { margin-right: 6px; }
+  /* Touch screens: no keyboard, so no key hints. */
+  @media (hover: none) { .chip kbd, .pick .qk, .kb-only { display: none; } }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 0 0 12px; font-size: 14px; align-items: center; }
   .keys h4 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 13px; color: var(--muted); font-weight: 600; }
   .keys dt { justify-self: end; white-space: nowrap; }
@@ -391,7 +402,7 @@
   .swipe:target .card, .card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding-right: 0; }
   @media (hover: hover) and (pointer: fine) { .top { padding-right: 150px; } }
-  a.name { color: var(--text); font-weight: 700; font-size: 17px; text-decoration: none; letter-spacing: -.01em; }
+  a.name { color: var(--text); font-weight: 700; font-size: 17px; text-decoration: none; letter-spacing: -.01em; overflow-wrap: anywhere; min-width: 0; }
   a.name:hover { color: var(--accent); }
   .badge { font-size: 12px; padding: 1px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
@@ -466,7 +477,7 @@
   @media (max-width: 720px) {
     header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); gap: 8px 10px; }
     .stats { display: none; }
-    .lang { margin-left: auto; }
+    #lock:not([hidden]), #lock[hidden] + #add-btn { margin-left: auto; }
     .search { order: 3; flex-basis: 100%; max-width: none; margin: 0; font-size: 16px; /* 16px: iOS doesn't zoom in */ }
     .layout { grid-template-columns: 1fr; }
     /* The sidebar becomes a drawer behind the ☰ button. */
@@ -512,7 +523,7 @@
   .md-top .prev .ico { transform: rotate(180deg); }
   .md-scroll { overflow: auto; padding: 0 18px 12px; flex: 1; min-height: 0; overscroll-behavior: contain; }
   .md-scroll h3 { margin: 12px 0 6px; font-size: 21px; letter-spacing: -.01em; }
-  .md-scroll h3 a { color: var(--text); text-decoration: none; }
+  .md-scroll h3 a { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
   .md-scroll h3 a:hover { color: var(--accent); }
   .md-sub { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 0 0 10px; color: var(--muted); font-size: 13px; }
   .md-one { margin: 0 0 6px; font-size: 16px; }
@@ -591,6 +602,9 @@
     <symbol id="i-split" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M12 4.5v15"/></symbol>
     <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8M3.5 13.5V18a1.5 1.5 0 0 0 1.5 1.5h14a1.5 1.5 0 0 0 1.5-1.5v-4.5M3.5 13.5H8a4 4 0 0 0 8 0h4.5"/></symbol>
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M10 4l1.8 5.2L17 11l-5.2 1.8L10 18l-1.8-5.2L3 11l5.2-1.8zM18 3v4M16 5h4M18 16v4M16 18h4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.8-5"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.2 6.2a1.5 1.5 0 0 1-2.1 0zM8 8h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   </defs>
 </svg>
@@ -604,7 +618,9 @@
   <span class="update" id="update" hidden><a id="update-link" target="_blank" rel="noopener noreferrer"></a><button id="update-x" type="button">✕</button></span>
   <input id="q" class="search" type="search" enterkeyhint="search">
   <button id="lock" class="lock" type="button" hidden></button>
+  <button id="add-btn" class="lang hbtn" type="button" aria-haspopup="dialog"></button>
   <button id="palette-btn" class="lang" type="button" aria-haspopup="dialog"></button>
+  <button id="settings-btn" class="lang hbtn" type="button" aria-haspopup="dialog"></button>
   <button id="lang" class="lang" type="button"></button>
 </header>
 <button id="crumb" class="crumb" type="button" aria-controls="nav"></button>
@@ -711,8 +727,17 @@
   <input id="cmd-input" type="text" role="combobox" aria-expanded="true" aria-controls="cmd-list" aria-autocomplete="list" autocomplete="off" spellcheck="false">
   <div id="cmd-list" role="listbox"></div>
 </dialog>
+<dialog id="add-dlg" aria-labelledby="ad-title">
+  <form id="add-dlg-form" method="dialog">
+    <h3 id="ad-title"></h3>
+    <p class="dlg-error" id="ad-error"></p>
+    <label><span id="ad-help"></span><input id="ad-url" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+    <div class="dlg-actions"><span class="spacer"></span>
+      <button class="btn" id="ad-cancel" type="button"></button><button class="btn primary" id="ad-ok" type="submit"></button></div>
+  </form>
+</dialog>
 <dialog id="keys-dlg" aria-labelledby="ky-title">
-  <h3 id="ky-title"></h3>
+  <h3 id="ky-title" tabindex="-1"></h3>
   <dl class="keys" id="ky-body"></dl>
   <div class="dlg-actions"><span class="spacer"></span><button class="btn" id="ky-close" type="button"></button></div>
 </dialog>
@@ -724,12 +749,16 @@
 </dialog>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo" type="button"></button></div>
 <script>
+  const cardsN = (n) => `${n} ${n === 1 ? "card" : "cards"}`;
   const STRINGS = {
     en: {
       search: "Search tools, tags, links…", all: "All", favorites: "Favorites", trash: "Trash", any: "Any",
       kind: "Kind", switchTo: "中文", nav: "Views and categories",
       stats: (n, s) => `${n} ${n === 1 ? "item" : "items"} · shared ${s}×`, shared: (n) => `shared ${n}×`,
-      empty: "Nothing here yet — drop a link in your chat.", emptyFav: "No favorites yet — swipe a card right, or tap the star.",
+      empty: "Nothing here yet.", emptyStart: "Nothing here yet. Paste a link below to start — or save one with the Chrome extension, or run npx driftnet add <link>.",
+      noMatch: (q, v) => `No cards match “${q}” in ${v}.`, searchAll: "Search everything", searchIn: (v) => `Search ${v}…`,
+      addTitle: "Add a link", addHelp: "A link to a tool, post or video (example.com works too)", addThis: (u) => `Add this link: ${u}`, kAdd: "Add a link",
+      addedAlready: "Already saved — here it is", addNothing: "No link found in that.", noSuggestion: "No suggestion for this card — press m to pick a folder", emptyFav: "No favorites yet — swipe a card right, or tap the star.",
       pageMore: (n) => `Show more (${n} left)`, emptyTrash: "The trash is empty.", hint: "Swipe right to favorite, left to remove.", hintTrash: "Swipe right to restore.",
       kinds: { repo: "Repos", product: "Products", video: "Videos", article: "Articles", post: "Posts", other: "Other" },
       kind1: { repo: "Repo", product: "Product", video: "Video", article: "Article", post: "Post", other: "Other" },
@@ -745,13 +774,13 @@
       folders: "Folders", newFolder: "New folder", newSub: "New folder inside", editFolder: "Edit folder", folderName: "Name",
       folderDesc: "What goes here? (driftnet's AI reads this to sort new links)", folderParent: "Inside", topLevel: "— Top level —",
       save: "Save", cancel: "Cancel", del: "Delete folder", delSure: "Delete? Links move up",
-      refresh: "Refresh (fetch and summarise again)", refreshed: (n) => `Refreshed “${n}”`, refreshBusy: "Already refreshing this one.", refreshWait: "Refreshed a moment ago — try again in a minute.", refreshFailed: (why) => `Couldn’t refresh${why ? `: ${why}` : ""}`,
+      refresh: "Refresh (fetch and summarise again)", refreshShort: "Re-summarise", refreshed: (n) => `Refreshed “${n}”`, refreshBusy: "Already refreshing this one.", refreshWait: "Refreshed a moment ago — try again in a minute.", refreshFailed: (why) => `Couldn’t refresh${why ? `: ${why}` : ""}`,
       moveTo: "Move to…", moveTitle: (n) => `Move “${n}” to`, moved: (n, f) => `Moved “${n}” to ${f}`, expand: "Show sub-folders",
       dragHint: "Drag onto a folder in the sidebar", foundIn: "Found in this post:", related: "Related:", folderMoved: (n, f) => `“${n}” is now inside ${f}`,
       topLevelShort: "the top level",
       pkShare: "Share as pack…", pkTitle: "Share as pack", pkHelp: "A pack is this folder, its sub-folders and the cards in them as one file. Someone else imports it with one click. Your notes, chat text and counters are never included.", pkName: "Pack name", pkDesc: "Description", pkDownload: "Download pack", pkLinkL: "Link to share", pkCopy: "Copy link", pkCopied: "Link copied", pkSigned: "Anyone with this link can download this one pack, and nothing else in your catalogue.", pkOpen: "Anyone who can reach this address can download this pack.", pkNoLink: "No public address is set, so there is no link to share yet. Set one in Settings → Access, or start a tunnel. You can still download the file.", pkClose: "Close", pkTooBig: "This folder is too big to share as a pack.",
       mapAll: "All", focusCrumb: "Mind map location", focusUp: "Up one level", focusFolder: "Focus on this folder", mapTree: "Mind map",
-      mapHintFocus: "Double-click a folder (or press z on it) to focus on it.",
+      mapHintFocus: "Double-click a folder (or press z on it) to focus on it.", mapHintFocusTouch: "To show one folder on its own, tap its ⋯ and choose Focus on this folder.",
       kTreeNav: "Mind map: next / previous node", kTreeOpen: "Open a folder, or step into it", kTreeClose: "Close a folder, or step out to its parent", kTreeEnds: "First / last node", kTreeType: "Type a name", kTreeTypeText: "Jump to the node starting with it",
       kFocus: "Focus on the folder (mind map)", kFocusUp: "Back up one level (mind map)", keysMap: "Mind map",
       map: "Mind map", mapHint: "Tap a folder to open it, tap a card to preview it. To file a card: drag it onto a folder — on a phone, hold it a moment, let go, then tap the folder. ⋯ renames a folder.",
@@ -765,12 +794,12 @@
       histActor: (a) => a === "admin" ? "You" : a === "system:refresh" ? "Refresh" : a === "system" ? "System" : a.replace(/^agent:/, "agent "),
       notes: "Notes", note: "Note", addNote: "Add a note", editNote: "Edit note", noteFor: (n) => `Note on “${n}”`,
       noteHelp: "Only for you: what you thought, whether you tried it…", newNote: "New note", noteTitle: "Title",
-      noteBody: "Markdown. Write #12 to link card 12.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
-      emptyNotes: "No notes yet. Notes can link cards: write #12.", exportMd: "Download a backup (Markdown)", exportVault: "Download for Obsidian / Notion",
+      noteBody: "Type # and a card number (e.g. #3) to link a card.", delNote: "Delete note", delNoteSure: "Really delete?", untitled: "Untitled",
+      emptyNotes: "No notes yet. A note can link cards: type # and a card number (e.g. #3).", exportMd: "Export as Markdown", exportVault: "Download for Obsidian / Notion",
       saved: "Saved", tagsEdit: "Edit tags", tagsHelp: "Tags, separated by commas (up to 8)", purge: "Delete forever", purgeSure: "Click again to delete forever", purged: (n) => `“${n}” deleted for good`,
-      emptyTrashBtn: "Empty trash", emptyTrashSure: (n) => `Click again to delete ${n} for good`, trashEmptied: (n) => `${n} cards deleted for good`, settings: "Settings", pickedUp: (n) => `Picked up “${n}” — tap the folder it goes into`, alreadyThere: "It's already in that folder",
+      emptyTrashBtn: "Empty trash", emptyTrashSure: (n) => `Click again to delete ${n} for good`, trashEmptied: (n) => `${n} ${n === 1 ? "card" : "cards"} deleted for good`, settings: "Settings", pickedUp: (n) => `Picked up “${n}” — tap the folder it goes into`, alreadyThere: "It's already in that folder",
       readOnlyNudge: "You can only look here — tap Unlock at the top to change things", filterFolders: "Type to find a folder…", undoHint: "z undoes",
-      tplTitle: "Start with folders for:", tplAi: "AI & coding", tplResearch: "Research", tplEveryday: "Everyday", tplSkip: "Keep the default", tplFailed: "Can't change the folders now: you already have cards or changed them.",
+      tplTitle: "Pick a starter set of folders (it replaces the current default folders):", tplAi: "AI & coding", tplResearch: "Research", tplEveryday: "Everyday", tplSkip: "Keep the default", tplFailed: "Can't change the folders now: you already have cards or changed them.",
       addLink: "Add", addPlaceholder: "Paste a link to a tool, post or video…", added: "Saved — sorting it now",
       shortcuts: "Keys: j / k next / previous · f favorite · m move · n note · # trash · / search · g m mind map",
       keysTitle: "Keyboard shortcuts", keysMove: "Move, favorite, trash", keysSelect: "Select several cards", keysGo: "Go to", keysQuick: "File into your most-used folders",
@@ -786,17 +815,18 @@
       inbox: "Inbox", emptyInbox: "Inbox zero — every card has a folder you chose.", hintInbox: "Tap a folder to file the card. Not filed yet: the cards below.",
       chipOther: "Other folder…", chipTitle: (p) => `Confidence ${p}%`,
       keysInbox: "In the Inbox", kChip: "File into the card's suggested folder 1–3", kSkip: "Skip: focus the next card", kQuickInbox: "In the Inbox, 1–3 pick the focused card's suggested folders instead; 4–9 still file into your most-used folders.",
-      planBtn: "Suggest folders", planNoModel: "Needs an AI model (Settings → AI)", planTitle: "Suggested folder changes",
+      planBtn: "Suggest folders", planNoModel: "Needs an AI model — set one in ⚙ Settings → AI", planTitle: "Suggested folder changes",
       planIntro: "The AI only proposes. Tick what you want, then apply; nothing changes until then, and Undo reverts the whole plan. Cards you filed by hand are never moved.",
       planThinking: "Asking the model…", planNone: "The model found nothing worth changing.", planApply: (n) => `Apply ${n} selected`,
       planCreate: (p) => `Create “${p}”`, planRename: (a, b) => `Rename “${a}” to “${b}”`, planMove: (n, d) => `Move ${n} ${n === 1 ? "card" : "cards"} to “${d}”`,
       planMerge: (a, b) => `Merge “${a}” into “${b}”`, planApplied: (n) => `Applied ${n} ${n === 1 ? "change" : "changes"} to your folders`, planNeeds: "Needs the folder it creates",
       nSelected: (n) => `${n} selected`, selectAll: "Select all", clearSel: "Clear", trashShort: "Trash",
       moveTitleMany: (n) => `Move ${n} cards to`, pickedMany: (n) => `Picked up ${n} cards — tap the folder they go into`,
-      bulkMoved: (n, f) => `Moved ${n} cards to ${f}`, bulkRemoved: (n) => `${n} cards moved to the trash`, bulkRestored: (n) => `${n} cards restored`,
-      bulkFaved: (n) => `${n} cards added to favorites`, bulkUnfaved: (n) => `${n} cards removed from favorites`,
+      bulkMoved: (n, f) => `Moved ${cardsN(n)} to ${f}`, bulkRemoved: (n) => `${cardsN(n)} moved to the trash`, bulkRestored: (n) => `${cardsN(n)} restored`,
+      bulkFaved: (n) => `${cardsN(n)} added to favorites`, bulkUnfaved: (n) => `${cardsN(n)} removed from favorites`,
       st: {
-        title: "Settings", save: "Save", welcome: "Welcome! Pick a model below to get summaries — or none: links are still sorted into folders, just without a summary. Then paste a link.",
+        title: "Settings", save: "Save", welcome: "Welcome! Pick a model below to get summaries and links sorted into folders. Without one, links are still saved: they wait in Other (and the Inbox) for you to file, and an agent you connect can write the summaries. Then paste a link.",
+        advanced: "Advanced", advancedHelp: "Other providers' settings, search by meaning, extra keys and video tool paths.", openSettings: "Open Settings",
         display: "This browser", sort: "Order", sorts: { best: "Best first", newest: "Newest first", shared: "Most shared first" },
         compact: "Compact cards (one line each)", tags: "Show tags", said: "Show what people said in chat",
         theme: "Theme", themes: { auto: "Follow the system", light: "Light", dark: "Dark" },
@@ -855,7 +885,7 @@
         loginAdvanced: "Forgot it (you set it up)? Open driftnet on the computer it runs on — Settings there sets a new one. On a server: From your computer run  ssh -L PORT:127.0.0.1:PORT <server>  and open http://localhost:PORT.",
         keyWrong: "That's neither the admin password nor a share key.",
         labels: {
-          DRIFTNET_LLM_PROVIDER: ["Model provider", "Summaries. None: links are still sorted, only without a summary."],
+          DRIFTNET_LLM_PROVIDER: ["Model provider", "Writes the summaries and sorts links into folders. None: links are saved and wait in Other / the Inbox for you to file; an agent can write the summaries."],
           DRIFTNET_LLM_MODEL: ["Model", "e.g. claude-haiku-5-5, gpt-5-mini, gemini-3.8-flash, qwen3"],
           DRIFTNET_LLM_BASE_URL: ["API URL", "For OpenAI-compatible APIs: Gemini, Grok, OpenRouter, Ollama (http://127.0.0.1:11434/v1)…"],
           DRIFTNET_LLM_API_KEY: ["API key", ""],
@@ -905,7 +935,7 @@
         choices: {
           DRIFTNET_LLM_PROVIDER: { "": "None", anthropic: "Anthropic (API key)", openai: "OpenAI-compatible (OpenAI, Grok, Ollama…)", gemini: "Google Gemini (API key)", bedrock: "Amazon Bedrock", vertex: "Google Vertex AI", "claude-cli": "Claude subscription (Claude Code CLI)", "gemini-cli": "Google account (Gemini CLI)" },
           DRIFTNET_LLM_EFFORT: { "": "Default", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high" },
-          DRIFTNET_JUDGE: { "": "Jev if a key is set", jev: "Jev", rules: "Rules (free, no model)", llm: "The model decides", heuristic: "The model decides", off: "No judge" },
+          DRIFTNET_JUDGE: { "": "Jev if a key is set", jev: "Jev", rules: "Rules (free, no model)", llm: "The model decides", heuristic: "No judge: unsorted links go to Other", off: "No judge" },
           DRIFTNET_SUMMARY_DEPTH: { "": "Standard (default)", brief: "Brief: one line, 2 highlights, what you see", standard: "Standard", detailed: "Detailed: more highlights, use cases, how to try it" },
           DRIFTNET_LOCALE: { "": "Same as the summaries", en: "English", "zh-TW": "繁體中文" },
           DRIFTNET_REPLY_STYLE: { "": "Rich (default)", rich: "Rich: cards and vote buttons", text: "Plain text" },
@@ -926,7 +956,10 @@
       search: "搜尋工具、標籤、連結…", all: "全部", favorites: "最愛", trash: "垃圾桶", any: "不限",
       kind: "類型", switchTo: "EN", nav: "檢視與分類",
       stats: (n, s) => `${n} 則 · 分享 ${s} 次`, shared: (n) => `分享 ${n} 次`,
-      empty: "還沒有內容，把連結丟進聊天室吧。", emptyFav: "還沒有最愛，把卡片往右滑或按星號。",
+      empty: "這裡還沒有內容。", emptyStart: "還沒有內容。在下面貼一個連結開始，或用 Chrome 擴充功能收錄，也可以執行 npx driftnet add <連結>。",
+      noMatch: (q, v) => `「${v}」裡沒有符合「${q}」的卡片。`, searchAll: "搜尋全部", searchIn: (v) => `在「${v}」裡搜尋…`,
+      addTitle: "收錄連結", addHelp: "工具、貼文或影片的連結（只打 example.com 也可以）", addThis: (u) => `收錄這個連結：${u}`, kAdd: "收錄連結",
+      addedAlready: "已經收過了，就是這張", addNothing: "裡面找不到連結。", noSuggestion: "這張卡片沒有建議的資料夾，按 m 自己選", emptyFav: "還沒有最愛，把卡片往右滑或按星號。",
       pageMore: (n) => `再顯示 ${n} 張`, emptyTrash: "垃圾桶是空的。", hint: "往右滑加入最愛，往左滑移到垃圾桶。", hintTrash: "往右滑還原。",
       kinds: { repo: "程式庫", product: "產品", video: "影片", article: "文章", post: "貼文", other: "其他" },
       worth: { skip: "略過", low: "次要", normal: "值得看", "must-see": "必看" },
@@ -941,13 +974,13 @@
       folders: "資料夾", newFolder: "新資料夾", newSub: "在裡面新增資料夾", editFolder: "編輯資料夾", folderName: "名稱",
       folderDesc: "放什麼？（driftnet 的 AI 會照這段說明把新連結分進來）", folderParent: "放在", topLevel: "— 最上層 —",
       save: "儲存", cancel: "取消", del: "刪除資料夾", delSure: "確定刪除？內容移到上一層",
-      refresh: "重新整理（再抓一次並重新摘要）", refreshed: (n) => `已重新整理「${n}」`, refreshBusy: "這張卡片正在重新整理。", refreshWait: "剛剛才整理過，請一分鐘後再試。", refreshFailed: (why) => `重新整理失敗${why ? `：${why}` : ""}`,
+      refresh: "重新整理（再抓一次並重新摘要）", refreshShort: "重新摘要", refreshed: (n) => `已重新整理「${n}」`, refreshBusy: "這張卡片正在重新整理。", refreshWait: "剛剛才整理過，請一分鐘後再試。", refreshFailed: (why) => `重新整理失敗${why ? `：${why}` : ""}`,
       moveTo: "移動到…", moveTitle: (n) => `把「${n}」移動到`, moved: (n, f) => `已將「${n}」移到 ${f}`, expand: "展開子資料夾",
       dragHint: "拖到側邊欄的資料夾", foundIn: "從這篇找到：", related: "相關卡片：", folderMoved: (n, f) => `「${n}」已移到 ${f} 底下`,
       topLevelShort: "最上層",
       pkShare: "分享成資料夾包…", pkTitle: "分享成資料夾包", pkHelp: "資料夾包把這個資料夾、底下的子資料夾和裡面的卡片包成一個檔案，別人一鍵就能匯入。你的筆記、聊天內容和各種計數都不會放進去。", pkName: "資料夾包名稱", pkDesc: "說明", pkDownload: "下載資料夾包", pkLinkL: "分享連結", pkCopy: "複製連結", pkCopied: "已複製連結", pkSigned: "拿到這個連結的人只能下載這一個資料夾包，看不到你目錄裡的其他內容。", pkOpen: "任何連得到這個位址的人都能下載這個資料夾包。", pkNoLink: "還沒設定公開網址，所以暫時沒有可分享的連結。請到「設定 → 存取」設定，或啟動通道。現在仍可以下載檔案。", pkClose: "關閉", pkTooBig: "這個資料夾太大，無法分享成資料夾包。",
       mapAll: "全部", focusCrumb: "樹狀圖位置", focusUp: "回上一層", focusFolder: "聚焦這個資料夾", mapTree: "樹狀圖",
-      mapHintFocus: "連點兩下資料夾（或在資料夾上按 z）可以只看這個資料夾。",
+      mapHintFocus: "連點兩下資料夾（或在資料夾上按 z）可以只看這個資料夾。", mapHintFocusTouch: "想只看一個資料夾：點它的 ⋯，再選「聚焦這個資料夾」。",
       kTreeNav: "樹狀圖：下一個／上一個節點", kTreeOpen: "展開資料夾，或進入第一個子項", kTreeClose: "收合資料夾，或回到上一層", kTreeEnds: "第一個／最後一個節點", kTreeType: "直接輸入名稱", kTreeTypeText: "跳到名稱開頭相符的節點",
       kFocus: "聚焦這個資料夾（樹狀圖）", kFocusUp: "回上一層（樹狀圖）", keysMap: "樹狀圖",
       map: "樹狀圖", mapHint: "點資料夾展開，點卡片預覽。整理卡片：把它拖到資料夾上；手機上按住卡片一下、放開，再點要放進去的資料夾。按 ⋯ 可以改資料夾名稱。",
@@ -961,12 +994,12 @@
       histActor: (a) => a === "admin" ? "你" : a === "system:refresh" ? "重新整理" : a === "system" ? "系統" : a.replace(/^agent:/, "agent "),
       notes: "筆記", note: "筆記", addNote: "加筆記", editNote: "改筆記", noteFor: (n) => `「${n}」的筆記`,
       noteHelp: "只有你看得到：心得、試用結果、要注意的地方…", newNote: "新筆記", noteTitle: "標題",
-      noteBody: "支援 Markdown。寫 #12 就會連到第 12 張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
-      emptyNotes: "還沒有筆記。筆記可以連到卡片：寫 #12。", exportMd: "下載備份（Markdown）", exportVault: "下載給 Obsidian／Notion",
+      noteBody: "輸入 # 加卡片編號（例如 #3）就能連到那張卡片。", delNote: "刪除筆記", delNoteSure: "確定刪除？", untitled: "未命名",
+      emptyNotes: "還沒有筆記。筆記可以連到卡片：輸入 # 加卡片編號（例如 #3）。", exportMd: "匯出成 Markdown", exportVault: "下載給 Obsidian／Notion",
       saved: "已儲存", tagsEdit: "編輯標籤", tagsHelp: "標籤，用逗號分隔（最多 8 個）", purge: "永久刪除", purgeSure: "再按一次即永久刪除", purged: (n) => `已永久刪除「${n}」`,
       emptyTrashBtn: "清空垃圾桶", emptyTrashSure: (n) => `再按一次，永久刪除這 ${n} 張`, trashEmptied: (n) => `已永久刪除 ${n} 張卡片`, settings: "設定", pickedUp: (n) => `已拿起「${n}」，點要放進去的資料夾`, alreadyThere: "它已經在這個資料夾裡了",
       readOnlyNudge: "目前只能看。要修改，請點上方的「解鎖」", filterFolders: "輸入文字找資料夾…", undoHint: "按 z 復原",
-      tplTitle: "從這些資料夾開始：", tplAi: "AI 與程式", tplResearch: "研究", tplEveryday: "日常生活", tplSkip: "維持預設", tplFailed: "現在不能換資料夾了：已經有卡片，或資料夾被你改過。",
+      tplTitle: "選一組起始資料夾（會取代目前的預設資料夾）：", tplAi: "AI 與程式", tplResearch: "研究", tplEveryday: "日常生活", tplSkip: "維持預設", tplFailed: "現在不能換資料夾了：已經有卡片，或資料夾被你改過。",
       addLink: "收錄", addPlaceholder: "貼上工具、貼文或影片的連結…", added: "收到，正在整理",
       shortcuts: "快捷鍵：j／k 下一張／上一張 · f 最愛 · m 移動 · n 筆記 · # 垃圾桶 · / 搜尋 · g m 樹狀圖",
       keysTitle: "快捷鍵", keysMove: "移動、最愛、垃圾桶", keysSelect: "一次選多張卡片", keysGo: "切換畫面", keysQuick: "放進最常用的資料夾",
@@ -982,7 +1015,7 @@
       inbox: "收件匣", emptyInbox: "收件匣清空了——每張卡片都有你選的資料夾。", hintInbox: "點一下資料夾就能歸檔。下面是還沒歸檔的卡片。",
       chipOther: "其他資料夾…", chipTitle: (p) => `信心 ${p}%`,
       keysInbox: "在收件匣", kChip: "歸到這張卡片建議的第 1–3 個資料夾", kSkip: "略過：移到下一張卡片", kQuickInbox: "在收件匣裡，1–3 改成選擇目前卡片的建議資料夾；4–9 仍然是放進最常用的資料夾。",
-      planBtn: "建議整理資料夾", planNoModel: "需要先設定 AI 模型（設定 → AI）", planTitle: "建議的資料夾調整",
+      planBtn: "建議整理資料夾", planNoModel: "需要 AI 模型：請到 ⚙ 設定 → AI 設定一個", planTitle: "建議的資料夾調整",
       planIntro: "AI 只負責提議。勾選想要的項目再套用，套用前什麼都不會改；復原可以一次還原整份方案。你親手歸檔的卡片不會被移動。",
       planThinking: "正在請模型想想…", planNone: "模型認為目前沒有值得調整的地方。", planApply: (n) => `套用選取的 ${n} 項`,
       planCreate: (p) => `新增「${p}」`, planRename: (a, b) => `把「${a}」改名為「${b}」`, planMove: (n, d) => `把 ${n} 張卡片移到「${d}」`,
@@ -992,7 +1025,8 @@
       bulkMoved: (n, f) => `已將 ${n} 張卡片移到 ${f}`, bulkRemoved: (n) => `已將 ${n} 張卡片移到垃圾桶`, bulkRestored: (n) => `已還原 ${n} 張卡片`,
       bulkFaved: (n) => `已將 ${n} 張卡片加入最愛`, bulkUnfaved: (n) => `已將 ${n} 張卡片移出最愛`,
       st: {
-        title: "設定", save: "儲存", welcome: "歡迎！在下面選一個模型就會有摘要；不選也可以，連結一樣會分進資料夾，只是沒有摘要。接著貼一個連結試試看。",
+        title: "設定", save: "儲存", welcome: "歡迎！在下面選一個模型，就會有摘要，連結也會自動分進資料夾。不選也可以：連結照樣會存下來，先放在「其他」（和收件匣）等你歸檔，接上的 agent 也能幫你寫摘要。接著貼一個連結試試看。",
+        advanced: "進階", advancedHelp: "其他供應商的設定、語意搜尋、額外的金鑰和影片工具路徑。", openSettings: "開啟設定",
         display: "這個瀏覽器", sort: "排序", sorts: { best: "值得看的在前", newest: "最新的在前", shared: "最多人分享的在前" },
         compact: "精簡卡片（每張一行）", tags: "顯示標籤", said: "顯示大家在聊天室說的話",
         theme: "外觀", themes: { auto: "跟系統一樣", light: "淺色", dark: "深色" },
@@ -1051,7 +1085,7 @@
         loginAdvanced: "密碼是你自己設的但忘了？到跑 driftnet 的那台電腦打開網頁，設定裡可以直接設新的。跑在伺服器上的話：在你的電腦執行  ssh -L PORT:127.0.0.1:PORT <伺服器>  再打開 http://localhost:PORT。",
         keyWrong: "這不是管理密碼，也不是分享碼。",
         labels: {
-          DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要。選「不使用」也會分類，只是沒有摘要。"],
+          DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要，並把連結分進資料夾。選「不使用」：連結照樣存下來，放在「其他」／收件匣等你歸檔；接上的 agent 也能幫忙寫摘要。"],
           DRIFTNET_LLM_MODEL: ["模型", "例如 claude-haiku-5-5、gpt-5-mini、gemini-3.8-flash、qwen3"],
           DRIFTNET_LLM_BASE_URL: ["API 網址", "OpenAI 相容 API 用：Gemini、Grok、OpenRouter、Ollama（http://127.0.0.1:11434/v1）…"],
           DRIFTNET_LLM_API_KEY: ["API 金鑰", ""],
@@ -1101,7 +1135,7 @@
         choices: {
           DRIFTNET_LLM_PROVIDER: { "": "不使用", anthropic: "Anthropic（API 金鑰）", openai: "OpenAI 相容（OpenAI、Grok、Ollama…）", gemini: "Google Gemini（API 金鑰）", bedrock: "Amazon Bedrock", vertex: "Google Vertex AI", "claude-cli": "Claude 訂閱（Claude Code CLI）", "gemini-cli": "Google 帳號（Gemini CLI）" },
           DRIFTNET_LLM_EFFORT: { "": "預設", low: "低", medium: "中", high: "高", xhigh: "極高" },
-          DRIFTNET_JUDGE: { "": "有 Jev 金鑰就用 Jev", jev: "Jev", rules: "規則（免費，不用模型）", llm: "交給模型", heuristic: "交給模型", off: "不用判斷器" },
+          DRIFTNET_JUDGE: { "": "有 Jev 金鑰就用 Jev", jev: "Jev", rules: "規則（免費，不用模型）", llm: "交給模型", heuristic: "不用判斷器：沒分類的連結放到「其他」", off: "不用判斷器" },
           DRIFTNET_SUMMARY_DEPTH: { "": "標準（預設）", brief: "簡短：一句話、2 個重點、看得到什麼", standard: "標準", detailed: "詳細：更多重點、使用情境、怎麼試用" },
           DRIFTNET_LOCALE: { "": "跟摘要一樣", en: "English", "zh-TW": "繁體中文" },
           DRIFTNET_REPLY_STYLE: { "": "豐富（預設）", rich: "豐富：卡片與投票按鈕", text: "純文字" },
@@ -1154,6 +1188,8 @@
   let role = "admin";
   let serverPort = 8787;
   let summaries = true;
+  /** What /api/ui said last (local page, password set…). */
+  let uiInfo = {};
   /** Something needs the password: ask in a dialog that checks it, and keep whatever the user was doing. */
   function needAdmin() {
     toast(T().needPassword);
@@ -1237,9 +1273,34 @@
     $("lang").textContent = T().switchTo;
     $("palette-btn").textContent = isMac ? "⌘K" : "Ctrl K";
     $("palette-btn").title = $("palette-btn").ariaLabel = T().palette;
+    $("add-btn").innerHTML = ic("plus"); $("add-btn").title = $("add-btn").ariaLabel = `${T().addTitle} (a)`;
+    $("settings-btn").innerHTML = ic("gear"); $("settings-btn").title = $("settings-btn").ariaLabel = T().settings;
     $("nav").setAttribute("aria-label", T().nav);
     $("menu").setAttribute("aria-label", T().menu);
   }
+
+  // ── Back closes things (phones) ──────────────────────────────────────────
+  // While a card, a dialog or the drawer is open there is one extra history entry ({dnLayer}); Back lands on the
+  // entry before it and closes the top one. Closing it any other way takes the entry back, keeping the address it had.
+  let layerTimer = 0, carryUrl = null;
+  const layersOpen = () => !!document.querySelector("dialog[open]") || (document.body.classList.contains("menu-open") && isDrawer());
+  function syncLayer() {
+    clearTimeout(layerTimer);
+    // A moment later: closing one dialog and opening the next (card → Move to…) must not step back and forth.
+    layerTimer = setTimeout(() => {
+      const open = layersOpen(), pushed = !!history.state?.dnLayer;
+      if (open && !pushed) history.pushState({ dnLayer: 1 }, "", location.href);
+      else if (!open && pushed) { carryUrl = location.href; history.back(); }
+    }, 60);
+  }
+  addEventListener("popstate", () => {
+    if (carryUrl) { const u = carryUrl; carryUrl = null; if (u !== location.href) history.replaceState(history.state, "", u); return; }
+    const top = [...document.querySelectorAll("dialog[open]")].pop();
+    if (top) top.close();
+    else if (document.body.classList.contains("menu-open")) setMenu(false);
+    syncLayer();
+  });
+  new MutationObserver(syncLayer).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
 
   // ── Drawer (phones) ──────────────────────────────────────────────────────
   const isDrawer = () => matchMedia("(max-width: 720px)").matches;
@@ -1251,6 +1312,7 @@
     document.querySelector("header").inert = open && isDrawer();
     document.querySelector(".skip").inert = open && isDrawer();
     $("menu").setAttribute("aria-expanded", String(open));
+    syncLayer();
     if (!keyboard) return;
     if (open) $("nav").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
     else if (isDrawer()) $("menu").focus({ preventScroll: true });
@@ -1262,13 +1324,21 @@
   addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("menu-open")) setMenu(false, true); });
 
   /** One line under the header saying what is shown, so a closed drawer hides nothing. */
-  function updateCrumb() {
+  /** What is shown, in words: the view, then the folder and kind filters. */
+  function viewName() {
     const t = T();
     const parts = [state.view === "favorites" ? t.favorites : state.view === "trash" ? t.trash : state.view === "inbox" ? t.inbox : state.view === "review" ? t.review
       : state.view === "notes" ? t.notes : state.view === "map" ? t.map : t.all];
     if (state.category) parts.push(catLabel(state.category));
     if (state.kind) parts.push(t.kinds[state.kind] ?? state.kind);
-    $("crumb").innerHTML = `${esc(t.showing)} <b>${esc(parts.join(" · "))}</b>`;
+    return parts.join(" · ");
+  }
+  function updateCrumb() {
+    const t = T(), name = viewName();
+    $("crumb").innerHTML = `${esc(t.showing)} <b>${esc(name)}</b>`;
+    // The search box says what it searches: everything, or only the view / folder on screen.
+    const ph = state.view === "all" && !state.category && !state.kind ? t.search : t.searchIn(name);
+    $("q").placeholder = ph; $("q").setAttribute("aria-label", ph);
   }
 
   async function load() {
@@ -1287,6 +1357,8 @@
     role = ui.role ?? "admin";
     serverPort = ui.port ?? 8787;
     summaries = ui.summaries ?? true;
+    uiInfo = ui;
+    if (state.category && !folders.some((f) => f.id === state.category)) state.category = "";
     document.body.classList.toggle("readonly", role !== "admin");
     $("lock").hidden = role === "admin";
     if (ui.setup && !store.get("driftnet-setup-seen")) { store.set("driftnet-setup-seen", "1"); setTimeout(() => openSettings(true), 300); }
@@ -1587,9 +1659,14 @@
     moveBest = null;
     $("mv-filter").placeholder = t.filterFolders;
     $("mv-filter").setAttribute("aria-label", t.filterFolders);
-    $("move-dlg").showModal();
     // Type to narrow the folders; Enter files into the first match; arrows walk the list.
-    $("mv-filter").focus();
+    // A phone gets the list, not a keyboard popping up over it: the filter takes focus only with a mouse or trackpad.
+    const fine = matchMedia("(pointer: fine)").matches;
+    $("move-dlg").toggleAttribute("autofocus", !fine);
+    $("move-dlg").tabIndex = -1;
+    $("move-dlg").showModal();
+    if (fine) $("mv-filter").focus();
+    else if (document.activeElement === $("mv-filter")) $("move-dlg").focus();
   }
   $("mv-cancel").onclick = () => $("move-dlg").close();
   $("mv-filter").addEventListener("input", () => {
@@ -1623,15 +1700,13 @@
     else moveItem(moving, b.dataset.to);
   };
 
-  async function moveItem(id, to, quiet = false) {
+  async function moveItem(id, to) {
     const item = find(id);
     if (!item || item.category === to) return;
     const from = item.category;
-    const token = store.get("driftnet-token");
-    const res = await fetch(`/api/items/${id}/move`, { method: "POST", body: JSON.stringify({ folder: to }),
-      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
-    if (res?.status === 401) return needAdmin();
-    if (!res?.ok) return toast(T().failed);
+    // Through the bulk endpoint: its Undo puts the card back exactly as it was (still unfiled, in the Inbox, if it was).
+    const r = await mapWrite("/api/items/bulk", "POST", { action: "move", ids: [id], folder: to });
+    if (!r) return;
     item.category = to;
     const f = folderById(to); if (f) f.count++;
     const old = folderById(from); if (old) old.count--;
@@ -1650,7 +1725,15 @@
     if (onMap && onMap !== item) onMap.category = to;
     if (mapShown()) drawMap();
     bumpUse(to);
-    if (!quiet) { toast(T().moved(nameOf(item), folderPath(to)), async () => { await moveItem(id, from, true); renderKeep(); }); }
+    refreshCounts();
+    toast(T().moved(nameOf(item), folderPath(to)), async () => {
+      if (!(await mapWrite("/api/items/bulk/undo", "POST", { undo: r.undo }))) return;
+      item.category = from;
+      if (onMap) onMap.category = from;
+      await refreshFolders();
+      await renderKeep();
+      refreshCounts();
+    });
   }
   const subtreeOf = (id) => { const out = new Set([id]); for (const q = [id]; q.length;) for (const k of kids(q.pop())) { out.add(k.id); q.push(k.id); } return out; };
   /** Re-draw just the tree's counts after a move. */
@@ -1720,7 +1803,7 @@
   /** The token list Settings last fetched, to warn when a new token repeats an active name. */
   let knownTokens = [];
   const nameTaken = (list, name) => list.some((k) => !k.revokedAt && k.name.toLowerCase() === name.toLowerCase());
-  async function openSettings(welcome = false) {
+  async function openSettings(welcome = false, want = null) {
     const t = T(), st = t.st;
     const token = store.get("driftnet-token");
     const res = await fetch("/api/settings", { headers: token ? { authorization: `Bearer ${token}` } : {} }).catch(() => null);
@@ -1759,12 +1842,12 @@
       server = {
         general: group("language") + group("chat") + group("digest") + group("webhook") + group("updates") + importPanel() + backupPanel(serverSettings),
         access: accessStatus + accessPanel(serverSettings, field) + (agentTokens ? tokensPanel(serverSettings.access, agentTokens, minted) + pairPanel(serverSettings.access) : ""),
-        ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + group("model") + group("rules") +
+        ai: `<p class="set-status" id="st-status">${esc(st.status(serverSettings.engines))}</p>` + aiPanel(serverSettings, field) +
           `<fieldset class="set-group"><legend>${esc(st.plugins)}</legend><div class="set-row">${plugins}</div></fieldset>`,
       };
     }
     // Three tabs instead of one long scroll: what you see, who gets in, which AI.
-    const tab = welcome ? "ai" : store.get("driftnet-settings-tab") || "general";
+    const tab = want ?? (welcome ? "ai" : store.get("driftnet-settings-tab") || "general");
     const tabs = [["general", st.tabGeneral], ["access", st.tabAccess], ["ai", st.tabAi]];
     const section = (k, html) => `<section data-tab="${k}" role="tabpanel" id="panel-${k}" aria-labelledby="tab-${k}">${html}</section>`;
     $("st-title").textContent = st.title;
@@ -1775,12 +1858,39 @@
         ? section("general", local) + section("access", server) + section("ai", server)
         : section("general", local + server.general) + section("access", server.access) + section("ai", server.ai));
     $("st-body").dataset.tab = tab;
+    placeAi();
     $("st-cancel").textContent = t.cancel;
     $("st-save").textContent = st.save;
     settingsOpener = isDrawer() ? $("menu") : document.activeElement;
     $("settings-dlg").showModal();
     $("st-body").querySelector('[data-tab-btn][aria-selected="true"]')?.focus();
   }
+  /** Settings › AI: the chosen provider's own fields sit under it; other providers', embeddings and tool paths fold into Advanced. */
+  const PROVIDER_FIELDS = { DRIFTNET_LLM_MODEL: "anthropic openai gemini bedrock vertex claude-cli gemini-cli", DRIFTNET_LLM_BASE_URL: "openai",
+    DRIFTNET_LLM_API_KEY: "anthropic openai gemini vertex", DRIFTNET_LLM_EFFORT: "anthropic openai gemini", DRIFTNET_LLM_REGION: "bedrock vertex",
+    AWS_ACCESS_KEY_ID: "bedrock", AWS_SECRET_ACCESS_KEY: "bedrock", AWS_SESSION_TOKEN: "bedrock", AWS_BEARER_TOKEN_BEDROCK: "bedrock",
+    GOOGLE_CLOUD_PROJECT: "vertex", DRIFTNET_VERTEX_CREDENTIALS: "vertex" };
+  const AI_ADVANCED = ["TYPESAFE_API_KEY", "GITHUB_TOKEN", "DRIFTNET_EMBED", "DRIFTNET_EMBED_PROVIDER", "DRIFTNET_EMBED_MODEL", "DRIFTNET_EMBED_BASE_URL",
+    "DRIFTNET_EMBED_API_KEY", "DRIFTNET_EMBED_FLOOR", "DRIFTNET_YTDLP", "DRIFTNET_FFMPEG", "DRIFTNET_TESSERACT", "DRIFTNET_WHISPER"];
+  function aiPanel(sv, field) {
+    const st = T().st, all = sv.settings;
+    const adv = new Set(AI_ADVANCED);
+    if (all.find((x) => x.key === "DRIFTNET_JUDGE")?.value !== "rules") adv.add("DRIFTNET_JUDGE_RULES");
+    const row = (s, n) => field(s).replace('<label class="set-row"', `<label class="set-row" data-n="${n}"${PROVIDER_FIELDS[s.key] ? ` data-for="${PROVIDER_FIELDS[s.key]}"` : ""}`);
+    const pick = (test) => all.map((s, n) => (test(s) ? row(s, n) : "")).join("");
+    const plain = (g) => (s) => s.group === g && !adv.has(s.key) && !PROVIDER_FIELDS[s.key] && s.key !== "DRIFTNET_LLM_PROVIDER";
+    return `<fieldset class="set-group"><legend>${esc(st.model)}</legend>${pick((s) => s.key === "DRIFTNET_LLM_PROVIDER")}<div id="ai-prov"></div>${pick(plain("model"))}</fieldset>` +
+      `<fieldset class="set-group"><legend>${esc(st.rules)}</legend>${pick(plain("rules"))}</fieldset>` +
+      `<details class="set-adv"><summary>${esc(st.advanced)}</summary><small>${esc(st.advancedHelp)}</small><div id="ai-prov-other">${pick((s) => !!PROVIDER_FIELDS[s.key])}</div>${pick((s) => adv.has(s.key))}</details>`;
+  }
+  /** Move each provider field next to the provider select when that provider uses it, else into Advanced. */
+  function placeAi() {
+    const sel = $("st-body").querySelector('[data-key="DRIFTNET_LLM_PROVIDER"]'), here = $("ai-prov"), there = $("ai-prov-other");
+    if (!sel || !here || !there) return;
+    const rows = [...$("st-body").querySelectorAll("[data-for]")].sort((a, b) => a.dataset.n - b.dataset.n);
+    for (const r of rows) (r.dataset.for.split(" ").includes(sel.value) ? here : there).append(r);
+  }
+  $("st-body").addEventListener("change", (e) => { if (e.target.dataset?.key === "DRIFTNET_LLM_PROVIDER") placeAi(); });
   /** Settings › Backup: download a zip (secrets only with the password typed again) or restore one (applied at the next start). */
   function backupPanel(sv) {
     const st = T().st;
@@ -2166,6 +2276,11 @@
       [/^model: .*DRIFTNET_LLM_MODEL is required/, () => zh ? "還沒存：這個供應商要填「模型」名稱。" : "Not saved: this provider needs a model name."],
       [/^model: .*(API_KEY is required|needs an API key|needs a key)/i, () => zh ? "還沒存：這個供應商要填 API 金鑰。" : "Not saved: this provider needs an API key."],
       [/^model: (.+)/, (m) => zh ? `還沒存：模型設定不完整（${m[1]}）。` : `Not saved: the model setup is incomplete (${m[1]}).`],
+      // Why a link was not saved (POST /api/ingest answers 422).
+      [/(\S+) (?:is|resolves to) a private or local address/, (m) => zh ? `沒有收錄：${m[1]} 是內網或本機位址，driftnet 不會去抓。` : `Not saved: ${m[1]} is a private or local address, so driftnet won't fetch it.`],
+      [/(\S+) did not resolve/, (m) => zh ? `沒有收錄：找不到 ${m[1]} 這個網站，請檢查網址。` : `Not saved: ${m[1]} couldn't be found — check the address.`],
+      [/links are not fetched|not a web link/, () => zh ? "沒有收錄：這不是網頁連結，要以 http:// 或 https:// 開頭。" : "Not saved: that isn't a web link — it needs to start with http:// or https://."],
+      [/(\S+) is blocked in your settings/, (m) => zh ? `沒有收錄：${m[1]} 在你的封鎖清單裡（設定 → AI →「不要收錄的網域」）。` : `Not saved: ${m[1]} is on your blocked list (Settings → AI → Never catalogue these domains).`],
       [/too many wrong passwords/, () => zh ? "密碼錯太多次，請 15 分鐘後再試。" : "Too many wrong passwords — try again in 15 minutes."],
     ];
     for (const [re, f] of rules) { const m = re.exec(msg); if (m) return f(m); }
@@ -2189,7 +2304,7 @@
   function syncFocusHash() {
     const want = mapShown() && mapFocus ? `#focus=${encodeURIComponent(mapFocus)}` : "";
     if (want === location.hash || (!want && !location.hash.startsWith("#focus="))) return;
-    history.replaceState(null, "", location.pathname + location.search + want);
+    history.replaceState(history.state, "", location.pathname + location.search + want);
   }
   /** Focus the map on a folder (null = back to everything), remembering where each view was. */
   async function setMapFocus(id) {
@@ -2239,7 +2354,8 @@
           : `<button type="button" data-map="focus" data-id="${esc(id)}">${esc(catLabel(id))}</button>`)).join("") + `</nav>`;
     })() : "";
     const allOpen = mapOpen.size > 0 || !!state.q;
-    const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip"><span>${esc(t.mapHint)} ${esc(t.mapHintFocus)}</span><button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
+    const kb = matchMedia("(hover: hover)").matches;   // a touch screen gets no "press z"
+    const tip = store.get("driftnet-map-tip") ? "" : `<p class="hint map-tip"><span>${esc(t.mapHint)} ${esc(kb ? t.mapHintFocus : t.mapHintFocusTouch)}</span><button class="link-btn" type="button" data-map="tip">${esc(t.gotIt)}</button></p>`;
     $("list").innerHTML = `<div class="map-bar">
         <button class="btn" type="button" data-map="${allOpen ? "collapse" : "expand"}">${ic(allOpen ? "collapse" : "expand")} ${esc(allOpen ? t.collapseAll : t.expandAll)}</button>
         <button class="btn" type="button" data-map="new">${ic("plus")} ${esc(t.newFolder)}</button>
@@ -2272,18 +2388,19 @@
     wrap.scrollTop = root.offsetTop * mapZoom - wrap.clientHeight / 2;
     wrap.scrollLeft = (root.offsetLeft + root.offsetWidth / 2) * mapZoom - wrap.clientWidth / 2;
   }
-  function fitWidth() {
+  /** floor: never smaller than this; persist: false for split view, which must not change the full map's saved zoom. */
+  function fitWidth(floor = 0.6, persist = true) {
     const wrap = $("map-wrap"), c = $("map-canvas");
     if (!wrap || !c) return;
-    mapZoomTo(Math.max(0.6, Math.min(1, (wrap.clientWidth - 8) / c.offsetWidth)));
+    mapZoomTo(Math.max(floor, Math.min(1, (wrap.clientWidth - 8) / c.offsetWidth)), persist);
     const root = c.querySelector('.mnode[data-key="root"]');
     if (root) wrap.scrollTop = root.offsetTop * mapZoom - wrap.clientHeight / 2;
   }
   function fitMap() {
     const wrap = $("map-wrap"), c = $("map-canvas");
     if (!wrap || !c) return;
-    // Fit, but never so small the text can't be read (phones stop at 0.6, desktops at 0.45); then start at the root.
-    const floor = isDrawer() ? 0.6 : 0.45;
+    // Fit: on a phone really fit (an overview to tap into), on a desktop stop at 0.45 so text stays readable; then start at the root.
+    const floor = isDrawer() ? MIN_ZOOM_PHONE : 0.45;
     mapZoomTo(Math.max(floor, Math.min(1.3, (wrap.clientWidth - 8) / c.offsetWidth, (wrap.clientHeight - 8) / c.offsetHeight)));
     centreOnRoot();
   }
@@ -2292,7 +2409,14 @@
     const wrap = $("map-wrap");
     if (wrap) wrap.style.height = `${Math.max(320, innerHeight - wrap.getBoundingClientRect().top - 12)}px`;
   }
-  addEventListener("resize", () => { if (mapShown()) sizeMap(); if (splitOn()) sizeSplit(); });
+  let lastW = innerWidth, fitTimer = 0;
+  addEventListener("resize", () => {
+    if (mapShown()) sizeMap();
+    if (splitOn()) sizeSplit();
+    // Split view: the pane changed width, so fit the map to it again (a height-only change, like a phone's toolbar, doesn't count).
+    if (splitOn() && innerWidth !== lastW) { clearTimeout(fitTimer); fitTimer = setTimeout(() => { if (splitOn()) fitWidth(0.3, false); }, 150); }
+    lastW = innerWidth;
+  });
 
   /** Root → folders → sub-folders and cards, laid out left to right like XMind. */
   function drawMap() {
@@ -2449,12 +2573,13 @@
     if (first && q && wrap) wrap.scrollTo({ left: first.offsetLeft * mapZoom - wrap.clientWidth / 2, top: first.offsetTop * mapZoom - wrap.clientHeight / 2 });
   }
 
-  function mapZoomTo(z) {
+  const MIN_ZOOM_PHONE = 0.15;
+  function mapZoomTo(z, persist = true) {
     const wrap = $("map-wrap");
     // Zoom around the centre of what is on screen, not the top-left corner.
     const cx = wrap ? (wrap.scrollLeft + wrap.clientWidth / 2) / mapZoom : 0, cy = wrap ? (wrap.scrollTop + wrap.clientHeight / 2) / mapZoom : 0;
-    mapZoom = Math.min(2, Math.max(0.3, Math.round(z * 20) / 20));
-    store.set("driftnet-map-zoom", String(mapZoom));
+    mapZoom = Math.min(2, Math.max(isDrawer() ? MIN_ZOOM_PHONE : 0.3, Math.round(z * 100) / 100));
+    if (persist) store.set("driftnet-map-zoom", String(mapZoom));
     drawMap();
     if (wrap) { wrap.scrollLeft = cx * mapZoom - wrap.clientWidth / 2; wrap.scrollTop = cy * mapZoom - wrap.clientHeight / 2; }
   }
@@ -2733,9 +2858,10 @@
     if (!i) return void (mdlDlg.open && mdlDlg.close());
     const t = T(), s = i.summary, admin = role === "admin", inTrash = state.view === "trash";
     const url = safeUrl(s?.primaryUrl || i.url), name = s?.name ?? i.title;
-    const ids = mdIds(), at = ids.indexOf(i.id);
-    $("md-pos").textContent = at >= 0 ? t.mdPos(at + 1, ids.length) : "";
-    for (const [id, label, off] of [["md-prev", t.mdPrev, at <= 0], ["md-next", t.mdNext, at < 0 || at >= ids.length - 1]]) {
+    // "3 of 120": the whole list, not just the pages loaded so far (Next loads the next page).
+    const ids = mdIds(), at = ids.indexOf(i.id), total = Math.max(ids.length, pageTotal);
+    $("md-pos").textContent = at >= 0 ? t.mdPos(at + 1, total) : "";
+    for (const [id, label, off] of [["md-prev", t.mdPrev, at <= 0], ["md-next", t.mdNext, at < 0 || at >= total - 1]]) {
       const b = $(id); b.innerHTML = ic("chev"); b.setAttribute("aria-label", label); b.title = label; b.hidden = at < 0; b.disabled = off;
     }
     $("md-close").setAttribute("aria-label", t.close); $("md-close").title = t.close;
@@ -2765,13 +2891,13 @@
       <div class="md-fine">${i.shareCount ? `<span>${esc(t.shared(i.shareCount))}</span>` : ""}<span>${esc(i.createdAt.slice(0, 10))}</span>${i.enrichedBy ? `<span>${esc(t.enrichedBy(i.enrichedBy.replace(/^agent:/, "")))}</span>` : ""}</div>`;
     paintRelated(i.id);
     const busy = refreshing.has(i.id);
-    const btn = (act, icon, label, extra = "") => `<button class="btn ${extra}" type="button" data-md="${act}">${ic(icon)} ${esc(label)}</button>`;
+    const btn = (act, icon, label, extra = "", title = "") => `<button class="btn ${extra}" type="button" data-md="${act}"${title ? ` title="${esc(title)}"` : ""}>${ic(icon)} ${esc(label)}</button>`;
     $("md-actions").innerHTML = `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ic("link")} ${esc(t.openLink)}</a>` +
       (admin ? (inTrash ? btn("restore", "undo", t.restore) + btn("purge", "trash", t.purge, "danger")
         : btn("favorite", "star", i.favorite ? t.unfavorite : t.favorite, i.favorite ? "on" : "") + btn("move", "move", t.moveTo) +
-          `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refresh)}</button>` +
-          btn("health", "refresh", t.checkLink) + btn("note", "note", i.note ? t.editNote : t.addNote) + (s ? btn("tags", "note", t.tagsEdit) : "") + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
-      btn("history", "undo", t.histBtn, histFor === i.id ? "on" : "") +
+          `<button class="btn ${busy ? "spin" : ""}" type="button" data-md="refresh" title="${esc(t.refresh)}" ${busy ? "disabled" : ""}>${ic("refresh")} ${esc(t.refreshShort)}</button>` +
+          btn("health", "check", t.checkLink) + btn("note", "note", i.note ? t.editNote : t.addNote) + (s ? btn("tags", "tag", t.tagsEdit) : "") + `<span class="spacer"></span>` + btn("trash", "trash", t.remove, "danger")) : "") +
+      btn("history", "clock", t.histBtn, histFor === i.id ? "on" : "", t.histTitle) +
       (modalFrom === "map" ? btn("list", "list", t.showInList) : "");
     if (histFor === i.id) paintHistory(i);
   }
@@ -2834,19 +2960,24 @@
     if (!wasOpen) mdlDlg.showModal();
     $("md-scroll").scrollTop = 0;
     mdlDlg.style.transform = "";
-    history.replaceState(null, "", `${location.pathname}${location.search}#item-${id}`);
+    // Its own history entry, so Back (a phone's above all) closes the card instead of leaving driftnet.
+    if (!history.state?.dnLayer) history.pushState({ dnLayer: 1 }, "", location.href);
+    history.replaceState(history.state, "", `${location.pathname}${location.search}#item-${id}`);
   }
   /** Step to the previous / next card in the list the modal came from. */
-  function stepModal(d) {
-    const ids = mdIds(), at = ids.indexOf(modalId), to = ids[at + d];
-    if (at < 0 || to == null) return;
+  async function stepModal(d) {
+    let ids = mdIds(), at = ids.indexOf(modalId);
+    if (at < 0) return;
+    if (ids[at + d] == null && d > 0 && items.length < pageTotal) { await loadMore(); ids = mdIds(); at = ids.indexOf(modalId); }
+    const to = ids[at + d];
+    if (to == null || !mdlDlg.open) return;
     openModal(to, modalFrom);
   }
   mdlDlg.addEventListener("close", () => {
     if (mdlDlg.open) return;   // reopened (a link, a hash) before this queued event ran
     const id = modalId, from = modalFrom;
     // Only this card's own hash: a late close event must not wipe the link of a card opened since.
-    if (!keepHash && location.hash === `#item-${id}`) history.replaceState(null, "", location.pathname + location.search);
+    if (!keepHash && location.hash === `#item-${id}`) history.replaceState(history.state, "", location.pathname + location.search);
     keepHash = false;
     mdlDlg.style.transform = "";
     // Focus goes back to the card you ended on (the one you opened, or the last one you stepped to).
@@ -2910,7 +3041,7 @@
     if (act1 === "list") {
       keepHash = true; mdlDlg.close();
       Object.assign(state, { view: "all", category: "", kind: "" });
-      history.replaceState(null, "", `#item-${id}`);
+      history.replaceState(history.state, "", `#item-${id}`);
       return load();
     }
     if (act1 === "history") {
@@ -3008,16 +3139,18 @@
     if (!item || !to) return;
     if (item.category === to) return toast(T().alreadyThere);
     const from = item.category;
-    if (!(await mapWrite(`/api/items/${id}/move`, "POST", { folder: to }))) return;
+    const r = await mapWrite("/api/items/bulk", "POST", { action: "move", ids: [id], folder: to });
+    if (!r) return;
     item.category = to;
     // Filing many cards in a row: the target stays as it was (no sudden expansion); its count pulses instead.
     drawMap();
     pulse(`f:${to}`);
     bumpUse(to);
     toast(T().moved(nameOf(item), folderPath(to)), async () => {
-      if (await mapWrite(`/api/items/${id}/move`, "POST", { folder: from })) { item.category = from; drawMap(); refreshFolders(); }
+      if (await mapWrite("/api/items/bulk/undo", "POST", { undo: r.undo })) { item.category = from; drawMap(); refreshFolders(); refreshCounts(); }
     });
     refreshFolders();
+    refreshCounts();
   }
   async function mapMoveFolder(id, to) {
     if (id === to || (to && subtreeOf(id).has(to))) return;
@@ -3084,16 +3217,27 @@
     const withKey = (u) => (a?.private || a?.readKey ? `${u}?key=${key}` : u);
     // With an admin password set, agent cards offer their own token instead of the password.
     const canMint = !!a?.passwordSet;
+    // No password on a page opened on this computer: nothing to authorise, so the commands carry no header.
+    const open = !!a && !a.passwordSet && !!uiInfo.local;
     const secrets = {};
     const card = (id, title, desc, code, agent) => `<div class="conn" id="cc-${id}"><div class="conn-head"><h4>${esc(title)}</h4>
       <button class="btn copy" type="button" data-copy="#cx-${id}">${esc(st.copy)}</button></div><p>${esc(desc)}</p><pre id="cx-${id}">${esc(code)}</pre>
       ${agent && canMint ? `<div class="conn-mint"><input id="cn-${id}" class="conn-name" maxlength="60" value="${esc(agent)}" autocomplete="off" aria-label="${esc(st.tokCardName)}"><button class="btn" type="button" data-mint="${id}">${esc(st.tokCardCreate)}</button></div>` : ""}</div>`;
     const cards = [
+      card("init", zh ? "推薦：一次接好你的 AI 工具" : "Recommended: connect your AI apps in one go",
+        isLocalUrl
+          ? (zh ? "在這台電腦的終端機執行。會一次幫 Claude Code、Claude Desktop、Cursor、Windsurf、Codex 接上 driftnet；想先看會改什麼，加 --dry-run。"
+                : "Run in a terminal on this computer. Connects Claude Code, Claude Desktop, Cursor, Windsurf and Codex in one go; add --dry-run to see what it would change first.")
+          : (zh ? "在要連線的那台電腦執行。會一次幫 Claude Code、Claude Desktop、Cursor、Windsurf、Codex 接上這個 driftnet。" : "Run on the computer you want to connect. Connects Claude Code, Claude Desktop, Cursor, Windsurf and Codex to this driftnet in one go."),
+        isLocalUrl ? "npx driftnet init" : `npx driftnet init --remote ${base} --token ${pw}`, isLocalUrl ? "" : "init"),
       card("ccp", zh ? "Claude Code：裝插件" : "Claude Code: the plugin", zh ? "在 Claude Code 裡輸入。會裝好 skill 和本機 MCP。" : "Type it inside Claude Code. Brings the skill and a local MCP server.",
         `/plugin install driftnet --marketplace KevinChu1110/driftnet`),
-      card("cc", zh ? "Claude Code：連到這個 driftnet" : "Claude Code: connect to this driftnet",
-        zh ? "在終端機執行。先 export DRIFTNET_TOKEN=你的管理密碼，指令會自動帶入。" : "Run in a terminal. Export DRIFTNET_TOKEN=<your admin password> first; the command reads it.",
-        `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer $DRIFTNET_TOKEN"`, "Claude Code"),
+      open
+        ? card("cc", zh ? "Claude Code：連到這個 driftnet" : "Claude Code: connect to this driftnet", zh ? "在終端機執行。" : "Run in a terminal.",
+            `claude mcp add --transport http driftnet ${base}/mcp`)
+        : card("cc", zh ? "Claude Code：連到這個 driftnet" : "Claude Code: connect to this driftnet",
+            zh ? "在終端機執行。先 export DRIFTNET_TOKEN=你的管理密碼，指令會自動帶入。" : "Run in a terminal. Export DRIFTNET_TOKEN=<your admin password> first; the command reads it.",
+            `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer $DRIFTNET_TOKEN"`, "Claude Code"),
       card("claude", zh ? "Claude 網頁版／桌面版（自訂 connector）" : "Claude.ai / Claude Desktop (custom connector)",
         zh ? "設定 → Connectors → 新增自訂 connector，貼上這個網址。用分享碼連線，只能搜尋和查看，不能改。" : "Settings → Connectors → Add custom connector, paste this URL. The share key makes it read-only: search and look, no changes.",
         withKey(`${base}/mcp`)),
@@ -3106,11 +3250,15 @@
            : `Read ${withKey(`${base}/llms.txt`)} — it's my catalogue of AI tools. Find me one for: (your task).`),
       card("feed", st.feed, zh ? "RSS／Atom 訂閱源：最新 50 張卡片。給 RSS 閱讀器或 n8n、Zapier 用；加上 ?folder=資料夾代號 可只看一個資料夾。" : "RSS / Atom feed of the newest 50 cards, for feed readers, n8n or Zapier. Add ?folder=<folder-id> for one folder.",
         withKey(`${base}/feed.xml`)),
-      card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。把裡面的 <你的管理密碼> 換成真的密碼；有了它，agent 可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. Replace <your-admin-password> with the real one; with it they can save, vote and work the queue.",
-        JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2), "Hermes"),
+      open
+        ? card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。agent 可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. With it they can save, vote and work the queue.",
+            JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp` } } }, null, 2))
+        : card("agents", "Hermes / OpenClaw / pi", zh ? "這些 agent 的 MCP 設定。把裡面的 <你的管理密碼> 換成真的密碼；有了它，agent 可以收錄、投票、幫忙讀佇列裡的連結。" : "MCP settings for these agents. Replace <your-admin-password> with the real one; with it they can save, vote and work the queue.",
+            JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${pw}` } } } }, null, 2), "Hermes"),
     ].join("");
     // What each agent card shows once it has its own token.
     snippets = {
+      init: (tok) => `npx driftnet init --remote ${base} --token ${tok}`,
       cc: (tok) => `claude mcp add --transport http driftnet ${base}/mcp \\\n  --header "Authorization: Bearer ${tok}"`,
       agents: (tok) => JSON.stringify({ mcpServers: { driftnet: { type: "http", url: `${base}/mcp`, headers: { Authorization: `Bearer ${tok}` } } } }, null, 2),
     };
@@ -3273,7 +3421,7 @@
   function jumpTo(id) {
     Object.assign(state, { view: "all", category: "", kind: "", q: "" });
     $("q").value = "";
-    history.replaceState(null, "", `#item-${id}`);
+    history.replaceState(history.state, "", `#item-${id}`);
     load();
   }
 
@@ -3289,24 +3437,61 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
-  /** The first link, straight from the page (the empty list offers this). */
-  async function addLink(e) {
-    e.preventDefault();
-    const url = $("add-url").value.trim();
-    if (!/^https?:\/\//.test(url)) return toast(T().addPlaceholder);
-    const b = e.submitter; if (b) b.disabled = true;
+  /**
+   * Save one link from the page (the ＋ dialog, the empty list, a link typed into search). The server adds https://
+   * to a bare domain and says why it refused one; `say` shows that reason (a toast unless a dialog has its own line).
+   * True only when a card was really saved.
+   */
+  async function addUrl(url, say = toast) {
+    url = url.trim();
+    if (!url) return false;
     const token = store.get("driftnet-token");
     const res = await fetch("/api/ingest", { method: "POST", body: JSON.stringify({ url }),
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) } }).catch(() => null);
-    if (b) b.disabled = false;
-    if (res?.status === 401) return needAdmin();
-    if (!res?.ok) return toast(T().failed);
-    toast(T().added);
-    load();
+    if (res?.status === 401) { needAdmin(); return false; }
+    const data = await res?.json().catch(() => null);
+    if (!res?.ok) { say(friendlyError(data?.error) ?? T().failed); return false; }
+    const got = Array.isArray(data) ? data[0] : null;
+    if (!got?.item?.id) { say(T().addNothing); return false; }
+    toast(got.cached ? T().addedAlready : T().added);
+    $("q").value = ""; state.q = "";
+    jumpTo(got.item.id);
+    return true;
   }
+  async function addLink(e) {
+    e.preventDefault();
+    const b = e.submitter; if (b) b.disabled = true;
+    await addUrl($("add-url").value);
+    if (b?.isConnected) b.disabled = false;
+  }
+  function openAdd(prefill = "") {
+    if (role !== "admin") return needAdmin();
+    if (document.querySelector("dialog[open]")) return;
+    const t = T();
+    $("ad-title").textContent = t.addTitle; $("ad-help").textContent = t.addHelp;
+    $("ad-url").placeholder = t.addPlaceholder; $("ad-error").textContent = "";
+    $("ad-cancel").textContent = t.cancel; $("ad-ok").textContent = t.addLink;
+    $("ad-url").value = prefill;
+    $("add-dlg").showModal();
+    $("ad-url").focus();
+  }
+  $("add-btn").onclick = () => openAdd();
+  $("settings-btn").onclick = () => openSettings();
+  $("ad-cancel").onclick = () => $("add-dlg").close();
+  $("add-dlg").addEventListener("click", (e) => { if (e.target === $("add-dlg")) $("add-dlg").close(); });
+  $("add-dlg-form").onsubmit = async (e) => {
+    e.preventDefault();
+    $("ad-ok").disabled = true; $("ad-error").textContent = "";
+    const ok = await addUrl($("ad-url").value, (why) => { $("ad-error").textContent = why; });
+    $("ad-ok").disabled = false;
+    if (ok) $("add-dlg").close();
+  };
+  /** Search text that is a link (a URL, or a bare domain like example.com): offer to save it instead. */
+  const linkLike = (q) => /^(https?:\/\/\S+|[\w-]+(\.[\w-]+)*\.[a-z]{2,}(\/\S*)?)$/i.test(q.trim());
 
   async function render() {
     updateCrumb();
+    store.set("driftnet-view", JSON.stringify({ view: state.view, category: state.category }));
     const viewKey = [state.view, state.category, state.kind, state.q].join("|");
     if (viewKey !== lastViewKey) { lastViewKey = viewKey; selected.clear(); selAnchor = null; }
     document.body.classList.toggle("map-view", mapShown());
@@ -3327,6 +3512,7 @@
       await renderMap();   // the map first: the selection check then knows both sides
       await inPane($("split-list"), renderCards);
       sizeSplit();
+      fitWidth(0.3, false);   // the map pane is narrow: show its whole width
       syncSelection();
     };
     return (splitQueue = splitQueue.catch(() => {}).then(run));
@@ -3488,13 +3674,23 @@
     pageBusy = false;
     pageObserver?.disconnect();
     const t = T();
-    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : state.view === "review" ? t.emptyReview : t.empty;
+    const fresh = state.view === "all" && !state.q && !state.category && !state.kind && role === "admin";
+    const empty = state.view === "trash" ? t.emptyTrash : state.view === "favorites" ? t.emptyFav : state.view === "inbox" ? t.emptyInbox : state.view === "review" ? t.emptyReview : fresh ? t.emptyStart : t.empty;
+    // A link typed into search: offer to save it (right away for a full URL, otherwise only when nothing matched).
+    const addQ = role === "admin" && state.q && linkLike(state.q) && (!items.length || /^(https?:\/\/|www\.)/i.test(state.q))
+      ? `<div class="add-q"><button class="btn primary" type="button" data-add-q>${ic("plus")} ${esc(t.addThis(state.q))}</button></div>` : "";
+    const scoped = state.view !== "all" || state.category || state.kind;
     $("list").innerHTML = items.length
-      ? (state.view === "trash" ? `<div class="trash-bar"><button class="btn danger" type="button" id="trash-empty">${ic("trash")} ${esc(t.emptyTrashBtn)}</button></div>` : "") + `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
-      : `<div class="empty first"><span>${esc(empty)}</span>${state.view === "all" && !state.q && !state.category && role === "admin"
-          ? `<form class="add" id="add-form"><input id="add-url" type="url" inputmode="url" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
+      ? addQ + (state.view === "trash" ? `<div class="trash-bar"><button class="btn danger" type="button" id="trash-empty">${ic("trash")} ${esc(t.emptyTrashBtn)}</button></div>` : "") + `<p class="hint swipe-hint">${esc(state.view === "trash" ? t.hintTrash : state.view === "inbox" ? t.hintInbox : state.view === "review" ? t.hintReview : t.hint)}</p>` + items.map(card).join("") + moreHtml()
+      : state.q
+        // Searching found nothing: say so (not "Inbox zero"), and offer the whole catalogue when only part of it was searched.
+        ? `<div class="empty nomatch"><span>${esc(t.noMatch(state.q, viewName()))}</span>${scoped ? `<button class="btn" type="button" data-search-all>${esc(t.searchAll)}</button>` : ""}${addQ}</div>`
+        : `<div class="empty first"><span>${esc(empty)}</span>${fresh
+          ? `<form class="add" id="add-form"><input id="add-url" type="text" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="${esc(t.addPlaceholder)}" aria-label="${esc(t.addPlaceholder)}">
              <button class="btn primary" type="submit">${ic("plus")} ${esc(t.addLink)}</button></form>
              <button class="btn" type="button" data-connect-empty>${ic("plug")} ${esc(t.st.connect)}</button>${templateChooser(t)}` : ""}</div>`;
+    $("list").querySelector("[data-add-q]")?.addEventListener("click", (e) => { const b = e.currentTarget; b.disabled = true; addUrl(state.q).then(() => { if (b.isConnected) b.disabled = false; }); });
+    $("list").querySelector("[data-search-all]")?.addEventListener("click", () => { Object.assign(state, { view: "all", category: "", kind: "" }); load(); });
     watchMore();
     if (keep) scrollTo({ top: y });
     $("add-form")?.addEventListener("submit", addLink);
@@ -3972,12 +4168,13 @@
     applyPrefs();
   }
   const commands = [
+    { id: "add", label: { en: "Add a link…", "zh-TW": "收錄連結…" }, keys: ["a"], help: "kAdd", when: () => role === "admin", run: () => openAdd() },
     { id: "view-list", label: { en: "Show the card list", "zh-TW": "顯示卡片列表" }, keys: ["g", "a"], help: "kAll", run: () => showLayout("list") },
     { id: "view-map", label: { en: "Show the mind map", "zh-TW": "顯示樹狀圖" }, keys: ["g", "m"], help: "kMap", run: () => showLayout("map") },
     { id: "view-split", label: { en: "Show cards and mind map side by side", "zh-TW": "並排顯示卡片與樹狀圖" }, when: () => wideQuery.matches, run: () => showLayout("split") },
     { id: "move", label: { en: "Move the focused card…", "zh-TW": "移動目前選取的卡片…" }, when: () => role === "admin" && !!pal.focused, run: () => openMovePicker(pal.focused) },
     { id: "new-folder", label: { en: "New folder", "zh-TW": "新增資料夾" }, when: () => role === "admin", run: () => openFolderDialog(null, null) },
-    { id: "export-md", label: { en: "Download a backup (Markdown)", "zh-TW": "下載備份（Markdown）" }, run: () => download("markdown") },
+    { id: "export-md", label: { en: "Export as Markdown", "zh-TW": "匯出成 Markdown" }, run: () => download("markdown") },
     { id: "export-vault", label: { en: "Download for Obsidian / Notion", "zh-TW": "下載給 Obsidian／Notion" }, run: () => download("vault") },
     { id: "settings", label: { en: "Settings", "zh-TW": "設定" }, run: () => openSettings() },
     { id: "dark", label: { en: "Toggle dark mode", "zh-TW": "切換深色模式" }, run: toggleDark },
@@ -4084,6 +4281,9 @@
       `<h4>${esc(t.keysMap)}</h4>` + row(["↓", "↑"], t.kTreeNav) + row(["→"], t.kTreeOpen) + row(["←"], t.kTreeClose) + row(["Home", "End"], t.kTreeEnds) +
       row([t.kTreeType], t.kTreeTypeText) + row(["z"], t.kFocus) + row(["Esc", "Backspace"], t.kFocusUp);
     $("keys-dlg").showModal();
+    // Start at the top: focus would otherwise land on Close, at the bottom of a long list.
+    $("ky-title").focus({ preventScroll: true });
+    $("keys-dlg").scrollTop = 0;
   }
   $("ky-close").onclick = () => $("keys-dlg").close();
   $("keys-dlg").addEventListener("click", (e) => { if (e.target === $("keys-dlg")) $("keys-dlg").close(); });
@@ -4133,7 +4333,7 @@
   $("plan-body").addEventListener("change", syncPlan);
   async function openPlan() {
     const t = T();
-    if (!summaries) return toast(t.planNoModel);
+    if (!summaries) return toast(t.planNoModel, () => openSettings(false, "ai"), t.st.openSettings);
     plan = null;
     $("pl-title").textContent = t.planTitle;
     $("pl-intro").textContent = t.planIntro;
@@ -4164,12 +4364,13 @@
 
   /** The newest undoable action, so z (or ⌘/Ctrl+Z) can undo it from the keyboard. */
   let lastUndo = null;
-  function toast(text, undo) {
+  /** label: the button does something else than Undo (z then leaves it alone). */
+  function toast(text, undo, label) {
     $("toast-text").textContent = text;
     const u = $("toast-undo");
     u.hidden = !undo;
-    u.textContent = T().undo;
-    lastUndo = undo ?? null;
+    u.textContent = label ?? T().undo;
+    lastUndo = label ? null : undo ?? null;
     u.onclick = async () => { clearTimeout(toastTimer); $("toast").classList.remove("show"); lastUndo = null; await undo?.(); };
     $("toast").classList.add("show");
     toastMs = Math.min(9000, 4500 + text.length * 45);
@@ -4204,12 +4405,25 @@
     // Inbox: 1–3 pick the focused card's suggestion chips (before the global "file into top-9 folders").
     if (state.view === "inbox" && /^[1-3]$/.test(k) && role === "admin" && focusedId() && !selected.size) {
       const chip = document.querySelectorAll(`#item-${focusedId()} [data-chip]`)[Number(k) - 1];
-      if (chip) { e.preventDefault(); inboxFile(focusedId(), chip.dataset.chip); return; }
+      e.preventDefault();
+      // No such suggestion: say so rather than quietly filing into a most-used folder.
+      if (chip) inboxFile(focusedId(), chip.dataset.chip); else toast(T().noSuggestion);
+      return;
     }
     if (/^[1-9]$/.test(k) && role === "admin" && !document.activeElement?.isContentEditable && quickMove(Number(k))) { e.preventDefault(); return; }
     if (k === "x" && role === "admin" && !document.activeElement?.isContentEditable && focusedId() && state.view !== "map") { e.preventDefault(); toggleSelect(focusedId()); return; }
     const chord = commands.find((c) => c.keys?.length === 2 && c.keys[0] === prev && c.keys[1] === k);
     if (chord) { chord.run(); return; }
+    if (k === "a" && role === "admin" && prev !== "g") { e.preventDefault(); openAdd(); return; }
+    // Cards selected: f, m and # act on all of them, not just the focused one.
+    if (selected.size && role === "admin" && ["f", "#", "Delete", "m"].includes(k)) {
+      e.preventDefault();
+      const ids = [...selected];
+      if (k === "m") openMovePickerFor(ids);
+      else if (k === "f") bulkApply(ids.every((id) => find(id)?.favorite) ? "unfavorite" : "favorite", ids);
+      else bulkApply(state.view === "trash" ? "restore" : "trash", ids);
+      return;
+    }
     const cards = [...$("list").querySelectorAll(".swipe .card")];
     if (!cards.length) return;
     const cur = document.activeElement?.closest?.(".card");
@@ -4239,6 +4453,13 @@
   };
   let timer;
   if (location.hash.startsWith("#focus=")) { mapFocus = focusFromHash(); state.view = "map"; }
+  // A reload comes back to the view (and folder) you were on; a link to a card or a map folder decides for itself.
+  else if (!location.hash) {
+    try {
+      const v = JSON.parse(store.get("driftnet-view") ?? "null");
+      if (["all", "favorites", "inbox", "review", "map", "notes", "trash"].includes(v?.view)) Object.assign(state, { view: v.view, category: typeof v.category === "string" ? v.category : "" });
+    } catch {}
+  }
   $("q").oninput = (e) => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value.trim(); render(); }, 200); };
   // A scanned pairing link (#pair=<code>): take the code out of the address bar at once, swap it for this device's token.
   async function claimPairing() {

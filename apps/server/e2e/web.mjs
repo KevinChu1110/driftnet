@@ -148,8 +148,12 @@ const shoot = async (file) => {
   writeFileSync(join(SHOTS, file), Buffer.from(data, "base64"));
 };
 const open = async () => {
+  // A dialog just closed steps back out of its history entry: let that land before navigating away.
+  await waitFor(s, `!history.state?.dnLayer`, "no dialog history entry left", 3000).catch(() => {});
+  await evaluate(s, `localStorage.removeItem("driftnet-view")`).catch(() => {});
   await cdp("Page.navigate", { url: `http://127.0.0.1:${port}/` }, s);
-  await evaluate(s, `localStorage.setItem("driftnet-locale", ${JSON.stringify(LANG)})`).catch(() => {});
+  // Every step starts from All: the page remembers the last view across reloads.
+  await evaluate(s, `localStorage.setItem("driftnet-locale", ${JSON.stringify(LANG)}); localStorage.removeItem("driftnet-view")`).catch(() => {});
   await cdp("Page.reload", {}, s);
   await waitFor(s, `document.querySelectorAll(".swipe").length`, "cards");
 };
@@ -344,6 +348,8 @@ try {
     await waitFor(s, `${modalOpen} && !document.querySelector("#item-dlg .gallery")`, "a 404 picture disappears from the modal");
     await evaluate(s, `document.getElementById("item-dlg").close()`);
     // A shared link: #item-<id> opens the modal, on a fresh load and on a hash change.
+    // (Closing the card steps back out of its history entry: let that finish before leaving the page.)
+    await waitFor(s, `!history.state?.dnLayer`, "the card's history entry is gone");
     await cdp("Page.navigate", { url: "about:blank" }, s);
     await cdp("Page.navigate", { url: `http://127.0.0.1:${port}/#item-${sharkId}` }, s);
     await waitFor(s, `document.getElementById("item-dlg")?.open && document.getElementById("md-title")?.textContent.includes("ascii-sharks")`, "a #item link opens the modal on load");
@@ -1014,6 +1020,7 @@ try {
 
     // A phone that got a link from a bot: no password stored, only ?key= in the link.
     await evaluate(s, `(() => { localStorage.removeItem("driftnet-token"); localStorage.removeItem("driftnet-key"); return 1; })()`);
+    await waitFor(s, `!history.state?.dnLayer`, "the settings' history entry is gone");
     await cdp("Page.navigate", { url: `http://remote.test:${port}/?key=${key}#item-1` }, s);
     await waitFor(s, `document.querySelectorAll(".swipe").length > 1`, "cards through a share-key link");
     assert.equal(await evaluate(s, `location.search`), "", "the key is taken out of the address bar");
