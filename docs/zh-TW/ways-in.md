@@ -33,7 +33,10 @@
 （要改就設 `TZ`）。排定時間 driftnet 剛好沒開的話，下次啟動會補發一則，不會多發。內文連結一律是公開網址（`DRIFTNET_PUBLIC_URL`），
 不會帶唯讀分享金鑰，因為訊息會貼進群組。用 `POST /api/digest/send {"dryRun": true}` 試看看。Webhook 也會收到 `digest.sent` 事件。
 
-聊天機器人的 token 在 driftnet 啟動時讀取：寫進 `~/.driftnet/.env` 後，把 driftnet 關掉再重新啟動。
+**接上機器人。** 打開 **⚙ 設定 → 聊天室**，貼上權杖後按「儲存」。每個平台都寫了權杖去哪裡拿，也有一行狀態（已連線、尚未設定，或最近一次的錯誤，
+例如權杖貼錯、Discord 沒開 Message Content intent）。機器人馬上啟動，不用重新啟動 driftnet；改掉或清空權杖只會重啟或停掉那一個機器人。
+權杖存在 `~/.driftnet/.env`，存了之後不會再顯示（欄位留空就是沿用）。手動改 `~/.driftnet/.env` 也可以，但要重新啟動 driftnet。
+由執行環境（systemd、Docker）設定的權杖會顯示為鎖定，要到那邊改。LINE，以及不用 Socket Mode 的 Slack，另外需要平台連得到的[公開網址](online.md)。
 
 <p align="center"><img src="../../assets/discord-zh-TW.jpg" alt="driftnet 回覆一則含兩個連結的 Discord 訊息：每個連結一行，各自指向網頁" width="80%"></p>
 <sub>Discord 實測畫面：一則訊息兩個連結，各回一行。使用者名稱和伺服器網址已隱藏。</sub>
