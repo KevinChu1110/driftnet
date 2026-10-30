@@ -2614,7 +2614,8 @@
   });
   $("list").addEventListener("dblclick", (e) => {
     const node = e.target.closest(".mnode.folder");
-    if (!node) return;
+    // The tap that drops a held card can land where the hold was and count as a double-tap: that is not "focus".
+    if (!node || justDropped) return;
     clearTimeout(folderTap);
     setMapFocus(node.dataset.key.slice(2));
   });

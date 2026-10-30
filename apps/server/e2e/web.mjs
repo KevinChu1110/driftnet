@@ -813,6 +813,7 @@ try {
       await waitFor(s, `document.getElementById("pickbar").hidden`, "dropped");
       for (let k = 0; k < 20 && (await api(`/api/items/${cid}`)).category !== dest; k++) await sleep(150);
       assert.equal((await api(`/api/items/${cid}`)).category, dest, "hold + tap a folder files the card");
+      assert.equal(await evaluate(s, `location.hash.startsWith("#focus=")`), false, "dropping does not also focus the folder");
       console.log("✓ phone map: hold a card, tap a folder — filed");
     }
     // Touch: hold one card, tap a second to add it, tap a folder — both are filed in one go.
