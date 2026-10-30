@@ -42,6 +42,9 @@ const seed = `
   const zh = process.env.DEMO_LANG === "zh-TW";
   const mine = store.createFolder({ name: zh ? "我的工作流" : "My workflow", description: "Tools I use every day" });
   store.createFolder({ name: zh ? "設計" : "Design", description: "UI and design helpers", parent: mine.id });
+  // demo-items.json files the everyday cards under the id "everyday": make it under its English name, then rename.
+  const life = store.createFolder({ name: "Everyday", description: "Tips, recipes, travel and other everyday finds" });
+  if (zh) store.updateFolder(life.id, { name: "生活" });
   store.updateFolder(mine.id, { position: -1 });
   if (process.env.DEMO_UPDATE) store.setState("update_check", JSON.stringify({ at: Date.now(), latest: "9.9.9" }));
   for (const i of items) store.upsert({ url: i.url, aliases: [], title: i.title, flags: [], source: "demo", summary: i.summary,

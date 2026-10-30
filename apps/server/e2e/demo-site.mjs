@@ -130,11 +130,17 @@ try {
 
   // Needs a server: a friendly toast instead of a failure.
   await evaluate(`document.querySelector("#item-${all[0]} [data-act='refresh']").click()`);
-  await waitFor(`/npx driftnet/.test(document.getElementById("toast-text").textContent) && document.getElementById("toast").classList.contains("show")`, "demo toast on refresh");
+  const installLink = `document.querySelector("#toast-text a")?.href ?? ""`;
+  await waitFor(`/install/.test(document.getElementById("toast-text").textContent) && document.getElementById("toast").classList.contains("show")`, "demo toast on refresh");
+  assert.ok(!(await evaluate(`document.getElementById("toast-text").textContent`)).includes("`"), "no Markdown backticks in the toast");
+  assert.match(await evaluate(installLink), /README\.md#-quick-start$/, "the toast links to the quick start");
   await evaluate(`document.getElementById("toast").classList.remove("show"); document.getElementById("toast-text").textContent = ""`);
   await evaluate(`document.querySelector("[data-settings]").click()`);
   await sleep(150);
-  assert.ok(await evaluate(`/npx driftnet/.test(document.getElementById("toast-text").textContent)`), "demo toast on settings");
+  assert.ok(await evaluate(`/install/.test(document.getElementById("toast-text").textContent)`), "demo toast on settings");
+  // Adding a link (the empty page's form posts to /api/ingest): its own message, also pointing to install.
+  await evaluate(`fetch("./api/ingest", { method: "POST", body: JSON.stringify({ url: "https://example.com" }) })`);
+  await waitFor(`/Adding your own links/.test(document.getElementById("toast-text").textContent)`, "demo toast on adding a link");
   console.log("ok  demo toast for actions that need a server");
 
   // Language toggle.
@@ -142,6 +148,8 @@ try {
   await waitFor(`document.documentElement.lang === "zh-TW" && /展示/.test(document.getElementById("demo-banner").textContent)`, "zh-TW banner");
   await waitFor(`/[\\u4e00-\\u9fff]/.test(document.querySelector(".swipe")?.textContent ?? "")`, "cards in zh-TW");
   assert.equal(await evaluate(`${star}.getAttribute("aria-pressed")`), "true", "the star is still on in the other language");
+  assert.deepEqual((await cards()).sort((a, b) => a - b), [...all].sort((a, b) => a - b), "the same cards (same ids) in both languages");
+  assert.match(await evaluate(`document.querySelector("#demo-banner a").href`), /README\.zh-TW\.md#-/, "zh-TW install link goes to the Chinese README");
   await evaluate(`document.getElementById("lang").click()`);
   await waitFor(`document.documentElement.lang === "en"`, "back to English");
   console.log("ok  language toggle (cards, banner, state kept)");
@@ -154,6 +162,6 @@ try {
 } finally {
   try { await cdp("Browser.close"); } catch { /* already gone */ }
   chrome.kill(); site.close();
-  rmSync(profile, { recursive: true, force: true });
+  rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); // Chrome may still be writing its profile
 }
 process.exit(failed ? 1 : 0);

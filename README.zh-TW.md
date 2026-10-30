@@ -74,7 +74,7 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 - 🗳️ **學會排除垃圾。** 按 👎，發布者的信譽就下降；一直被倒讚的來源之後就不再花錢處理。
 - 🛡️ **預設就安全。** 拒絕指向私有或本機位址的連結，提示詞注入永遠不會傳給 agent。
 - 🤖 **agent 也能用。** MCP、`/openapi.json`、`/llms.txt`、`/feed.xml` 和對外 Webhook；也可以讓它們自己來讀（見 [Agent](docs/zh-TW/agents.md)）。
-- 🧩 **模型任選或不接，資料屬於你。** API、你的 Claude 或 Google 訂閱、Ollama，或完全不接（連結就全部放在「other」，不分類）。資料存在本機 SQLite；介面、回覆和摘要都支援英文與繁體中文。
+- 🧩 **模型任選或不接，資料屬於你。** 用 Ollama 跑免費的本機模型、你已經有的 Claude 或 Gemini 訂閱、付費 API 金鑰（花費很低），或完全不接（連結照樣存下來，先放在「其他」等待整理）。資料存在本機 SQLite；介面、回覆和摘要都支援英文與繁體中文。
 
 ## 🚀 開始使用
 
@@ -93,15 +93,21 @@ Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-inst
 
 ### 或自己跑一行指令
 
-需要 [Node.js](https://nodejs.org) 22.13 以上。在終端機輸入：
+需要 [Node.js](https://nodejs.org) 22.13 以上。沒用過終端機？
+[Mac 和 Windows 一步一步教你](docs/zh-TW/install-beginners.md)。在終端機輸入：
 
 ```bash
 npx driftnet
 ```
 
 瀏覽器會自動打開 **http://localhost:8787**：這是你自己電腦提供的 driftnet 網頁
-（*localhost* 就是「這台電腦」，別人看不到）。⚙ 設定會帶你選模型，也可以先跳過、不接模型直接用。
+（*localhost* 就是「這台電腦」，別人看不到）。到 ⚙ 設定 → AI：選一個供應商，填好它的金鑰和模型。
+也可以先跳過：連結照樣會存下來，先放在「其他」等待整理；也可以讓 AI agent 幫你寫摘要（[Agent](docs/zh-TW/agents.md)）。
 想一次接好這台電腦上的 AI 工具（Claude Code、Claude Desktop、Cursor、Windsurf、Codex）：`npx driftnet init`。
+
+**使用 driftnet 的時候，終端機視窗要一直開著：關掉視窗 driftnet 就停了。** 想讓它開機自動啟動，
+要改用原始碼安裝並執行 `pnpm service:install`（macOS 和 Linux，見下方「其他跑法」）；
+`npx driftnet` 目前還沒有開機自動啟動的選項。
 
 設定存在 `~/.driftnet/.env`，清單存在 `~/.driftnet/driftnet.db`。
 
@@ -163,6 +169,7 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 
 | | |
 |---|---|
+| [新手安裝](docs/zh-TW/install-beginners.md) | 沒用過終端機：Mac 和 Windows 一步一步來 |
 | [driftnet 怎麼處理一個連結](docs/zh-TW/how-it-works.md) | 八個步驟、短影音、連結健康檢查、以語意搜尋 |
 | [接法](docs/zh-TW/ways-in.md) | Chrome、Discord、Telegram、Slack、LINE、投票、每週摘要 |
 | [網頁](docs/zh-TW/web-page.md) | 卡片、資料夾、心智圖、AI 整理、筆記、分享、快捷鍵 |

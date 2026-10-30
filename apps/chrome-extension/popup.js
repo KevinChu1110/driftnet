@@ -22,7 +22,14 @@ async function render(status) {
   $("item").replaceChildren();
   $("open").hidden = true;
   if (!status || status.state === "sending") return void (box.textContent = t("sending"));
-  if (status.state === "error") return void (box.textContent = status.message);
+  if (status.state === "error") {
+    box.textContent = status.message;
+    if (status.help) {
+      const how = Object.assign(el("a", t("helpLink")), { href: status.help, target: "_blank", rel: "noopener" });
+      box.append(" ", how);
+    }
+    return;
+  }
 
   const { item, cached } = status.result;
   const s = item.summary;

@@ -148,6 +148,8 @@ async function makeOne(lang) {
   // Everything but the card that "arrives" in the chat scene.
   await run(`import { loadCategories, Store } from "@driftnet/core";
     const items = JSON.parse(process.env.DEMO_ITEMS); const store = new Store(process.env.DEMO_DB); store.seedFolders(loadCategories());
+    const life = store.createFolder({ name: "Everyday", description: "Tips, recipes, travel and other everyday finds" });
+    if (process.env.DEMO_LANG === "zh-TW") store.updateFolder(life.id, { name: "生活" });
     for (const i of items) { ${up} }
     for (const [id, n] of [[1, 2], [2, 1]]) for (let k = 0; k < n; k++) store.recordShare(id, { platform: "line", chatId: "demo" });`, { DEMO_ITEMS: JSON.stringify(items.filter((i) => !star(i))) });
   const server = spawn(tsx, ["src/main.ts"], { cwd: SERVER, env: { ...process.env, DRIFTNET_HOME: home, DRIFTNET_OPEN: "0" }, stdio: "ignore" });

@@ -275,6 +275,14 @@ try {
   const popup2 = await open(`chrome-extension://${extId}/popup.html?tab=${blank}`);
   const err = await waitFor(popup2, `(() => { const s = document.getElementById("status"); return /can't be read|無法讀取/.test(s.textContent) && s.textContent; })()`, "error message");
   console.log("✓ unreadable page reported:", err);
+
+  // 6. driftnet not running: a plain message with a link to the quick start, not "Failed to fetch".
+  await evaluate(options, `chrome.storage.local.set({ serverUrl: "http://127.0.0.1:9" }).then(() => 1)`);
+  const popup3 = await open(`chrome-extension://${extId}/popup.html?tab=${tabId}`);
+  const down = await waitFor(popup3, `(() => { const s = document.getElementById("status"); return /Can't reach driftnet|連不到/.test(s.textContent) && s.textContent; })()`, "unreachable message", 20000);
+  assert.doesNotMatch(down, /Failed to fetch/);
+  assert.match(await evaluate(popup3, `document.querySelector("#status a").href`), /README(\.zh-TW)?\.md#-/);
+  console.log("✓ driftnet not running reported:", down);
   console.log("\nall extension checks passed");
 } catch (err) {
   failed = true;

@@ -87,5 +87,22 @@
   },
   "tokenRejected": {
     "message": "Server rejected the token (HTTP 401) — check it."
+  },
+  "unreachableLocal": {
+    "message": "Can't reach driftnet on this computer — start it with npx driftnet in a terminal and keep that window open."
+  },
+  "unreachableRemote": {
+    "message": "Can't reach driftnet at $URL$ — is it running, and is the address right?",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "helpLink": {
+    "message": "How?"
+  },
+  "helpUrl": {
+    "message": "https://github.com/KevinChu1110/driftnet/blob/main/README.md#-quick-start"
   }
 }

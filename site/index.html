@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>driftnet</title>
-<meta name="description" content="Drop links in your group chat. driftnet finds the real project, explains it and keeps it searchable. Runs on your computer, any model or none.">
+<meta name="description" content="Drop links in your group chat. driftnet finds the real project, explains it and keeps it searchable. Runs on your computer, free and open source.">
 <meta property="og:title" content="driftnet">
 <meta property="og:description" content="Catch the links before they drift away.">
 <meta property="og:image" content="https://kevinchu1110.github.io/driftnet/assets/og.jpg">
@@ -140,6 +140,23 @@ pre.code .c { color: #8fb0be; }
 .final h2 { font: 650 clamp(30px, 3.4vw, 42px)/1.1 var(--display); letter-spacing: -.025em; margin: 0 0 12px; }
 .final p { color: var(--ink-2); margin: 0; max-width: 48ch; }
 .final .ctas { justify-content: flex-end; }
+/* how to start: three steps, then the sentence for an agent */
+.steps { grid-column: 1 / -1; list-style: none; margin: 0; padding: 32px 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 32px; }
+.steps > li { min-width: 0; }
+.steps h3 { font: 650 18px/1.3 var(--display); margin: 0 0 6px; }
+.steps h3 .n { color: var(--accent); margin-right: 6px; }
+.steps p { margin: 0 0 14px; font-size: 15px; max-width: none; }
+.final .steps .note { margin: 12px 0 0; font-size: 14px; color: var(--ink-3); }
+.final .note strong { color: var(--ink); font-weight: 600; }
+.more { font-weight: 600; font-size: 15px; color: var(--ink); text-underline-offset: 3px; }
+.ask { grid-column: 1 / -1; min-width: 0; }
+.ask p { font-size: 15px; margin: 0 0 10px; max-width: none; }
+.say { display: block; width: 100%; text-align: left; cursor: pointer; font: 450 14px/1.6 var(--mono); color: var(--ink); background: var(--tint); border: 1px solid var(--line); border-radius: var(--r-ctl); padding: 14px 16px; overflow-wrap: anywhere; }
+.say:hover { border-color: var(--ink-3); }
+.say .hint { font: 600 13px/1 var(--body); color: var(--ink-3); margin-left: 8px; white-space: nowrap; }
+.logos figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.logos figcaption { font-size: 13px; color: var(--ink-3); line-height: 1.2; }
+.logos a { text-decoration: none; }
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--ink-3); font-size: 14px; }
 footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 footer a { color: var(--ink-2); }
@@ -166,6 +183,7 @@ footer a { color: var(--ink-2); }
   .yours .grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
   .final .box { grid-template-columns: minmax(0, 1fr); padding: 32px 24px; }
   .final .ctas { justify-content: flex-start; }
+  .steps { grid-template-columns: minmax(0, 1fr); }
   .section { padding: 80px 0; }
 }
 @media (max-width: 560px) {
@@ -173,7 +191,7 @@ footer a { color: var(--ink-2); }
   .nav-links { gap: 14px; }
   .nav-links .hide-sm { display: none; }
   .facts { grid-template-columns: 1fr; }
-  .logos { gap: 28px 36px; }
+  .logos { gap: 24px 28px; }
 }
 </style>
 </head>
@@ -182,7 +200,7 @@ footer a { color: var(--ink-2); }
   <a class="brand" href="./"><img src="assets/logo.svg" alt="" width="28" height="28">driftnet</a>
   <nav class="nav-links">
     <a href="demo/" data-i18n="navDemo">Demo</a>
-    <a href="https://github.com/KevinChu1110/driftnet">GitHub</a>
+    <a href="https://github.com/KevinChu1110/driftnet" data-href-zh="https://github.com/KevinChu1110/driftnet/blob/main/README.zh-TW.md">GitHub</a>
     <button class="lang" type="button" id="lang" aria-label="Switch language">中文</button>
   </nav>
 </header>
@@ -241,7 +259,7 @@ footer a { color: var(--ink-2); }
           <div class="text">
             <h3 data-i18n="f3Title">Your agents look here first</h3>
             <p data-i18n="f3Body">Claude Code, Cursor and Codex search the same catalogue over MCP before picking a tool.</p>
-            <pre class="code"><span class="c"># connect the agents on this machine</span>
+            <pre class="code"><span class="c" data-i18n="f3Code"># connect the AI apps on this computer</span>
 npx driftnet init</pre>
           </div>
         </article>
@@ -260,13 +278,13 @@ npx driftnet init</pre>
     <div class="wrap">
       <p class="reveal" data-i18n="sourcesSub">Catches links from the chats you already use, the browser, and your agents.</p>
       <div class="logos reveal">
-        <img src="https://cdn.simpleicons.org/discord/44535d/b2c0c7" alt="Discord" width="30" height="30">
-        <img src="https://cdn.simpleicons.org/telegram/44535d/b2c0c7" alt="Telegram" width="30" height="30">
-        <img class="mono-src" src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/slack/slack-original.svg" alt="Slack" width="30" height="30">
-        <img src="https://cdn.simpleicons.org/line/44535d/b2c0c7" alt="LINE" width="30" height="30">
-        <a href="https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm" title="Chrome Web Store"><img src="https://cdn.simpleicons.org/googlechrome/44535d/b2c0c7" alt="Chrome extension" width="30" height="30"></a>
-        <img src="https://cdn.simpleicons.org/modelcontextprotocol/44535d/b2c0c7" alt="Model Context Protocol" width="30" height="30">
-        <img src="https://cdn.simpleicons.org/claude/44535d/b2c0c7" alt="Claude" width="30" height="30">
+        <figure><img src="https://cdn.simpleicons.org/discord/44535d/b2c0c7" alt="" width="30" height="30"><figcaption>Discord</figcaption></figure>
+        <figure><img src="https://cdn.simpleicons.org/telegram/44535d/b2c0c7" alt="" width="30" height="30"><figcaption>Telegram</figcaption></figure>
+        <figure><img class="mono-src" src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/slack/slack-original.svg" alt="" width="30" height="30"><figcaption>Slack</figcaption></figure>
+        <figure><img src="https://cdn.simpleicons.org/line/44535d/b2c0c7" alt="" width="30" height="30"><figcaption>LINE</figcaption></figure>
+        <a href="https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm" title="Chrome Web Store"><figure><img src="https://cdn.simpleicons.org/googlechrome/44535d/b2c0c7" alt="" width="30" height="30"><figcaption>Chrome</figcaption></figure></a>
+        <figure><img src="https://cdn.simpleicons.org/modelcontextprotocol/44535d/b2c0c7" alt="" width="30" height="30"><figcaption>MCP</figcaption></figure>
+        <figure><img src="https://cdn.simpleicons.org/claude/44535d/b2c0c7" alt="" width="30" height="30"><figcaption>Claude</figcaption></figure>
       </div>
     </div>
   </section>
@@ -276,8 +294,8 @@ npx driftnet init</pre>
       <h2 class="reveal" data-i18n="yoursTitle">Runs on your computer. Stays yours.</h2>
       <dl class="facts reveal">
         <div><dt data-i18n="y1t">No account</dt><dd data-i18n="y1d">One command starts it. Nothing to sign up for.</dd></div>
-        <div><dt data-i18n="y2t">Any model, or none</dt><dd data-i18n="y2d">Ollama, Claude, GPT, Gemini. Without one, your agent writes the summaries.</dd></div>
-        <div><dt data-i18n="y3t">One file to keep</dt><dd data-i18n="y3d">Everything sits in a single SQLite file, with one-click backups.</dd></div>
+        <div><dt data-i18n="y2t">Your pick of AI, or none</dt><dd data-i18n="y2d">A free model on your computer (Ollama), a subscription you already have (Claude or Gemini CLI), or a paid API key (pennies). With none, links are still saved but wait unsorted, for you or an AI agent to sort.</dd></div>
+        <div><dt data-i18n="y3t">One file to keep</dt><dd data-i18n="y3d">Everything sits in a single file on your computer (SQLite), with one-click backups.</dd></div>
         <div><dt data-i18n="y4t">Open source</dt><dd data-i18n="y4d">MIT licensed. Read every line it runs.</dd></div>
       </dl>
     </div>
@@ -288,12 +306,34 @@ npx driftnet init</pre>
       <div class="box reveal">
         <div>
           <h2 data-i18n="finalTitle">Start catching.</h2>
-          <p data-i18n="finalSub">Needs Node.js 22 or newer. Or paste one line to your AI agent and let it set things up.</p>
+          <p data-i18n="finalSub">The quickest start: driftnet's page on your computer plus the Chrome extension. Free, and it needs Node.js 22.13 or newer.</p>
         </div>
         <div class="ctas">
-          <button class="btn copy" type="button" data-copy="npx driftnet">npx driftnet <span class="hint" data-i18n="copy">copy</span></button>
           <a class="btn btn-primary" href="demo/" data-i18n="tryDemo">Try the demo</a>
         </div>
+        <ol class="steps">
+          <li>
+            <h3><span class="n">1</span><span data-i18n="s1t">Start it on your computer</span></h3>
+            <p data-i18n="s1d">Paste this into a terminal. Your browser opens driftnet's page at localhost:8787.</p>
+            <button class="btn copy" type="button" data-copy="npx driftnet">npx driftnet <span class="hint" data-i18n="copy">copy</span></button>
+            <p class="note"><strong data-i18n="s1keep">Keep that terminal window open while you use driftnet.</strong> <span data-i18n="s1login">Want it to start at login? Run it from source (macOS / Linux).</span></p>
+            <p class="note"><a class="more" href="https://github.com/KevinChu1110/driftnet/blob/main/docs/install-beginners.md" data-href-zh="https://github.com/KevinChu1110/driftnet/blob/main/docs/zh-TW/install-beginners.md" data-i18n="s1new">Never used a terminal? Step by step →</a></p>
+          </li>
+          <li>
+            <h3><span class="n">2</span><span data-i18n="s2t">Add the Chrome extension</span></h3>
+            <p data-i18n="s2d">One click saves the page you are on, Threads and Instagram posts included. The card shows up on your driftnet page.</p>
+            <a class="more" href="https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm" data-i18n="s2link">Get it from the Chrome Web Store →</a>
+          </li>
+          <li>
+            <h3><span class="n">+</span><span data-i18n="s3t">Optional: a group chat</span></h3>
+            <p data-i18n="s3d">Drop links into LINE, Discord, Telegram or Slack. Connecting a chat is an extra setup step (a bot of your own), so do it once the basics work.</p>
+            <a class="more" href="https://github.com/KevinChu1110/driftnet/blob/main/docs/ways-in.md" data-href-zh="https://github.com/KevinChu1110/driftnet/blob/main/docs/zh-TW/ways-in.md" data-i18n="s3link">How to connect a chat →</a>
+          </li>
+          <li class="ask">
+            <p data-i18n="askLead">Or let your AI agent do it: paste this sentence into Claude Code, Cursor, Codex or any agent that can run commands on your computer.</p>
+            <button class="say" type="button" data-copy="Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.">Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.<span class="hint" data-i18n="copy">copy</span></button>
+          </li>
+        </ol>
       </div>
     </div>
   </section>
@@ -302,7 +342,7 @@ npx driftnet init</pre>
 <footer>
   <div class="wrap">
     <span data-i18n="footer">MIT licensed. Built by Kevin Chu.</span>
-    <span><a href="https://github.com/KevinChu1110/driftnet">GitHub</a></span>
+    <span><a href="https://github.com/KevinChu1110/driftnet" data-href-zh="https://github.com/KevinChu1110/driftnet/blob/main/README.zh-TW.md">GitHub</a></span>
   </div>
 </footer>
 
@@ -315,17 +355,26 @@ const T = {
     currentTitle: "動態消息是一條水流。",
     currentSub: "好東西只漂過一次。你貼到某個地方說「之後再看」，然後就沒有然後了。driftnet 是你放進水裡的那張網。",
     whatTitle: "它幫你把貼文讀完。",
-    f1Title: "從 reels 追到 repo", f1Body: "貼文沒附連結？driftnet 會讀說明、留言，連影片裡講的話都會聽，然後找到它介紹的專案。",
+    f1Title: "從短影音追到原始出處", f1Body: "貼文沒附連結？driftnet 會讀說明、留言，連影片裡講的話都會聽，然後找到它介紹的東西。",
     f2Title: "照你的資料夾放", f2Body: "每張卡片都放進你自己的資料夾。你手動移過的，它就不會再動。",
-    f3Title: "agent 會先來這裡查", f3Body: "Claude Code、Cursor、Codex 挑工具之前，會先透過 MCP 查這份清單。",
-    f4Title: "一年後還找得到", f4Body: "用字搜尋，中文也行；接上本機模型還能用意思搜尋。每張卡片都用你的語言說明它是什麼。",
-    sourcesSub: "從你本來就在用的聊天室、瀏覽器和 agent 收連結。",
+    f3Title: "你的 AI 助手也查得到", f3Body: "Claude Code、Cursor、Codex 這類會寫程式的 AI 助手，挑工具之前會先查你存下來的這份清單。",
+    f3Code: "# 把這台電腦上的 AI 助手接上 driftnet",
+    f4Title: "一年後還找得到", f4Body: "打關鍵字就能搜，中文也行；裝了本機模型，還能照意思找，不必記得原本的字。每張卡片都用你的語言說明它是什麼。",
+    sourcesSub: "從你本來就在用的聊天室、瀏覽器和 AI 助手收連結。",
     yoursTitle: "跑在你的電腦上，資料是你的。",
     y1t: "不用註冊", y1d: "一行指令就啟動，沒有帳號要申請。",
-    y2t: "任何模型，或完全不接", y2d: "Ollama、Claude、GPT、Gemini 都行。沒接模型，就讓你的 agent 寫摘要。",
-    y3t: "只有一個檔案", y3d: "全部放在一個 SQLite 檔裡，備份一鍵完成。",
+    y2t: "AI 自己選，或先不接", y2d: "可以用 Ollama 在自己電腦上跑免費模型、用你已經有的訂閱（Claude 或 Gemini CLI），或付費 API 金鑰（花費很低）。都不接也能存連結，只是會先放著不分類，等你或 AI 助手來整理。",
+    y3t: "只有一個檔案", y3d: "所有資料都存在你電腦上的一個檔案裡，備份一鍵完成。",
     y4t: "開放原始碼", y4d: "MIT 授權，跑的每一行程式你都看得到。",
-    finalTitle: "開始撈吧。", finalSub: "需要 Node.js 22 以上。或者貼一句話給你的 AI agent，讓它幫你裝好。",
+    finalTitle: "開始撈吧。", finalSub: "最快的開始方式：在自己電腦上開 driftnet 的網頁，再裝 Chrome 擴充功能。免費，需要 Node.js 22.13 以上。",
+    s1t: "在你的電腦上啟動", s1d: "把這行貼到終端機執行，瀏覽器會打開 driftnet 的網頁（localhost:8787）。",
+    s1keep: "使用 driftnet 的時候，終端機視窗要一直開著。", s1login: "想讓它開機自動啟動？要改用原始碼安裝（macOS / Linux）。",
+    s1new: "沒用過終端機？一步一步教你 →",
+    s2t: "裝 Chrome 擴充功能", s2d: "點一下就把正在看的網頁存起來，Threads、Instagram 貼文也行。卡片會出現在你的 driftnet 網頁上。",
+    s2link: "到 Chrome 線上應用程式商店安裝 →",
+    s3t: "選用：接上聊天群組", s3d: "把連結丟進 LINE、Discord、Telegram 或 Slack。接聊天室要多做一些設定（建立你自己的機器人），建議先把基本的用順了再接。",
+    s3link: "怎麼接聊天室 →",
+    askLead: "或者交給你的 AI 助手：把下面這句話貼給 Claude Code、Cursor、Codex，或任何能在你電腦上執行指令的 AI 助手。",
     footer: "MIT 授權。Kevin Chu 製作。", lang: "EN"
   }
 };
@@ -333,6 +382,8 @@ const EN = {};
 document.querySelectorAll("[data-i18n]").forEach((el) => { EN[el.dataset.i18n] = el.textContent; });
 Object.assign(EN, { copied: "copied", lang: "中文" });
 const imgs = [...document.querySelectorAll("img[data-src-zh]")].map((img) => ({ img, en: img.getAttribute("src"), zh: img.dataset.srcZh }));
+// GitHub links go to the Chinese README and docs on the zh page.
+const links = [...document.querySelectorAll("a[data-href-zh]")].map((a) => ({ a, en: a.getAttribute("href"), zh: a.dataset.hrefZh }));
 let lang;
 try { lang = localStorage.getItem("driftnet-site-lang") || ""; } catch { lang = ""; }
 if (lang !== "en" && lang !== "zh") lang = (navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en";
@@ -342,6 +393,7 @@ function apply(next) {
   document.documentElement.lang = lang === "zh" ? "zh-Hant-TW" : "en";
   document.querySelectorAll("[data-i18n]").forEach((el) => { const v = dict[el.dataset.i18n]; if (v) el.textContent = v; });
   imgs.forEach(({ img, en, zh }) => { img.src = lang === "zh" ? zh : en; });
+  links.forEach(({ a, en, zh }) => { a.href = lang === "zh" ? zh : en; });
   document.getElementById("lang").textContent = dict.lang;
   try { localStorage.setItem("driftnet-site-lang", lang); } catch {}
 }

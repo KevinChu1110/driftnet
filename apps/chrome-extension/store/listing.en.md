@@ -1,6 +1,6 @@
 # Chrome Web Store listing (English)
 
-Not submitted. Paste these into the Developer Dashboard.
+The text the store shows: paste changes into the Developer Dashboard by hand (the live listing does not update from this file).
 
 ## Name
 driftnet
@@ -14,6 +14,11 @@ Send the post you're looking at (text, comments, links, even behind a login) to 
 Productivity
 
 ## Detailed description
+
+Needs driftnet running on your computer (free, open source): https://kevinchu1110.github.io/driftnet/
+
+Install it first: with Node.js 22.13 or newer, run `npx driftnet` in a terminal and keep that window
+open while you use it. Step by step: https://github.com/KevinChu1110/driftnet/blob/main/README.md#-quick-start
 
 driftnet catches the links you find while scrolling and turns them into a searchable catalogue
 that you and your AI agents own. This extension is the "send" button for the browser.
@@ -37,7 +42,7 @@ Private by design: the extension reads a tab only when you click, sends only to 
 server address you set (by default one running on your own computer, localhost:8787), and has no
 analytics, no account and no tracking.
 
-You need a driftnet server (free, MIT licensed): https://github.com/KevinChu1110/driftnet
+Source code (MIT licensed): https://github.com/KevinChu1110/driftnet
 
 ## Single purpose
 Send the web page, link or text selection the user chooses to the user's own driftnet server so

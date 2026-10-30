@@ -48,16 +48,23 @@ async function send(tabId, linkUrl) {
     }
     if (!page) return await setStatus({ state: "error", message: `${t("failed")}: the page returned nothing` }, tabId);
 
-    const res = await fetch(`${serverUrl}/api/ingest`, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({
-        url: page.url,
-        page: { title: page.title, text: page.text, links: page.links },
-        platform: "chrome",
-        chat: "browser",
-      }),
-    });
+    let res;
+    try {
+      res = await fetch(`${serverUrl}/api/ingest`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          url: page.url,
+          page: { title: page.title, text: page.text, links: page.links },
+          platform: "chrome",
+          chat: "browser",
+        }),
+      });
+    } catch {
+      // fetch only throws when nothing answered (not running, wrong address, offline): "Failed to fetch" helps nobody.
+      const local = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(serverUrl);
+      return await setStatus({ state: "error", message: local ? t("unreachableLocal") : t("unreachableRemote", serverUrl), help: t("helpUrl") }, tabId);
+    }
     if (!res.ok) {
       // The server says why (blocked address, bad token…); show that, not just a status code.
       const reason = await res.json().then((b) => b.error).catch(() => "");

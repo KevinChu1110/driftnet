@@ -15,8 +15,15 @@ const seed = `
   const zh = process.env.DEMO_LANG === "zh-TW";
   const store = new Store(process.env.DEMO_DB);
   store.seedFolders(loadCategories());
-  const mine = store.createFolder({ name: zh ? "我的工作流" : "My workflow", description: "Tools I use every day" });
-  store.createFolder({ name: zh ? "設計" : "Design", description: "UI and design helpers", parent: mine.id });
+  // Folders are made under their English name (so the ids are the same in both languages: a card moved
+  // in one language stays moved in the other), then renamed for zh-TW.
+  const folder = (en, zhName, description, parent) => {
+    const f = store.createFolder({ name: en, description, parent });
+    return zh ? store.updateFolder(f.id, { name: zhName }) : f;
+  };
+  const mine = folder("My workflow", "我的工作流", "Tools I use every day");
+  folder("Design", "設計", "UI and design helpers", mine.id);
+  folder("Everyday", "生活", "Tips, recipes, travel and other everyday finds");
   store.updateFolder(mine.id, { position: -1 });
   for (const i of items) store.upsert({ url: i.url, aliases: [], title: i.title, flags: [], source: "demo", summary: i.summary,
     judgement: { isAiTool: 1, category: i.category, kind: i.kind, worth: i.worth, engine: "llm", confidence: 1 } });
