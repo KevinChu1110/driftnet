@@ -13,6 +13,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
 [![CI](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml)
 [![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
 ![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
@@ -120,7 +121,7 @@ Any of these works:
 
 - **On the page:** paste a link into the box and press Add.
 - **In a terminal:** `npx driftnet add https://github.com/paperclipai/paperclip`
-- **From the browser:** the [Chrome extension](#chrome-extension) sends the page you are looking at.
+- **From the browser:** the [Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm) sends the page you are looking at.
 - **From a chat:** connect a [Discord, Telegram, Slack or LINE bot](#ways-in) and drop links there.
 
 A card shows up within 5–30 seconds: what it is, why it might matter to you, and where it was filed.

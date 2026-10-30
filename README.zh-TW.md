@@ -13,6 +13,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/driftnet.svg)](https://www.npmjs.com/package/driftnet)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
 [![CI](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinChu1110/driftnet/actions/workflows/ci.yml)
 [![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
 ![Node.js 22.13+](https://img.shields.io/badge/node-%3E%3D22.13-339933.svg)
@@ -117,7 +118,7 @@ npx driftnet
 
 - **在網頁上：** 把連結貼進輸入框，按「收錄」。
 - **在終端機：** `npx driftnet add https://github.com/paperclipai/paperclip`
-- **在瀏覽器：** [Chrome 擴充](#chrome-擴充)會送出你正在看的頁面。
+- **在瀏覽器：** [Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)會送出你正在看的頁面。
 - **在聊天室：** 接上 [Discord、Telegram、Slack 或 LINE 機器人](#接法)，直接把連結丟進去。
 
 5～30 秒內就會出現一張卡片：它是什麼、為什麼值得你看、放進了哪個資料夾。
