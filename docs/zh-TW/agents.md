@@ -45,7 +45,7 @@ claude mcp add --transport http driftnet https://your-driftnet.example/mcp \
 
 | MCP 工具 | 用途 |
 |---|---|
-| `driftnet_search_items` | 挑工具前先搜尋清單；`days` 看最近新增的；`view` 看收件匣、最愛或垃圾桶；可依資料夾或類型篩選 |
+| `driftnet_search_items` | 挑工具前先搜尋清單；`days` 看最近新增的；`view` 看收件匣、最愛或垃圾桶；可依資料夾或類型篩選。完全找不到時會更正拼錯的字，`corrected` 說明實際搜了什麼 |
 | `driftnet_save_link` | 收錄一個連結 |
 | `driftnet_lease_items`／`driftnet_enrich_item` | 整理佇列，見下方 |
 | `driftnet_get_item` | 查看一張卡片的全部內容：摘要、用途、你的筆記、聊天室裡大家說的話、從裡面找到的工具 |

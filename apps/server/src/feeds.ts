@@ -84,8 +84,9 @@ export function openApi(serverUrl: string) {
           operationId: "searchItems",
           summary: "Search catalogued AI tools",
           parameters: [
-            { name: "q", in: "query", schema: { type: "string" } },
+            { name: "q", in: "query", description: "Words to match; when nothing matches, misspelt words are corrected and the X-Search-Corrected header (URI-encoded) holds the query searched instead.", schema: { type: "string" } },
             { name: "category", in: "query", description: "A folder id; includes its sub-folders", schema: { type: "string" } },
+            { name: "fuzzy", in: "query", description: "0 turns off the spelling correction", schema: { type: "string", enum: ["0"] } },
             { name: "minWorth", in: "query", schema: { type: "string", enum: ["skip", "low", "normal", "must-see"] } },
             { name: "since", in: "query", schema: { type: "string", format: "date-time" } },
             { name: "limit", in: "query", schema: { type: "integer", maximum: 500 } },
