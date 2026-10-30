@@ -2,6 +2,7 @@ import { messages, type Driftnet } from "@driftnet/core";
 import { handleChat, type ChatReply } from "./handle.ts";
 import { reactionVote, rememberReply, voteOnItem, voteOnReply } from "./reactions.ts";
 import { telegramRich, warnOnce } from "./rich.ts";
+import type { Report } from "../chats.ts";
 
 /**
  * Telegram via long polling — no public URL needed, so it is the easiest adapter
@@ -66,17 +67,29 @@ export function onTelegramReaction(dn: Driftnet, mr: any, allowed: Set<string> |
   return voteOnReply(dn, `telegram:${mr.chat.id}:${mr.message_id}`, `telegram:${mr.user.id}`, vote);
 }
 
-export function startTelegram(dn: Driftnet, token: string): () => void {
+export function startTelegram(dn: Driftnet, token: string, report: Report = () => {}): () => void {
+  // Aborted on stop, so a 50 s long poll doesn't outlive the adapter (two pollers on one bot get 409 Conflict).
+  const abort = new AbortController();
   const api = (method: string, body: unknown) =>
     fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
-    }).then((r) => r.json() as Promise<{ ok: boolean; result: any }>);
+      signal: abort.signal,
+    }).then((r) => r.json() as Promise<{ ok: boolean; result: any; description?: string }>);
 
   // Persisted after each handled update, so a restart doesn't hand it out again (double replies).
-  let offset = Number(dn.store.getState("telegram:offset") ?? 0);
+  // Update ids belong to one bot: a different bot (a new token from ⚙ Settings) starts from 0.
+  const bot = token.split(":")[0]!;
+  const lastBot = dn.store.getState("telegram:bot");
+  let offset = !lastBot || lastBot === bot ? Number(dn.store.getState("telegram:offset") ?? 0) : 0;
+  if (lastBot !== bot) dn.store.setState("telegram:bot", bot);
   let running = true;
+  const wait = (ms: number) => new Promise<void>((r) => {
+    const t = setTimeout(r, ms);
+    abort.signal.addEventListener("abort", () => { clearTimeout(t); r(); }, { once: true });
+  });
+  const said = (me: { ok: boolean; result?: any }) => report("connected", me.result?.username ? `@${me.result.username}` : undefined);
   const allowed = chatAllowlist();
   const seenChats = new Set<string>();
 
@@ -104,10 +117,22 @@ export function startTelegram(dn: Driftnet, token: string): () => void {
   };
 
   (async () => {
+    // getMe answers at once; getUpdates can hold the line for 50 s before saying anything.
+    const me = await api("getMe", {}).catch((err) => ({ ok: false, result: undefined, description: (err as Error).message }));
+    if (!running) return;
+    if (me.ok) said(me);
+    else report("error", me.description ?? "Telegram refused the token");
     while (running) {
       try {
         const res = await api("getUpdates", { offset, timeout: 50, allowed_updates: ["message", "callback_query", "message_reaction"] });
-        for (const u of res.ok ? res.result : []) {
+        if (!res.ok) {
+          // A wrong token, or another program polling the same bot: say so, and don't hammer Telegram.
+          report("error", res.description ?? "Telegram refused the request");
+          await wait(5000);
+          continue;
+        }
+        if (me.ok) said(me);
+        for (const u of res.result) {
           try {
             if (u.callback_query) await handleCallback(u.callback_query);
             else if (u.message_reaction) onTelegramReaction(dn, u.message_reaction, allowed);
@@ -119,13 +144,15 @@ export function startTelegram(dn: Driftnet, token: string): () => void {
           dn.store.setState("telegram:offset", String(offset));
         }
       } catch (err) {
+        if (!running) break;
         console.warn("[telegram]", (err as Error).message);
-        await new Promise((r) => setTimeout(r, 5000));
+        report("error", (err as Error).message);
+        await wait(5000);
       }
     }
   })();
   console.log("[telegram] polling");
-  return () => { running = false; };
+  return () => { running = false; abort.abort(); };
 }
 
 /** Post a plain message to a chat (a scheduled digest); throws when Telegram refuses it. */

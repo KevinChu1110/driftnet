@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Driftnet, loadHomeEnv } from "@driftnet/core";
 import type { Settings } from "./settings.ts";
 import type { Tunnel } from "./access.ts";
+import type { ChatManager } from "./chats.ts";
 
 /**
  * Who may call a route. The dispatcher (app.ts) enforces it before the handler runs,
@@ -56,6 +57,8 @@ export interface App {
   tunnel: Tunnel;
   plugins: string[];
   envFile: ReturnType<typeof loadHomeEnv>;
+  /** The chat bots, when this process runs them (main.ts); the settings page shows their status. */
+  chats?: ChatManager;
   port: number;
   indexHtml: string;
   assets: Record<string, [Buffer, string]>;

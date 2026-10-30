@@ -3,6 +3,7 @@ import type { Driftnet } from "@driftnet/core";
 import { handleChat, type ChatReply } from "./handle.ts";
 import { reactionVote, rememberReply, voteOnReply } from "./reactions.ts";
 import { slackBlocks, slackEscape, warnOnce } from "./rich.ts";
+import type { Report } from "../chats.ts";
 
 /** Overridable for tests and Slack-compatible servers. */
 const api = (method: string) => `${process.env.SLACK_API_URL ?? "https://slack.com/api"}/${method}`;
@@ -97,7 +98,7 @@ export function onSlackEvent(dn: Driftnet, ev: any, botToken: string): Promise<v
  * in SLACK_APP_TOKEN, Socket Mode enabled, and the same bot token and event
  * subscriptions as the webhook setup.
  */
-export function startSlackSocket(dn: Driftnet, appToken: string, botToken: string): () => void {
+export function startSlackSocket(dn: Driftnet, appToken: string, botToken: string, report: Report = () => {}): () => void {
   let stopped = false;
   let ws: WebSocket | undefined;
 
@@ -111,6 +112,7 @@ export function startSlackSocket(dn: Driftnet, appToken: string, botToken: strin
         })
       ).json()) as { ok: boolean; url?: string; error?: string };
       if (!res.ok || !res.url) throw new Error(res.error ?? "no socket URL");
+      if (stopped) return; // stopped (or replaced from ⚙ Settings) while asking
       ws = new WebSocket(res.url);
       ws.onmessage = (msg) => {
         try {
@@ -123,10 +125,12 @@ export function startSlackSocket(dn: Driftnet, appToken: string, botToken: strin
           console.warn("[slack] socket message:", (err as Error).message);
         }
       };
-      ws.onopen = () => console.log("[slack] socket mode connected");
+      ws.onopen = () => { console.log("[slack] socket mode connected"); report("connected"); };
       ws.onclose = () => setTimeout(() => void connect(), 2000);
     } catch (err) {
+      if (stopped) return;
       console.warn("[slack] socket mode:", (err as Error).message);
+      report("error", (err as Error).message);
       setTimeout(() => void connect(), 15_000);
     }
   };

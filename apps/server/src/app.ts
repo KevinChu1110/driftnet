@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { mediaSigOk, packSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@driftnet/core";
 import { canRead, clientIp, foreignOrigin, hostAllowed, isAdmin, isLocal, isPassword, isTrustedLocal, token, Tunnel } from "./access.ts";
 import { Settings } from "./settings.ts";
+import type { ChatManager } from "./chats.ts";
 import { BadRequest, readBody, readJson, type App, type Ctx, type Route } from "./route.ts";
 import { routes as backup } from "./routes/backup.ts";
 import { routes as digest } from "./routes/digest.ts";
@@ -33,6 +34,8 @@ export interface AppOptions {
   tunnel?: Tunnel;
   plugins?: string[];
   envFile?: ReturnType<typeof loadHomeEnv>;
+  /** Started by the caller; createApp only shows its status and syncs it when settings change. */
+  chats?: ChatManager;
   /** Only used to tell the page and the tunnel which port this is; createApp never listens. */
   port?: number;
 }
@@ -113,6 +116,7 @@ export function createApp(opts: AppOptions): Server {
     tunnel: opts.tunnel ?? new Tunnel(port),
     plugins: opts.plugins ?? [],
     envFile: opts.envFile,
+    chats: opts.chats,
     indexHtml: readFileSync(new URL("../public/index.html", import.meta.url), "utf8"),
     /** Icons are public even in private mode: the browser asks for them before any token. */
     assets: {
