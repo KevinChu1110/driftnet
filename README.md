@@ -9,6 +9,8 @@
 
 **[▶ Try the demo](https://kevinchu1110.github.io/driftnet/demo/)** · **[Website](https://kevinchu1110.github.io/driftnet/)** · **[Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[Docs](#-docs)**
 
+🆕 **1.0 is out:** starts at login with `npx driftnet service install`, chat bots connect from ⚙ Settings → Chats, and search forgives typos. [What's new](https://github.com/KevinChu1110/driftnet/releases/tag/v1.0.0) · [What stays stable](docs/stability.md)
+
 [![npm](https://img.shields.io/npm/v/driftnet?logo=npm&color=CB3837)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
 [![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)

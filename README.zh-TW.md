@@ -9,6 +9,8 @@
 
 **[▶ 線上試玩](https://kevinchu1110.github.io/driftnet/demo/)** · **[官方網站](https://kevinchu1110.github.io/driftnet/)** · **[Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[文件](#-文件)**
 
+🆕 **1.0 正式版：** `npx driftnet service install` 開機自動啟動、在 ⚙ 設定 → 聊天室 直接接機器人、搜尋打錯字也找得到。[更新內容](https://github.com/KevinChu1110/driftnet/releases/tag/v1.0.0) · [保持穩定的部分](docs/zh-TW/stability.md)
+
 [![npm](https://img.shields.io/npm/v/driftnet?logo=npm&color=CB3837)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
 [![Glama MCP server](https://glama.ai/mcp/servers/KevinChu1110/driftnet/badges/score.svg)](https://glama.ai/mcp/servers/KevinChu1110/driftnet)
