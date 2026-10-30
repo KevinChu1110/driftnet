@@ -105,9 +105,12 @@ npx driftnet
 也可以先跳過：連結照樣會存下來，先放在「其他」等待整理；也可以讓 AI agent 幫你寫摘要（[Agent](docs/zh-TW/agents.md)）。
 想一次接好這台電腦上的 AI 工具（Claude Code、Claude Desktop、Cursor、Windsurf、Codex）：`npx driftnet init`。
 
-**使用 driftnet 的時候，終端機視窗要一直開著：關掉視窗 driftnet 就停了。** 想讓它開機自動啟動，
-要改用原始碼安裝並執行 `pnpm service:install`（macOS 和 Linux，見下方「其他跑法」）；
-`npx driftnet` 目前還沒有開機自動啟動的選項。
+**關掉那個終端機視窗，driftnet 就停了。** 想讓它開機自動啟動、在背景執行（macOS、Linux、Windows），
+執行一次：
+
+```bash
+npx driftnet service install      # 看狀態：npx driftnet service status · 取消：npx driftnet service uninstall
+```
 
 設定存在 `~/.driftnet/.env`，清單存在 `~/.driftnet/driftnet.db`。
 
@@ -118,7 +121,7 @@ npx driftnet
 - **在網頁上：** 把連結貼進輸入框，按「收錄」。
 - **在終端機：** `npx driftnet add https://github.com/paperclipai/paperclip`
 - **在瀏覽器：** [Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)會送出你正在看的頁面。
-- **在聊天室：** 接上 [Discord、Telegram、Slack 或 LINE 機器人](docs/zh-TW/ways-in.md)，直接把連結丟進去。
+- **在聊天室：** 到 ⚙ 設定 → 聊天室 貼上 Discord、Telegram、Slack 或 LINE 機器人的 token（[怎麼取得](docs/zh-TW/ways-in.md)），直接把連結丟進去。
 
 5～30 秒內就會出現一張卡片：它是什麼、為什麼值得你看、放進了哪個資料夾。
 
@@ -179,6 +182,7 @@ docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 
 | [指令列](docs/zh-TW/cli.md) | `driftnet add`、`search`、`export`、`backup` 等 |
 | [設定](docs/zh-TW/settings.md) | 所有設定、備份與還原 |
 | [放上網路](docs/zh-TW/online.md) | 密碼、公開網址、LINE webhook |
+| [保持穩定的部分](docs/zh-TW/stability.md) | 1.x 承諾不會改壞的：你的資料、設定、MCP 工具、API、指令列 |
 | [參與開發](CONTRIBUTING.zh-TW.md) | 目錄結構、測試、發版、擴充 |
 
 ## 資料去哪裡

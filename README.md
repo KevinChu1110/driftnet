@@ -108,9 +108,12 @@ in its key and model. Or skip it: links are still saved and wait unsorted under 
 can write the summaries ([Agents](docs/agents.md)). To connect the AI apps on this computer (Claude Code,
 Claude Desktop, Cursor, Windsurf, Codex) in one go: `npx driftnet init`.
 
-**Keep that terminal window open while you use driftnet: closing it stops driftnet.** To have it start
-at login instead, run it from source and use `pnpm service:install` (macOS and Linux, see *Other ways to
-run it* below); `npx driftnet` has no start-at-login option yet.
+**Closing that terminal window stops driftnet.** To have it start at login and run in the background
+instead (macOS, Linux, Windows), run once:
+
+```bash
+npx driftnet service install      # status: npx driftnet service status · undo: npx driftnet service uninstall
+```
 
 Your settings live in `~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`.
 
@@ -121,7 +124,7 @@ Any of these works:
 - **On the page:** paste a link into the box and press Add.
 - **In a terminal:** `npx driftnet add https://github.com/paperclipai/paperclip`
 - **From the browser:** the [Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm) sends the page you are looking at.
-- **From a chat:** connect a [Discord, Telegram, Slack or LINE bot](docs/ways-in.md) and drop links there.
+- **From a chat:** paste a Discord, Telegram, Slack or LINE bot token in ⚙ Settings → Chats ([how to get one](docs/ways-in.md)) and drop links there.
 
 A card shows up within 5–30 seconds: what it is, why it might matter to you, and where it was filed.
 
@@ -182,6 +185,7 @@ Without `start`, the container is the MCP server over stdio (`docker run -i --rm
 | [Command line](docs/cli.md) | `driftnet add`, `search`, `export`, `backup` and the rest |
 | [Settings](docs/settings.md) | Every setting, backup and restore |
 | [Putting it online](docs/online.md) | A password, a public URL, LINE webhooks |
+| [What stays stable](docs/stability.md) | What 1.x promises not to break: your data, settings, MCP tools, API, CLI |
 | [Contributing](CONTRIBUTING.md) | Layout, tests, releasing, extending |
 
 ## Where your data goes
