@@ -32,13 +32,20 @@ npx driftnet
 
 如果瀏覽器沒有自己打開，就手動打開瀏覽器，前往 `http://localhost:8787`。
 
-## 4. 視窗要一直開著
+## 4. 設定登入時自動啟動（之後就能關掉視窗）
 
-**只有那個終端機視窗開著，driftnet 才會運作。** 可以縮小，但關掉視窗（或重新開機）driftnet 就停了。
-下次再打開終端機執行一次 `npx driftnet` 就好，你的連結和設定都還在。
+用上面的方式啟動時，**只有那個終端機視窗開著，driftnet 才會運作**：關掉視窗（或重新開機）driftnet 就停了。
+不管怎樣，你的連結和設定都會留著。
 
-想讓它開機自動啟動，目前要改用原始碼安裝（`pnpm service:install`，只支援 macOS 和 Linux）；
-見 [README](../../README.zh-TW.md#-開始使用) 的「其他跑法」。
+想讓 driftnet 每次登入都自己啟動、不用一直開著視窗，先在那個視窗按 <kbd>Ctrl</kbd>+<kbd>C</kbd> 停掉它，再執行：
+
+```bash
+npx driftnet service install
+```
+
+macOS、Windows、Linux 都能用，不需要輸入系統管理員密碼。之後 driftnet 會在背景跑：想用時打開
+**http://localhost:8787** 就好，終端機可以關了。`npx driftnet service status` 可以查看狀態；
+`npx driftnet service uninstall` 可以取消。詳見[指令列](cli.md#開機登入自動啟動)。
 
 ## 5. 加入連結
 
