@@ -76,7 +76,7 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 - 🗳️ **Learns what to ignore.** 👎 a result and its publisher loses reputation; sources that keep getting voted down stop costing anything.
 - 🛡️ **Safe by default.** Private and local addresses are refused, and prompt injection is never passed on to agents.
 - 🤖 **Agents use it too.** MCP, `/openapi.json`, `/llms.txt`, `/feed.xml` and an outgoing webhook; or let them do the reading ([Agents](docs/agents.md)).
-- 🧩 **Any model or none, and it stays yours.** An API, your Claude or Google subscription, Ollama, or no model (links are then listed unsorted under "other"). Local SQLite; English and Traditional Chinese throughout.
+- 🧩 **Any model or none, and it stays yours.** A free local model through Ollama, a Claude or Gemini subscription you already have, a paid API key (pennies), or no model (links are then saved and wait unsorted under "Other"). Local SQLite; English and Traditional Chinese throughout.
 
 ## 🚀 Quick start
 
@@ -95,16 +95,22 @@ It checks Node.js, starts driftnet, connects itself over MCP and tells you when 
 
 ### Or run one command yourself
 
-You need [Node.js](https://nodejs.org) 22.13 or newer. Then, in a terminal:
+You need [Node.js](https://nodejs.org) 22.13 or newer. Never used a terminal?
+[Step by step for Mac and Windows](docs/install-beginners.md). Then, in a terminal:
 
 ```bash
 npx driftnet
 ```
 
 Your browser opens **http://localhost:8787**: that is driftnet's page, served by your own computer
-(*localhost* means "this machine"; nobody else can see it). ⚙ Settings walks you through picking a
-model, or skip it and start without one. To connect the AI apps on this computer (Claude Code,
+(*localhost* means "this machine"; nobody else can see it). ⚙ Settings → AI: pick a provider and fill
+in its key and model. Or skip it: links are still saved and wait unsorted under "Other", and an AI agent
+can write the summaries ([Agents](docs/agents.md)). To connect the AI apps on this computer (Claude Code,
 Claude Desktop, Cursor, Windsurf, Codex) in one go: `npx driftnet init`.
+
+**Keep that terminal window open while you use driftnet: closing it stops driftnet.** To have it start
+at login instead, run it from source and use `pnpm service:install` (macOS and Linux, see *Other ways to
+run it* below); `npx driftnet` has no start-at-login option yet.
 
 Your settings live in `~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`.
 
@@ -166,6 +172,7 @@ Without `start`, the container is the MCP server over stdio (`docker run -i --rm
 
 | | |
 |---|---|
+| [Install for beginners](docs/install-beginners.md) | Never used a terminal: Mac and Windows, step by step |
 | [How driftnet handles a link](docs/how-it-works.md) | The eight steps, reels and shorts, link health, search by meaning |
 | [Ways in](docs/ways-in.md) | Chrome, Discord, Telegram, Slack, LINE, votes, the weekly digest |
 | [The web page](docs/web-page.md) | Cards, folders, mind map, AI tidy-up, notes, sharing, shortcuts |
