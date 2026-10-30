@@ -93,7 +93,7 @@ export class Semantic {
     if (embedder?.label !== this.embedder?.label || embedder?.model !== this.embedder?.model || embedder?.fingerprint !== this.embedder?.fingerprint) this.use(embedder);
     return embedder
       ? `semantic search: on (${embedder.label}${embedder.local ? ", local" : ""}); ${this.store.vectors.count()} items embedded, the rest in the background`
-      : `semantic search: off${problem ? ` (${problem})` : (env.DRIFTNET_EMBED ?? "auto").toLowerCase() === "off" ? "" : " (no local embedding model found; see README \"Search by meaning\")"}`;
+      : `semantic search: off${problem ? ` (${problem})` : (env.DRIFTNET_EMBED ?? "auto").toLowerCase() === "off" ? "" : " (no local embedding model found; see docs/how-it-works.md \"Search by meaning\")"}`;
   }
 
   /** Install an embedder (tests, plugins). Vectors of another model are dropped, then the backfill starts. */

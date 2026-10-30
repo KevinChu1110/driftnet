@@ -123,9 +123,9 @@ export class Settings {
   /**
    * Apply changes: a string sets the value, null clears it. An empty string
    * for a secret means "unchanged" (the page never had the old value).
-   * Returns the keys that changed.
+   * Returns the keys that changed. `check` sees the would-be settings first and throws to refuse them.
    */
-  update(changes: Record<string, unknown>): string[] {
+  update(changes: Record<string, unknown>, check?: (next: NodeJS.ProcessEnv) => void): string[] {
     const next = new Map<string, string | null>();
     for (const [key, raw] of Object.entries(changes)) {
       const s = SETTINGS.find((x) => x.key === key);
@@ -154,6 +154,11 @@ export class Settings {
       next.set(key, value);
     }
     if (!next.size) return [];
+    if (check) {
+      const preview: NodeJS.ProcessEnv = { ...this.env };
+      for (const [key, value] of next) if (value === null) delete preview[key]; else preview[key] = value;
+      check(preview);
+    }
     this.write(next);
     for (const [key, value] of next) {
       if (value === null) delete this.env[key];

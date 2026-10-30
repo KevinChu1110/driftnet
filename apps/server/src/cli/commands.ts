@@ -96,11 +96,11 @@ export async function add(ctx: Ctx, argv: string[]): Promise<number> {
     const c = conn(ctx, flags);
     const note = typeof flags.note === "string" ? flags.note : undefined;
     const r = await call(c, ctx.fetch, "POST", "/api/ingest", { json: { url: positional[0], ...(note ? { note } : {}) } });
-    const results = ok<{ item: PubItem }[]>(r);
+    const results = ok<{ item: PubItem; cached?: boolean }[]>(r);
     if (!results.length) { ctx.err("driftnet: no link found in that argument"); return 1; }
-    for (const { item } of results) {
+    for (const { item, cached } of results) {
       const line = clean(item.summary?.oneLiner ?? "");
-      ctx.out(`#${item.id} ${nameOf(item)}${line ? ` — ${line}` : ""}`);
+      ctx.out(`#${item.id} ${nameOf(item)}${line ? ` — ${line}` : ""}${cached ? "  (already saved)" : ""}`);
       ctx.out(`${c.url}/#item-${item.id}`);
     }
     return 0;
@@ -146,6 +146,7 @@ export async function search(ctx: Ctx, argv: string[]): Promise<number> {
     };
     const { items } = await listItems(ctx, conn(ctx, flags), opts);
     if (flags.json) ctx.out(JSON.stringify(items, null, 2));
+    else if (!items.length) ctx.err("no matches");
     else for (const i of items) ctx.out(formatItem(i));
     return 0;
   });

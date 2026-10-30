@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { createProvider } from "@driftnet/core";
 import { isLocal, isPrivate, newKey, readKey, strength, token } from "../access.ts";
 import { SettingsError } from "../settings.ts";
 import { pairRoute } from "../pair.ts";
@@ -47,7 +48,10 @@ export const routes: Route[] = [
           if (typeof values.DRIFTNET_TOKEN === "string" && values.DRIFTNET_TOKEN.trim() && tunnel.running && strength(values.DRIFTNET_TOKEN.trim()) === "weak") {
             throw new SettingsError("while the public URL is open, the password must not be weak");
           }
-          const changed = settings.update(values);
+          // A half-filled model (no model name, no key) would stop driftnet from starting next time: refuse it now.
+          const changed = settings.update(values, (next) => {
+            try { createProvider(next); } catch (err) { throw new SettingsError(`model: ${(err as Error).message}`); }
+          });
           if (changed.length) dn.reconfigure(env);
           return send(200, { ...settings.view(), changed, engines: dn.engines });
         } catch (err) {

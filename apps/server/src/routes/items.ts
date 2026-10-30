@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { BlockedUrl, HistoryError, ItemError, RefreshBusy, RefreshTooSoon, canonicalize, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
+import { BlockedUrl, HistoryError, ItemError, RefreshBusy, RefreshTooSoon, canonicalize, extractUrls, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
 import { agentBrief, leaseRow } from "../brief.ts";
 import { actorOf, isAdmin, token } from "../access.ts";
@@ -270,6 +270,21 @@ export const routes: Route[] = [
         } catch (err) {
           if (err instanceof BlockedUrl) return send(422, { error: err.message });
           throw err;
+        }
+      }
+      // One link from the page box or the CLI: say why it wasn't saved instead of answering with nothing.
+      if (typeof body.url === "string" && !body.text) {
+        const raw = body.url.trim();
+        const [one, ...more] = extractUrls(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
+        if (!one) return send(422, { error: "not a web link: it needs to start with http:// or https://" });
+        if (!more.length) {
+          const note = body.note?.slice(0, 1000);
+          try {
+            return send(200, [pubResult(await dn.pipeline.ingest(one, { ...ctx, ...(note ? { note } : {}) }))]);
+          } catch (err) {
+            if (err instanceof BlockedUrl) return send(422, { error: err.message });
+            throw err;
+          }
         }
       }
       const text = [body.url, body.text, body.note].filter(Boolean).join(" ");

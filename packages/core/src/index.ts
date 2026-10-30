@@ -82,7 +82,13 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
   const choices = () => store.folderChoices((f) => f.name ?? categoryLabel(f.id, "en"));
 
   const semantic = new Semantic(store, { log: (l) => console.warn(l) });
-  let built = buildEngines(env);
+  // A broken model setting (no model name, no key) must not stop driftnet: start without summaries and say why.
+  let modelError: string | undefined;
+  let built: ReturnType<typeof buildEngines>;
+  try { built = buildEngines(env); } catch (err) {
+    modelError = (err as Error).message;
+    built = buildEngines(env, { noModel: true });
+  }
   const pipeline = new Pipeline({
     store,
     get categories() {
@@ -119,6 +125,7 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
       return built.labels;
     },
     warnings: [
+      ...(modelError ? [`Summaries are off: ${modelError}. Fix it in ⚙ Settings → AI.`] : []),
       // Vendor variables are ignored on purpose (see llm/index.ts); say so instead of failing silently.
       ...(!built.engines.summarizer && (env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY)
         ? ["A vendor API key variable is set, but driftnet only reads DRIFTNET_LLM_PROVIDER / DRIFTNET_LLM_MODEL / DRIFTNET_LLM_API_KEY — summaries are off"]
@@ -128,9 +135,9 @@ export function createDriftnet(env: NodeJS.ProcessEnv = process.env): Driftnet {
 }
 
 /** Judge, model and rules from settings; rebuilt when the settings page saves. */
-function buildEngines(env: NodeJS.ProcessEnv): { engines: Engines; labels: { judge: string; summarizer: string }; llm: LlmProvider | undefined } {
+function buildEngines(env: NodeJS.ProcessEnv, opts: { noModel?: boolean } = {}): { engines: Engines; labels: { judge: string; summarizer: string }; llm: LlmProvider | undefined } {
   const judge = buildJudge(env);
-  const llm = createProvider(env);
+  const llm = opts.noModel ? undefined : createProvider(env);
   const summarizer = llm ? new Summarizer(llm, env.DRIFTNET_LANGUAGE || "English", env.DRIFTNET_SUMMARY_RULES?.trim() ?? "", summaryDepth(env), readerProfile(env.DRIFTNET_PROFILE)) : undefined;
   const blockedDomains = (env.DRIFTNET_BLOCK_DOMAINS ?? "").split(/[\s,]+/).map((d) => d.trim().toLowerCase().replace(/^\*?\./, "")).filter(Boolean);
   const minConfidence = env.DRIFTNET_MIN_CONFIDENCE ? Number(env.DRIFTNET_MIN_CONFIDENCE) : undefined;

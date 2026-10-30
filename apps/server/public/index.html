@@ -2163,6 +2163,9 @@
       [/cloudflared is not installed/, () => zh ? "這台電腦還沒安裝 cloudflared。" : "cloudflared isn't installed on this computer."],
       [/set by the environment/, () => zh ? "這個設定由執行環境決定（例如 systemd），要在那裡改。" : "This one is set by the environment driftnet runs in; change it there."],
       [/already a folder called “(.+)” here/, (m) => zh ? `這裡已經有一個叫「${m[1]}」的資料夾了。` : `There's already a folder called “${m[1]}” here.`],
+      [/^model: .*DRIFTNET_LLM_MODEL is required/, () => zh ? "還沒存：這個供應商要填「模型」名稱。" : "Not saved: this provider needs a model name."],
+      [/^model: .*(API_KEY is required|needs an API key|needs a key)/i, () => zh ? "還沒存：這個供應商要填 API 金鑰。" : "Not saved: this provider needs an API key."],
+      [/^model: (.+)/, (m) => zh ? `還沒存：模型設定不完整（${m[1]}）。` : `Not saved: the model setup is incomplete (${m[1]}).`],
       [/too many wrong passwords/, () => zh ? "密碼錯太多次，請 15 分鐘後再試。" : "Too many wrong passwords — try again in 15 minutes."],
     ];
     for (const [re, f] of rules) { const m = re.exec(msg); if (m) return f(m); }

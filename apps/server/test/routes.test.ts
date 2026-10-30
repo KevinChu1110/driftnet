@@ -130,3 +130,30 @@ test("tags and permanent delete over HTTP: validation, 409 outside the trash, 40
   await call("POST", `/api/items/${bare.id}/trash`, auth);
   assert.deepEqual(JSON.parse((await call("DELETE", "/api/trash", auth)).body), { ok: true, removed: 1 });
 });
+
+test("settings: a half-filled model is refused before it is written, so driftnet still starts", async () => {
+  const { call } = await start();
+  const auth = { authorization: `Bearer ${PASSWORD}` };
+  const r = await call("PUT", "/api/settings", auth, { values: { DRIFTNET_LLM_PROVIDER: "anthropic" } });
+  assert.equal(r.status, 400);
+  assert.match(JSON.parse(r.body).error, /^model: .*DRIFTNET_LLM_MODEL/);
+  const view = JSON.parse((await call("GET", "/api/settings", auth)).body) as { settings: { key: string; value?: string }[] };
+  assert.equal(view.settings.find((s) => s.key === "DRIFTNET_LLM_PROVIDER")?.value, "", "nothing was saved");
+});
+
+test("a broken model setting at startup turns summaries off with a warning instead of crashing", () => {
+  const dn = createDriftnet({ DRIFTNET_HOME: mkdtempSync(join(tmpdir(), "driftnet-badmodel-")), DRIFTNET_JUDGE: "off", DRIFTNET_LLM_PROVIDER: "anthropic", DRIFTNET_LLM_MODEL: "x" });
+  assert.equal(dn.engines.summarizer, "off");
+  assert.ok(dn.warnings.some((w) => /Summaries are off: .*API_KEY/.test(w)));
+});
+
+test("ingest: one link that can't be saved says why instead of answering with nothing", async () => {
+  const { call } = await start();
+  const auth = { authorization: `Bearer ${PASSWORD}` };
+  const priv = await call("POST", "/api/ingest", auth, { url: "http://192.168.1.1" });
+  assert.equal(priv.status, 422);
+  assert.match(JSON.parse(priv.body).error, /private or local address/);
+  const notWeb = await call("POST", "/api/ingest", auth, { url: "ftp://example.com/file" });
+  assert.equal(notWeb.status, 422);
+  assert.match(JSON.parse(notWeb.body).error, /not a web link/);
+});
