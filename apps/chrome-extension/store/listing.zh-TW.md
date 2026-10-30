@@ -1,6 +1,6 @@
 # Chrome 線上應用程式商店刊登資料（繁體中文）
 
-尚未送審。內容貼進開發人員資訊主頁即可。
+商店上顯示的文字：修改後要手動貼進開發人員資訊主頁（線上的刊登內容不會跟著這個檔案更新）。
 
 ## 名稱
 driftnet
@@ -15,7 +15,12 @@ driftnet
 
 ## 詳細說明
 
-driftnet 會接住你滑到的連結，整理成你和你的 AI agent 都能搜尋的清單，資料在你自己手上。
+需要在你的電腦上執行 driftnet（免費、開放原始碼）：https://kevinchu1110.github.io/driftnet/
+
+請先安裝：裝好 Node.js 22.13 以上，在終端機執行 `npx driftnet`，使用期間讓那個視窗一直開著。
+一步一步的說明：https://github.com/KevinChu1110/driftnet/blob/main/README.zh-TW.md#-開始使用
+
+driftnet 會接住你滑到的連結，整理成你和你的 AI 助手都能搜尋的清單，資料在你自己手上。
 這個擴充功能就是瀏覽器裡的「送出」按鈕。
 
 很多頁面對匿名抓取一片空白：Facebook 圖片貼文、Threads 回覆、真正連結藏在留言裡的 Instagram
@@ -32,7 +37,7 @@ reels。擴充改送**你登入後自己看到的**內容：
 預設就私密：只有你按下時才讀取該分頁，只送到你設定的 driftnet 伺服器（預設是你電腦上的
 localhost:8787），沒有分析、不用註冊、不追蹤。
 
-需要有一台 driftnet 伺服器（免費、MIT 授權）：https://github.com/KevinChu1110/driftnet
+原始碼（MIT 授權）：https://github.com/KevinChu1110/driftnet
 
 ## 單一用途
 把使用者選定的網頁、連結或選取的文字，送到使用者自己的 driftnet 伺服器，存進個人清單。
