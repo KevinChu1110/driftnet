@@ -162,6 +162,6 @@ try {
 } finally {
   try { await cdp("Browser.close"); } catch { /* already gone */ }
   chrome.kill(); site.close();
-  rmSync(profile, { recursive: true, force: true });
+  rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); // Chrome may still be writing its profile
 }
 process.exit(failed ? 1 : 0);
