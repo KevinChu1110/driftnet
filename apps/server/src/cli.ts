@@ -7,7 +7,7 @@ const VERSION = process.env.DRIFTNET_VERSION ?? await import("node:fs").then((fs
 });
 
 const rest = process.argv.slice(3);
-const SUBCOMMANDS = ["add", "search", "open", "export", "import", "completion", "status", "init", "backup", "restore"];
+const SUBCOMMANDS = ["add", "search", "open", "export", "import", "completion", "status", "init", "backup", "restore", "service"];
 
 const wantsHelp = rest.some((a) => a === "--help" || a === "-h");
 if (cmd === "start") await import("./main.ts");
@@ -38,6 +38,8 @@ Commands (talk to a running driftnet; search and export also read the database d
   driftnet completion bash|zsh          print a shell completion script
   driftnet init [--client claude-code|claude-desktop|cursor|windsurf|codex|all] [--remote URL --token T] [--yes] [--dry-run]
                                         connect your agents (MCP + skill) in one command
+  driftnet service install|uninstall|status [--dry-run]
+                                        start driftnet at login (macOS, Linux, Windows), no terminal window needed
   Options for all of them: --url <server>  --token <password>   (or DRIFTNET_URL / DRIFTNET_TOKEN)
 
 Environment:
@@ -55,7 +57,8 @@ Docs: https://github.com/KevinChu1110/driftnet/blob/main/docs/cli.md`;
     while (end < lines.length && /^\s{10,}\S/.test(lines[end]!)) end++;
     console.log(`usage:\n${lines.slice(at, end).join("\n")}`);
     if (cmd === "init") console.log("\n  It edits each agent's MCP config file; try --dry-run first to see what would change.");
-    console.log("\n  Options for all commands: --url <server>  --token <password>   (or DRIFTNET_URL / DRIFTNET_TOKEN)");
+    if (cmd === "service") console.log("\n  install also updates: `npx driftnet@latest service install`. --dry-run prints what would be written and run.");
+    if (cmd !== "service") console.log("\n  Options for all commands: --url <server>  --token <password>   (or DRIFTNET_URL / DRIFTNET_TOKEN)");
   } else if (known) console.log(help);
   else {
     const near = [...SUBCOMMANDS, "mcp", "start"].map((c) => [c, distance(c, cmd)] as const).sort((a, b) => a[1] - b[1])[0]!;

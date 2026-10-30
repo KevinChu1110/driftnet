@@ -24,7 +24,7 @@ export interface InitCtx extends Ctx {
   skillSource?: string;
 }
 
-function realRun(cmd: string, args: string[]): Promise<RunResult> {
+export function realRun(cmd: string, args: string[]): Promise<RunResult> {
   return new Promise((resolve) => {
     let out = "", err = "";
     try {

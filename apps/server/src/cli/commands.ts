@@ -8,6 +8,7 @@ import { call, HttpError, ok, resolveConnection, ServerDown, type Connection } f
 import { completionScript } from "./completion.ts";
 import { init } from "./init.ts";
 import { backupCmd, restoreCmd } from "./backup.ts";
+import { service } from "./service.ts";
 
 /** Everything the commands touch outside themselves, so tests can swap it. */
 export interface Ctx {
@@ -294,5 +295,6 @@ export const HANDLERS: Record<string, (ctx: Ctx, argv: string[]) => Promise<numb
   add, search, open, export: exportCmd, import: importCmd, completion, status, init,
   backup: (ctx, argv) => guarded(ctx, () => backupCmd(ctx, argv)),
   restore: (ctx, argv) => guarded(ctx, () => restoreCmd(ctx, argv)),
+  service: (ctx, argv) => guarded(ctx, () => service(ctx, argv)),
 };
 export type { ArgSpec };

@@ -16,5 +16,24 @@ With driftnet running (`npx driftnet`), the same command talks to it. `search`, 
 | `driftnet status` (also says when a newer version is out) | `npx driftnet status` |
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 | `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
+| `driftnet service install\|uninstall\|status [--dry-run]` | `npx driftnet service install` |
 
 For a server elsewhere, add `--url http://host:8787 --token <password>` (or set `DRIFTNET_URL` and `DRIFTNET_TOKEN`; the password is also read from `~/.driftnet/.env`).
+
+## Start at login
+
+`npx driftnet service install` makes driftnet start by itself whenever you log in, with no terminal window:
+
+- **macOS:** a LaunchAgent, `~/Library/LaunchAgents/io.github.kevinchu1110.driftnet.plist` (restarted after a crash, at most every 10 s).
+- **Linux:** a systemd user unit, `~/.config/systemd/user/driftnet.service`. To keep it running when nobody is logged in (a server), run `loginctl enable-linger $USER` once.
+- **Windows:** a hidden script in your Startup folder (`driftnet.vbs`). Not a scheduled task: making a logon task needs an administrator prompt, the Startup folder does not.
+
+What the service runs: a private copy of the same driftnet version, installed with npm into `~/.driftnet/service/` and started with the `node` you ran the command with. Not `npx driftnet` itself, because npx's cache can be cleaned at any time and fetching again at login needs the network (and might pick up another version); not a global install, which can need `sudo`. Nothing here needs `sudo` or an administrator.
+
+- Logs go to `~/.driftnet/logs/driftnet.log`. The service never opens a browser; open http://localhost:8787 yourself.
+- `DRIFTNET_HOME` and `PORT`, if set when you install, are passed to the service.
+- `npx driftnet service status` says whether it is installed and running, what it runs, where the logs are, and whether something already listens on the port.
+- `--dry-run` prints exactly what would be written and run, and changes nothing.
+- Update: `npx driftnet@latest service install` (installing again replaces everything). Remove: `npx driftnet service uninstall` (your links and settings stay).
+- If you update or reinstall Node.js, run `service install` again so the service points at the new `node`.
+

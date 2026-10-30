@@ -11,6 +11,7 @@ export const COMMANDS: Record<string, string[]> = {
   completion: [],
   status: ["--url", "--token"],
   init: ["--client", "--remote", "--token", "--yes", "--dry-run"],
+  service: ["install", "uninstall", "status", "--dry-run"],
   help: [],
 };
 const GLOBAL = ["--help", "--version"];

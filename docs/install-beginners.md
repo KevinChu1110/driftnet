@@ -33,14 +33,22 @@ computer (*localhost* means "this computer"; nobody else can see it).
 
 If the browser does not open by itself, open it yourself and go to `http://localhost:8787`.
 
-## 4. Keep the window open
+## 4. Start it at login (so you can close the window)
 
-**driftnet runs only while that terminal window is open.** You can minimise it, but closing it (or
-restarting the computer) stops driftnet. Next time, open a terminal and run `npx driftnet` again: your
-links and settings are kept.
+Started like this, **driftnet runs only while that terminal window is open**: closing it (or restarting
+the computer) stops driftnet. Your links and settings are kept either way.
 
-To have it start by itself at login you currently need the from-source install
-(`pnpm service:install`, macOS and Linux only); see *Other ways to run it* in the [README](../README.md#-quick-start).
+To have driftnet start by itself every time you log in, with no window to keep open, press
+<kbd>Ctrl</kbd>+<kbd>C</kbd> in that window to stop it, then run:
+
+```bash
+npx driftnet service install
+```
+
+It works on macOS, Windows and Linux and needs no administrator password. driftnet is now running in the
+background: open **http://localhost:8787** whenever you want it, and you can close the terminal.
+`npx driftnet service status` checks on it; `npx driftnet service uninstall` undoes it. More in
+[Command line](cli.md#start-at-login).
 
 ## 5. Add links
 

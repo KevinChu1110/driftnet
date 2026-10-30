@@ -60,6 +60,7 @@ server.listen(PORT, HOST, () => {
   // At most once a day (the time of the last try is in the database), 3 s timeout, never blocks start.
   void checkForUpdate(dn.store, env).catch(() => {});
   // First run in a terminal: open the page, where ⚙ Settings walks through the rest.
+  if (!env.DRIFTNET_SERVICE && process.stdout.isTTY) console.log("Tip: `npx driftnet service install` starts driftnet at login");
   if (!envFile && process.stdout.isTTY && env.DRIFTNET_OPEN !== "0" && !env.CI) openBrowser(`http://localhost:${PORT}/`);
   if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);
   if (env.DISCORD_BOT_TOKEN) startDiscord(dn, env.DISCORD_BOT_TOKEN);
