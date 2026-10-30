@@ -1,8 +1,6 @@
 import { spawn } from "node:child_process";
 import { createDriftnet, healthFor, loadPlugins, defaultDbPath, driftnetHome, loadHomeEnv } from "@driftnet/core";
-import { startSlackSocket } from "./adapters/slack.ts";
-import { startTelegram } from "./adapters/telegram.ts";
-import { startDiscord } from "./adapters/discord.ts";
+import { ChatManager } from "./chats.ts";
 import { isPrivate, token, Tunnel } from "./access.ts";
 import { createApp } from "./app.ts";
 import { startDigestScheduler } from "./digest.ts";
@@ -41,7 +39,10 @@ const tunnel = new Tunnel(PORT);
 process.on("exit", () => { tunnel.stop(); healthFor(dn.store).stop(); });
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { tunnel.stop(); process.exit(0); });
 
-const server = createApp({ dn, env, settings, tunnel, plugins, envFile, port: PORT });
+// The chat bots: started once listening, restarted from ⚙ Settings → Chats when their keys change.
+const chats = new ChatManager(dn, env);
+process.on("exit", () => chats.stopAll());
+const server = createApp({ dn, env, settings, tunnel, plugins, envFile, chats, port: PORT });
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code !== "EADDRINUSE") throw err;
@@ -62,11 +63,10 @@ server.listen(PORT, HOST, () => {
   // First run in a terminal: open the page, where ⚙ Settings walks through the rest.
   if (!env.DRIFTNET_SERVICE && process.stdout.isTTY) console.log("Tip: `npx driftnet service install` starts driftnet at login");
   if (!envFile && process.stdout.isTTY && env.DRIFTNET_OPEN !== "0" && !env.CI) openBrowser(`http://localhost:${PORT}/`);
-  if (env.TELEGRAM_BOT_TOKEN) startTelegram(dn, env.TELEGRAM_BOT_TOKEN);
-  if (env.DISCORD_BOT_TOKEN) startDiscord(dn, env.DISCORD_BOT_TOKEN);
-  if (env.LINE_CHANNEL_SECRET) console.log("[line] webhook at /webhooks/line");
-  if (env.SLACK_APP_TOKEN && env.SLACK_BOT_TOKEN) startSlackSocket(dn, env.SLACK_APP_TOKEN, env.SLACK_BOT_TOKEN);
-  else if (env.SLACK_SIGNING_SECRET) console.log("[slack] webhook at /webhooks/slack");
+  chats.sync();
+  const st = chats.status();
+  if (st.line.state === "webhook") console.log("[line] webhook at /webhooks/line");
+  if (st.slack.state === "webhook") console.log("[slack] webhook at /webhooks/slack");
   // Reads its settings every tick, so turning the digest on in ⚙ Settings needs no restart.
   const stopDigest = startDigestScheduler(dn, env);
   process.on("exit", stopDigest);

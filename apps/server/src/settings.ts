@@ -6,18 +6,20 @@ import { DAYS, parseTargets, validTime } from "./digest.ts";
 /**
  * What the settings page may change. Everything here takes effect without a
  * restart (the judge, model and rules are rebuilt; the rest is read per
- * request). The server's own address, token and chat-platform keys are not
- * here on purpose: they need a restart, and a page that can change the token
- * could lock its owner out.
+ * request; the chat bots are restarted by ChatManager.sync). The server's own
+ * address and port are not here on purpose: they need a restart.
  */
 export interface Setting {
   key: string;
-  group: "model" | "language" | "chat" | "rules" | "access" | "webhook" | "digest" | "updates";
+  group: "model" | "language" | "chat" | "chats" | "rules" | "access" | "webhook" | "digest" | "updates";
   secret?: boolean;
   choices?: readonly string[];
   multiline?: boolean;
   max?: number;
   min?: number;
+  /** A shape check (no network): the value must match, or `shape` says what it should look like. */
+  pattern?: RegExp;
+  shape?: string;
 }
 
 export const SETTINGS: readonly Setting[] = [
@@ -79,6 +81,16 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_EMBED_FLOOR", group: "model", max: 5 },
   // Video frames shown to the summary model (opt-in; the model must accept pictures). DRIFTNET_VIDEO=watch is above.
   { key: "DRIFTNET_VIDEO_FRAMES", group: "rules", choices: ["", "off", "vision"] },
+  // Chat bots: ⚙ Settings → Chats. Saving restarts just that bot (chats.ts). Shapes only; whether a token works shows in its status line.
+  { key: "TELEGRAM_BOT_TOKEN", group: "chats", secret: true, pattern: /^\d{5,}:[\w-]{30,}$/, shape: "looks like 123456789:AA… (from @BotFather)" },
+  { key: "DRIFTNET_TELEGRAM_CHATS", group: "chats", pattern: /^-?\d+(\s*,\s*-?\d+)*$/, shape: "is a comma-separated list of chat ids, e.g. -1001234567890" },
+  { key: "DISCORD_BOT_TOKEN", group: "chats", secret: true, pattern: /^[\w-]{20,}\.[\w-]{4,}\.[\w-]{20,}$/, shape: "looks like three dot-separated parts (the bot token, not the client secret)" },
+  { key: "DISCORD_CHANNELS", group: "chats", pattern: /^\d{15,22}(\s*,\s*\d{15,22})*$/, shape: "is a comma-separated list of channel ids" },
+  { key: "SLACK_APP_TOKEN", group: "chats", secret: true, pattern: /^xapp-[\w-]{10,}$/, shape: "starts with xapp- (an app-level token)" },
+  { key: "SLACK_BOT_TOKEN", group: "chats", secret: true, pattern: /^xoxb-[\w-]{10,}$/, shape: "starts with xoxb- (the bot token)" },
+  { key: "SLACK_SIGNING_SECRET", group: "chats", secret: true, pattern: /^[0-9a-f]{32}$/i, shape: "is 32 letters and digits (Basic Information → Signing Secret)" },
+  { key: "LINE_CHANNEL_SECRET", group: "chats", secret: true, pattern: /^[0-9a-f]{32}$/i, shape: "is 32 letters and digits (Basic settings → Channel secret)" },
+  { key: "LINE_CHANNEL_ACCESS_TOKEN", group: "chats", secret: true, max: 1000, pattern: /^[A-Za-z0-9+/=._-]{40,}$/, shape: "is a long token (Messaging API → Channel access token)" },
 ];
 
 /**
@@ -150,6 +162,7 @@ export class Settings {
           if (invalid.length) throw new SettingsError(`${key}: not a valid target: ${invalid.join(", ")} (use telegram:<chat id>, discord:<channel id>, slack:<channel id>, line:<id>)`);
         }
         if (/URL$/.test(key) && !/^https?:\/\/\S+$/.test(value)) throw new SettingsError(`${key} must be an http(s) URL`);
+        if (s.pattern && !s.pattern.test(value)) throw new SettingsError(`${key} doesn't look right: it ${s.shape ?? "has the wrong shape"}`);
       }
       next.set(key, value);
     }

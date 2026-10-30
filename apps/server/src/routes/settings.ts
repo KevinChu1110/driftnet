@@ -52,14 +52,17 @@ export const routes: Route[] = [
           const changed = settings.update(values, (next) => {
             try { createProvider(next); } catch (err) { throw new SettingsError(`model: ${(err as Error).message}`); }
           });
-          if (changed.length) dn.reconfigure(env);
-          return send(200, { ...settings.view(), changed, engines: dn.engines });
+          if (changed.length) {
+            dn.reconfigure(env);
+            app.chats?.sync(); // restarts only the bots whose keys changed
+          }
+          return send(200, { ...settings.view(), changed, engines: dn.engines, chats: app.chats?.status() ?? null });
         } catch (err) {
           if (err instanceof SettingsError) return send(400, { error: err.message });
           throw err;
         }
       }
-      return send(200, { ...settings.view(), engines: dn.engines, plugins, restorePending: restorePending(dbPathOf(env)), ...accessView(req, app) });
+      return send(200, { ...settings.view(), engines: dn.engines, chats: app.chats?.status() ?? null, plugins, restorePending: restorePending(dbPathOf(env)), ...accessView(req, app) });
     },
   },
   // Agent tokens: one named key per agent. Admin password only, never a token itself (tokenRoute adds the per-method rules).

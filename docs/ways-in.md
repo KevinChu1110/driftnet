@@ -37,7 +37,12 @@ message at the chosen time: how many cards are new, how many wait in the Inbox, 
 sends one catch-up digest on the next start, never more. Links in it are your plain public URL (`DRIFTNET_PUBLIC_URL`), never the read-only share key,
 since the text lands in a group. Try it with `POST /api/digest/send {"dryRun": true}`. A webhook also gets a `digest.sent` event.
 
-Bot tokens are read when driftnet starts: put them in `~/.driftnet/.env`, then stop and start it again.
+**Connecting a bot.** Open **⚙ Settings → Chats**, paste the token(s) and press Save. Each platform shows where to get its token and a
+status line (connected, not set, or the last error, such as a wrong token or Discord's Message Content intent left off). The bot starts at once,
+no restart; changing or clearing a token restarts or stops just that bot. Tokens are stored in `~/.driftnet/.env` and never shown again
+(leave the field empty to keep one). Editing `~/.driftnet/.env` by hand still works, but then restart driftnet. A token set by the
+environment driftnet runs in (systemd, Docker) is shown as locked; change it there. LINE, and Slack without Socket Mode, also need a
+[public URL](online.md) that the platform can reach.
 
 <p align="center"><img src="../assets/discord-zh-TW.jpg" alt="driftnet answering a Discord message with two links: one line per link, each pointing to its page" width="80%"></p>
 <sub>A real run in Discord (<code>DRIFTNET_LANGUAGE=Traditional Chinese (Taiwan)</code>): two links in one message, one line back for each. Name and server address hidden.</sub>

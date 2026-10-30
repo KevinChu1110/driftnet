@@ -3,6 +3,7 @@ import type { Driftnet } from "@driftnet/core";
 import { handleChat, type ChatReply } from "./handle.ts";
 import { reactionVote, rememberReply, voteOnReply } from "./reactions.ts";
 import { discordEmbeds, warnOnce } from "./rich.ts";
+import type { Report } from "../chats.ts";
 
 const LAST = "discord:last:";
 const MAX_CATCH_UP = 1000; // per channel
@@ -157,7 +158,7 @@ const toChatMessage = (m: Message): ChatMessage => ({
  * Discord via the gateway (no public URL needed). Needs DISCORD_BOT_TOKEN and the
  * Message Content intent enabled in the developer portal.
  */
-export function startDiscord(dn: Driftnet, token: string): () => void {
+export function startDiscord(dn: Driftnet, token: string, report: Report = () => {}): () => void {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
@@ -197,14 +198,20 @@ export function startDiscord(dn: Driftnet, token: string): () => void {
   });
   client.once(Events.ClientReady, async (c) => {
     console.log(`[discord] ready as ${c.user.tag}`);
+    report("connected", c.user.tag);
     await catchUp(dn, async (channelId, after) => {
       const channel = await c.channels.fetch(channelId);
       if (!channel?.isTextBased()) return [];
       return [...(await channel.messages.fetch({ after, limit: 100 })).values()].map(toChatMessage);
     });
   });
-  void client.login(token);
-  return () => void client.destroy();
+  client.on(Events.Error, (err) => report("error", err.message));
+  // A wrong token, or the Message Content intent left off ("Used disallowed intents").
+  client.login(token).catch((err: Error) => {
+    console.warn("[discord]", err.message);
+    report("error", err.message);
+  });
+  return () => void client.destroy().catch(() => {});
 }
 
 /** Post a message to a channel over REST with the bot token (a scheduled digest); no gateway needed. Throws on refusal. */
