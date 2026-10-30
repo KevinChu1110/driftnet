@@ -240,7 +240,7 @@ ollama pull nomic-embed-text      # that's it: restart driftnet and the startup 
 
 | | Set up | On a laptop? | Sent while it was off |
 |---|---|---|---|
-| **Chrome extension** | Load `apps/chrome-extension`, or the zip from `pnpm build:extension` | ✅ | — |
+| **Chrome extension** | [Install from the Chrome Web Store](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm) | ✅ | — |
 | Telegram | `TELEGRAM_BOT_TOKEN`; privacy mode off for groups (`/setprivacy`) | ✅ | caught up on start (24 h) |
 | Discord | `DISCORD_BOT_TOKEN`; Message Content intent on | ✅ | read back per channel, quietly |
 | Slack | `SLACK_APP_TOKEN` (Socket Mode) + `SLACK_BOT_TOKEN` (+ `reactions:read` and the `reaction_added` event for voting) | ✅ | missed |
@@ -427,7 +427,7 @@ fetch on the side; if a site's markup changes it falls back to the generic reade
 
 **Install**
 
-- **Chrome Web Store**: coming soon.
+- **[Chrome Web Store](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)**: one click, updates itself.
 - **From the zip** (a [release build](https://github.com/KevinChu1110/driftnet/actions/workflows/extension.yml), or `pnpm build:extension` → `dist/driftnet-extension-<version>.zip`): unzip it, open `chrome://extensions`, turn on Developer mode, **Load unpacked**, pick the unzipped folder.
 - **From the source**: the same, picking `apps/chrome-extension`.
 

@@ -236,7 +236,7 @@ ollama pull nomic-embed-text      # 這樣就好：重啟 driftnet，啟動訊�
 
 | | 設定 | 筆電上能用？ | 關機期間的訊息 |
 |---|---|---|---|
-| **Chrome 擴充** | 載入 `apps/chrome-extension`，或 `pnpm build:extension` 產生的 zip | ✅ | — |
+| **Chrome 擴充** | [從 Chrome 線上應用程式商店安裝](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm) | ✅ | — |
 | Telegram | `TELEGRAM_BOT_TOKEN`；群組要先用 `/setprivacy` 關閉隱私模式 | ✅ | 啟動時補上（24 小時內） |
 | Discord | `DISCORD_BOT_TOKEN`；開啟 Message Content intent | ✅ | 逐頻道補讀，不回覆 |
 | Slack | `SLACK_APP_TOKEN`（Socket Mode）＋ `SLACK_BOT_TOKEN`（要投票另需 `reactions:read` 與 `reaction_added` 事件） | ✅ | 漏掉 |
@@ -392,7 +392,7 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 
 **安裝**
 
-- **Chrome 線上應用程式商店**：即將上架。
+- **[Chrome 線上應用程式商店](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)**：一鍵安裝，自動更新。
 - **用 zip**（[建置產物](https://github.com/KevinChu1110/driftnet/actions/workflows/extension.yml)，或 `pnpm build:extension` → `dist/driftnet-extension-<版本>.zip`）：解壓縮，開 `chrome://extensions` → 開發人員模式 → **載入未封裝項目** → 選解壓縮後的資料夾。
 - **用原始碼**：同上，選 `apps/chrome-extension`。
 
