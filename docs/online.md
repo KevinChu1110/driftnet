@@ -40,3 +40,7 @@ driftnet.example.com {
 	reverse_proxy 127.0.0.1:8787
 }
 ```
+
+Then set `DRIFTNET_PUBLIC_URL=https://driftnet.example.com` (⚙ Settings → Access): driftnet answers only
+requests addressed to this machine, that URL or `DRIFTNET_ALLOWED_HOSTS`, so a web page cannot reach it through
+DNS tricks; the admin password, a key or a token gets in under any name.

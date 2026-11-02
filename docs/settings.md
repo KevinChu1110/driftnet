@@ -61,7 +61,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_HOME` | `~/.driftnet` | Folder for `.env`, the database and the service log |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite file |
 | `DRIFTNET_HOST` / `PORT` | `127.0.0.1` / `8787` | Listen address. A non-local address without `DRIFTNET_TOKEN` prints a warning: anyone who reaches the port could change the catalogue |
-| `DRIFTNET_ALLOWED_HOSTS` | — | Without a password, driftnet only answers requests addressed to this machine (or `DRIFTNET_PUBLIC_URL`), which stops web pages from reaching it through DNS tricks. Add other host names here, comma-separated |
+| `DRIFTNET_ALLOWED_HOSTS` | — | driftnet only answers requests addressed to this machine, `DRIFTNET_PUBLIC_URL`, the tunnel, or a host listed here (comma-separated), which stops web pages from reaching it through DNS tricks. Requests that carry the password, a key or a token, and signed chat webhooks, pass under any name |
 | `DRIFTNET_OPEN` | `1` | `0` stops `npx driftnet` from opening the page in your browser |
 | `DRIFTNET_MEDIA_CACHE_MB` | `300` | Disk space for cached card pictures |
 | `DRIFTNET_ALLOW_PRIVATE_URLS` | — | `1` lets links to private or local addresses be fetched (intranet pages). Off by default: a shared link could otherwise read services on your machine or network |

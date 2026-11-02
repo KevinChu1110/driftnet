@@ -60,7 +60,7 @@
 | `DRIFTNET_HOME` | `~/.driftnet` | 放 `.env`、資料庫和服務日誌的資料夾 |
 | `DRIFTNET_DB` | `~/.driftnet/driftnet.db` | SQLite 檔案位置 |
 | `DRIFTNET_HOST`／`PORT` | `127.0.0.1`／`8787` | 監聽位址。設成非本機位址卻沒有 `DRIFTNET_TOKEN` 時會顯示警告：連得到這個埠的人都能改動清單 |
-| `DRIFTNET_ALLOWED_HOSTS` | — | 沒設密碼時，driftnet 只回應發給本機（或 `DRIFTNET_PUBLIC_URL`）的請求，避免網頁透過 DNS 手法連進來。其他主機名稱加在這裡，以逗號分隔 |
+| `DRIFTNET_ALLOWED_HOSTS` | — | driftnet 只回應發給本機、`DRIFTNET_PUBLIC_URL`、tunnel 或這裡列出的主機名稱（逗號分隔）的請求，避免網頁透過 DNS 手法連進來。帶著密碼、金鑰或 token 的請求，以及有簽章的聊天 webhook，用任何名稱都能通過 |
 | `DRIFTNET_OPEN` | `1` | 設 `0`：`npx driftnet` 啟動時不自動開瀏覽器 |
 | `DRIFTNET_MEDIA_CACHE_MB` | `300` | 卡片圖片快取可用的磁碟空間 |
 | `DRIFTNET_ALLOW_PRIVATE_URLS` | — | 設 `1` 允許抓取私有或本機位址的連結（內網頁面）。預設關閉，否則分享進來的連結可能讀到你電腦或內網上的服務 |

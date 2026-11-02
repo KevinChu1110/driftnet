@@ -134,7 +134,6 @@ export function createApp(opts: AppOptions): Server {
     const path = url.pathname;
     const reply: Ctx["send"] = (status, body, type, headers) => send(res, status, body, type, headers);
     try {
-      if (!hostAllowed(req, env)) return send(res, 421, { error: "unknown host; set DRIFTNET_ALLOWED_HOSTS to use this address, or set an admin password" });
       const method = req.method ?? "GET";
       let route: Route | undefined;
       let m: RegExpExecArray | null = null;
@@ -142,6 +141,11 @@ export function createApp(opts: AppOptions): Server {
         if (!methodMatches(r, method)) continue;
         m = typeof r.pattern === "string" ? (r.pattern === path ? ([path] as RegExpExecArray) : null) : r.pattern.exec(path);
         if (m) { route = r; break; }
+      }
+      // A signed chat webhook arrives under whatever address its platform was given; its signature is the guard.
+      const signedWebhook = route?.access === "public" && path.startsWith("/webhooks/");
+      if (!signedWebhook && !hostAllowed(req, env)) {
+        return send(res, 421, { error: "unknown host; set DRIFTNET_PUBLIC_URL (or add it to DRIFTNET_ALLOWED_HOSTS) to use this address" });
       }
       const run = () => route!.handler({ req, res, url, path, m: m!, app, send: reply, json: () => readJson(req), body: (limit) => readBody(req, limit) } as Ctx);
       // The page and its icons: before the throttle and the read gate.

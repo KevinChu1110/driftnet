@@ -92,7 +92,7 @@ test("another website's page is never trusted to write, even with no password", 
   assert.ok(!foreignOrigin(req()), "curl, agents, chat platforms send no Origin");
 });
 
-test("without a password only this machine's, the public and the allowed Host names get in (DNS rebinding)", () => {
+test("only this machine's, the public and the allowed Host names get in, password or not; a credential vouches for the rest (DNS rebinding)", () => {
   const ok = (host: string, e: NodeJS.ProcessEnv = {}) => hostAllowed(req({ host }), e);
   for (const h of ["localhost", "localhost:8787", "127.0.0.1:3000", "[::1]:8787"]) assert.ok(ok(h), h);
   assert.ok(!ok("evil.example.com"));
@@ -101,7 +101,12 @@ test("without a password only this machine's, the public and the allowed Host na
   const e = { DRIFTNET_PUBLIC_URL: "https://dn.example.org/", DRIFTNET_TUNNEL_URL: "https://abc.trycloudflare.com", DRIFTNET_ALLOWED_HOSTS: "nas.lan, Box.local:8787" };
   for (const h of ["dn.example.org", "abc.trycloudflare.com", "nas.lan", "box.local:8787"]) assert.ok(ok(h, e), h);
   assert.ok(!ok("evil.example.com", e));
-  assert.ok(ok("evil.example.com", { DRIFTNET_TOKEN: "admin-pass-123" }), "with a password the password is the defence");
+  // With a password set, reads were still open in public mode: a rebinding page could read everything. The password no longer waives the check.
+  const withPassword = { DRIFTNET_TOKEN: "admin-pass-123" };
+  assert.ok(!ok("evil.example.com", withPassword), "a password is not a reason to answer a foreign Host");
+  assert.ok(hostAllowed(req({ host: "proxy.example.net", auth: "whatever" }), withPassword), "a request carrying a credential was not made by a rebinding page");
+  assert.ok(hostAllowed(req({ host: "proxy.example.net", url: "/llms.txt?key=abc" }), withPassword), "the read key in the URL counts too");
+  assert.ok(!hostAllowed(req({ host: "proxy.example.net", url: "/?keyless=1" }), withPassword));
 });
 
 test("the throttle counts the socket peer; forwarded headers count only from a local proxy", () => {

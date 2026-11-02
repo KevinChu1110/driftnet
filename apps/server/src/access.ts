@@ -101,17 +101,20 @@ const hostOf = (url: string | undefined): string | undefined => {
 };
 
 /**
- * DNS rebinding guard. Without an admin password a web page could point its own
- * domain at 127.0.0.1 and read the catalogue through the browser, so the Host
- * header must name this machine, the public or tunnel address, or a host in
- * DRIFTNET_ALLOWED_HOSTS. With a password set, the password is the defence.
+ * DNS rebinding guard. A web page could point its own domain at 127.0.0.1:8787; the
+ * browser then treats driftnet as that page's own origin and lets it read the
+ * catalogue (reads are open in public mode, password or not) or, with no password,
+ * write to it. So the Host header must name this machine, the public or tunnel
+ * address, or a host in DRIFTNET_ALLOWED_HOSTS. A request that carries a password,
+ * key or token cannot have come from such a page (browsers add none of these on
+ * their own), so a proxy under a name not listed here still serves whoever logs in.
  */
 export function hostAllowed(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
-  if (token(env)) return true;
   const host = (req.headers.host ?? "").toLowerCase();
   if (LOOPBACK_HOST.test(host)) return true;
   const allowed = [hostOf(env.DRIFTNET_PUBLIC_URL), hostOf(env.DRIFTNET_TUNNEL_URL), ...(env.DRIFTNET_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase())];
-  return !!host && allowed.includes(host);
+  if (host && allowed.includes(host)) return true;
+  return !!req.headers.authorization || /[?&]key=/.test(req.url ?? "");
 }
 
 /**
