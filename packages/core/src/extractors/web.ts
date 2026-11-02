@@ -49,6 +49,8 @@ export async function extractWeb(url: string): Promise<Digest | null> {
   const body = social ? "" : outlineHtml(page.body, budget - (lead ? Math.ceil(lead.length / 2) : 0));
   const text = [lead, body].filter(Boolean).join("\n\n");
 
+  // Facebook no longer puts the caption in og:title for anonymous readers; the slug of og:url still carries it.
+  const fallbackTitle = social && !caption && !short && /(^|\.)facebook\.com$/.test(hostOf(url)) ? slugTitle(meta["og:url"]) : "";
   const kind: Kind = social
     ? (meta["og:type"]?.startsWith("video") ? "video" : "post")
     : meta["og:type"]?.startsWith("video") ? "video"
@@ -58,7 +60,7 @@ export async function extractWeb(url: string): Promise<Digest | null> {
   return {
     url: canonicalize(page.url) ?? url,
     kind,
-    title: firstLine(social ? caption || short : meta["og:title"] ?? meta["twitter:title"] ?? meta["title"] ?? "") || hostOf(url),
+    title: firstLine(social ? caption || short || fallbackTitle : meta["og:title"] ?? meta["twitter:title"] ?? meta["title"] ?? "") || hostOf(url),
     text,
     outlinks: [...new Set([...extractUrls(text), ...(social ? [] : contentLinks(page.body, page.url))])]
       .filter((u) => hostOf(u) !== hostOf(url))
@@ -126,6 +128,17 @@ function contentLinks(html: string, base: string): string[] {
     }
   }
   return out;
+}
+
+/**
+ * The caption a Facebook og:url carries as a slug: ".../videos/1分鐘帶你看完本週-ai-大事/123/" → "1分鐘帶你看完本週 ai 大事".
+ * Only a segment with hyphens or CJK counts; "videos", "reel" and ids do not.
+ */
+export function slugTitle(ogUrl: string | undefined): string {
+  if (!ogUrl || !URL.canParse(ogUrl)) return "";
+  const segments = new URL(ogUrl).pathname.split("/").filter(Boolean).map((p) => { try { return decodeURIComponent(p); } catch { return p; } });
+  const slug = segments.filter((p) => /\p{L}/u.test(p) && /-|[぀-ヿ㐀-鿿가-힯]/u.test(p)).sort((a, b) => b.length - a.length)[0] ?? "";
+  return slug.replace(/-+/g, " ").trim();
 }
 
 export function isLoginWall(url: string): boolean {

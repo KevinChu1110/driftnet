@@ -70,7 +70,7 @@ export function richItems(
       id: item.id,
       name: (s?.name ?? item.title).slice(0, 80),
       url: o.base ? cardLink(o.base, item.id) : s?.primaryUrl || item.url,
-      oneLiner: s?.oneLiner ?? (item.pending ? o.t.queued : ""),
+      oneLiner: s?.oneLiner ?? (item.pending ? (item.flags.includes("needs-page") ? o.t.needsPage : o.t.queued) : ""),
       mark: WORTH_MARK[item.worth],
       worthName: o.t.rich.worthName[item.worth],
       folder: o.label(item.category),

@@ -1,7 +1,7 @@
 import { BlockedUrl, extract, isSocial } from "./extractors/index.ts";
 import { findGithubRepo, matchGithub } from "./extractors/github.ts";
 import { safeFetch } from "./extractors/net.ts";
-import { enrichFromVideo, type VideoDeps } from "./extractors/video.ts";
+import { enrichFromVideo, substance, type VideoDeps } from "./extractors/video.ts";
 import { normalizeMedia } from "./media.ts";
 import { guard } from "./guard.ts";
 import type { Judge } from "./judge/index.ts";
@@ -228,7 +228,12 @@ export class Pipeline {
     const worthReading = judgement ? judgement.worth !== "skip" : true;
     // A video nobody could read at all (no captions, OCR, speech, watch or frames) is not worth a model call that
     // could only guess from a title: it stays pending, flagged "needs-transcript", for an agent with video tools.
-    if (this.opts.summarizer && worthReading && !distrusted && !flags.includes("injection") && !video.needsTranscript) {
+    // The same for a social post the anonymous fetch could not see (a login wall, or the empty shell Facebook serves
+    // a busy address) with no browser capture, video text or chat note to go on: a model could only answer "skip".
+    // It stays pending, flagged "needs-page", for the extension or an agent with a browser; a later share retries.
+    const needsPage = !video.needsTranscript && !video.flags.length && isSocial(digest.url) && !substance(digest.text) && !cleanedNote.text?.trim();
+    if (needsPage) flags.push("needs-page");
+    if (this.opts.summarizer && worthReading && !distrusted && !flags.includes("injection") && !video.needsTranscript && !needsPage) {
       const r = await this.opts.summarizer.summarize(
         digest, cleanedNote.text, judgement ? undefined : this.opts.categories, video.attachments,
       );

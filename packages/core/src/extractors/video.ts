@@ -82,7 +82,8 @@ export function isVideoUrl(url: string): boolean {
   if (hostIs(host, "youtube.com")) return /^\/(shorts\/[\w-]+|watch|live\/[\w-]+)/.test(path);
   if (host === "youtu.be") return path.length > 1;
   if (hostIs(host, "instagram.com")) return /^\/(?:[\w.]+\/)?(reels?|p|tv)\/[\w-]+/.test(path);
-  if (hostIs(host, "facebook.com")) return /^\/(reels?\/|watch|share\/(v|r)\/|.+\/videos\/|video\.php|videos\/)/.test(path);
+  // share/<id> is any post, video or not: behind a login wall its real address is never seen, so yt-dlp gets to look (a photo costs one quick "unsupported").
+  if (hostIs(host, "facebook.com")) return /^\/(reels?\/|watch|share\/(v|r)\/|share\/[\w-]+\/?$|.+\/videos\/|video\.php|videos\/)/.test(path);
   if (host === "fb.watch") return true;
   if (hostIs(host, "threads.net", "threads.com")) return /\/post\//.test(path);
   if (hostIs(host, "tiktok.com")) return /^\/(@[^/]+\/video\/|t\/|v\/|embed\/)/.test(path) || host.startsWith("vm.") || host.startsWith("vt.");
@@ -101,11 +102,15 @@ export function substance(text: string): string {
 
 export const isThin = (text: string): boolean => estimateTokens(substance(text)) < THIN_TOKENS;
 
-/** The decision, without any I/O: should this digest be read from its video? */
+/**
+ * The decision, without any I/O: should this digest be read from its video? A thin page always; a YouTube
+ * page always too, because its description rarely says what the video says (its captions are one metadata
+ * request away, and a page that is not thin stops after them: no download, no OCR, no speech).
+ */
 export function wantsVideo(digest: Pick<Digest, "kind" | "url" | "text">, env: NodeJS.ProcessEnv = process.env): boolean {
   if (videoMode(env) === "off") return false;
   if (digest.kind !== "video" && digest.kind !== "post") return false;
-  return isVideoUrl(digest.url) && isThin(digest.text);
+  return isVideoUrl(digest.url) && (isThin(digest.text) || youtubeWatchUrl(digest.url) !== undefined);
 }
 
 // --- tools -------------------------------------------------------------------------------------
@@ -351,6 +356,8 @@ export interface VideoReading {
   attachments: Attachment[];
   /** yt-dlp was started for this link (so an empty result means "could not read it", not "no tools"). */
   ran: boolean;
+  /** Why a step found nothing, when a tool said so (yt-dlp's last line: a 429, a login wall), for the log. */
+  reason?: string;
 }
 
 /** https://www.youtube.com/watch?v=ID for any YouTube link shape (watch, shorts, live, youtu.be), else undefined. */
@@ -389,8 +396,48 @@ export function pickDistinctFrames(thumbs: Uint8Array, max = MAX_VISION_FRAMES):
   return kept.length <= max ? kept : Array.from({ length: max }, (_, k) => kept[Math.floor((k * kept.length) / max)]!);
 }
 
-/** Exact languages plus each video's own auto-caption language; never the machine-translated "zh-Hans-en" kind (slow, and YouTube answers 429). */
-const SUB_LANGS = "en,.*-orig,zh-Hant,zh-Hans,zh-TW,zh-CN,zh,ja,ko,es,fr,de,pt,id,th,vi";
+/** Subtitle languages worth reading when the video's own language has none, in order. */
+const SUB_PREFERRED = ["en", "zh-Hant", "zh-TW", "zh-Hans", "zh-CN", "zh", "ja", "ko", "es", "fr", "de", "pt", "id", "th", "vi"];
+
+/** What yt-dlp's info.json says about a video; everything is optional and untrusted. */
+export interface VideoInfo {
+  title?: unknown; description?: unknown; duration?: unknown; language?: unknown; subtitles?: unknown; automatic_captions?: unknown;
+}
+
+/**
+ * The one subtitle track to fetch: a track written by a person, in the video's own language or the first preferred
+ * one; else the untranslated auto-caption ("xx-orig"), else an auto-caption in a preferred language. One track,
+ * because YouTube lists 150+ machine translations and answers 429 when several are asked for at once.
+ */
+export function pickSubtitleTrack(info: VideoInfo): { lang: string; auto: boolean } | undefined {
+  const keys = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v as object) : []);
+  const own = typeof info.language === "string" && info.language.trim() ? info.language.trim() : undefined;
+  const wanted = [...new Set([...(own ? [own] : []), ...SUB_PREFERRED])];
+  const find = (have: string[], want: string) => have.find((k) => k.toLowerCase() === want.toLowerCase() || k.toLowerCase().startsWith(`${want.toLowerCase()}-`));
+  const human = keys(info.subtitles).filter((k) => !/-orig$/.test(k));
+  for (const w of wanted) {
+    const k = find(human, w);
+    if (k) return { lang: k, auto: false };
+  }
+  const auto = keys(info.automatic_captions);
+  const orig = auto.find((k) => /-orig$/.test(k));
+  if (orig) return { lang: orig, auto: true };
+  for (const w of wanted) {
+    const k = auto.find((x) => x.toLowerCase() === w.toLowerCase());
+    if (k) return { lang: k, auto: true };
+  }
+  return undefined;
+}
+
+/** "119K views · 2.4K reactions | caption…" (how Facebook titles a reel) → the caption's first line, at most 120 characters. */
+export function videoTitle(raw: string): string {
+  const line = raw.replace(/^[^|\n]*(?:views|觀看|reactions|心情)[^|\n]*\|\s*/i, "").split("\n")[0]!.trim();
+  return line.length > 120 ? line.slice(0, 117) + "…" : line;
+}
+
+const lastLine = (s: string) => s.trim().split("\n").map((l) => l.trim()).filter(Boolean).pop()?.slice(0, 200) ?? "";
+const HAS_CJK = /[぀-ヿ㐀-鿿가-힯]/;
+
 const FILTER_SCALE = `fps=1/${FRAME_EVERY_SECONDS},scale='min(960,iw)':-2`;
 const VISION_SCALE = `fps=1/${FRAME_EVERY_SECONDS},scale='min(${VISION_WIDTH},iw)':-2`;
 const THUMB_SCALE = `fps=1/${FRAME_EVERY_SECONDS},scale=8:8:flags=area,format=gray`;
@@ -410,53 +457,72 @@ export async function readVideo(url: string, page: string, dir: string, deps: Re
   const wantVision = framesMode(deps.env) === "vision" && !!media.images && !!tools.ffmpeg;
   const ffArgs = tools.ffmpeg ? ["--ffmpeg-location", tools.ffmpeg] : [];
   const have = () => estimateTokens(substance(page)) + reading.sections.reduce((n, s) => n + estimateTokens(s.text), 0);
-  const base = ["--ignore-config", "--no-playlist", "--no-warnings", "--no-progress", "--socket-timeout", "15", "--retries", "1"];
+  // No --no-warnings: with --ignore-errors a refused subtitle or a login wall is reported as a warning, and that line is the reason we log.
+  const base = ["--ignore-config", "--no-playlist", "--no-progress", "--socket-timeout", "15", "--retries", "1"];
+  const out = ["-o", join(dir, "meta.%(ext)s"), "--", url];
 
-  // 1. captions, title, description: no download.
-  const meta = await spawn(ytdlp, [
-    ...base, "--ignore-errors", "--skip-download", "--write-info-json", "--write-subs", "--write-auto-subs",
-    "--sub-langs", SUB_LANGS, "--sub-format", "vtt/srt/best", "-o", join(dir, "meta.%(ext)s"), "--", url,
-  ], { cwd: dir, env, timeoutMs: TIMEOUTS.captions });
+  // 1. title, description, duration and the list of subtitle tracks: no download, one request.
+  const meta = await spawn(ytdlp, [...base, "--ignore-errors", "--skip-download", "--write-info-json", ...out], { cwd: dir, env, timeoutMs: TIMEOUTS.captions });
   const infoPath = join(dir, "meta.info.json");
-  let info: { title?: unknown; description?: unknown } | undefined;
+  let info: VideoInfo | undefined;
   try {
     info = JSON.parse(readFileSync(infoPath, "utf8"));
   } catch {
     // no info: yt-dlp could not read this link
   }
-  if (!info && !meta.timedOut && meta.code !== 0) return reading;
-  const title = typeof info?.title === "string" ? info.title.trim() : "";
+  if (!info && !meta.timedOut && meta.code !== 0) {
+    reading.reason = lastLine(meta.stderr) || `yt-dlp exited ${meta.code}`;
+    // Not a video at all (a photo post behind a share link): nothing for a transcript to be of.
+    if (/Unsupported URL|There is no video|is not a video/i.test(meta.stderr)) reading.ran = false;
+    return reading;
+  }
+  const title = typeof info?.title === "string" ? videoTitle(info.title) : "";
   const description = typeof info?.description === "string" ? info.description.trim() : "";
+  const duration = typeof info?.duration === "number" && info.duration > 0 ? info.duration : undefined;
   if (title) reading.title = title;
   const pageKey = norm(page);
   if (description && estimateTokens(substance(description)) >= 5 && !(pageKey && pageKey.includes(norm(description).slice(0, 40)))) {
     reading.sections.push({ label: "description", text: description });
   }
-  const subFiles = readdirSync(dir).filter((f) => /^meta\..+\.(vtt|srt)$/.test(f)).sort((a, b) => Number(/-orig\./.test(b)) - Number(/-orig\./.test(a)) || a.localeCompare(b));
-  if (subFiles.length) {
-    const captions = parseSubtitles(readFileSync(join(dir, subFiles[0]!), "utf8"));
+  // 1b. one subtitle track, chosen from that list; --load-info-json spares the page a second read.
+  const track = info ? pickSubtitleTrack(info) : undefined;
+  if (track) {
+    const subs = await spawn(ytdlp, [
+      ...base, "--ignore-errors", "--skip-download", "--load-info-json", infoPath, track.auto ? "--write-auto-subs" : "--write-subs",
+      "--sub-langs", track.lang, "--sub-format", "vtt/srt/best", ...out,
+    ], { cwd: dir, env, timeoutMs: TIMEOUTS.captions });
+    const subFile = readdirSync(dir).find((f) => /^meta\..+\.(vtt|srt)$/.test(f));
+    const captions = subFile ? parseSubtitles(readFileSync(join(dir, subFile), "utf8")) : "";
     if (captions) {
       reading.sections.push({ label: "captions", text: captions.slice(0, 4000) });
       reading.steps.push("captions");
+    } else {
+      reading.reason = lastLine(subs.stderr) || `no ${track.lang} subtitles came back`;
     }
   }
-  if (have() >= ENOUGH_TOKENS || videoMode(deps.env) === "captions") return reading;
+  // A page that is not thin (a YouTube description) only wanted its captions checked.
+  if (have() >= ENOUGH_TOKENS || videoMode(deps.env) === "captions" || !isThin(page)) return reading;
+  const cjk = HAS_CJK.test(page) || HAS_CJK.test(title) || HAS_CJK.test(description);
   const localTools = !!tools.tesseract || !!tools.whisper;
   const inlineWatch = wantWatch && !ytUrl;
   // A downloaded file is only needed by OCR, speech, frames, or an inline (non-YouTube) watch.
   if (!tools.ffmpeg || !(localTools || wantVision || inlineWatch)) return withWatch(reading, ytUrl, undefined, wantWatch, wantVision, have);
 
   // 2. the video itself, lowest quality that is still legible (>= 360p when offered), capped in size and length.
-  await spawn(ytdlp, [
-    ...base, ...ffArgs, "-f", "worst[height>=360]/worst", "--max-filesize", String(MAX_BYTES),
-    "--download-sections", `*0-${MAX_SECONDS}`, "-o", join(dir, "video.%(ext)s"), "--", url,
+  // The length cap makes yt-dlp stream through ffmpeg, which is slow; a clip known to be short is fetched whole.
+  const sections = duration !== undefined && duration <= MAX_SECONDS ? [] : ["--download-sections", `*0-${MAX_SECONDS}`];
+  const dl = await spawn(ytdlp, [
+    ...base, ...ffArgs, "-f", "worst[height>=360]/worst", "--max-filesize", String(MAX_BYTES), ...sections, "-o", join(dir, "video.%(ext)s"), "--", url,
   ], { cwd: dir, env, timeoutMs: TIMEOUTS.download });
   const found = readdirSync(dir).map((f) => join(dir, f)).find((f) => /\/video\.[^/]+$/.test(f) && !/\.(part|ytdl|json)$/.test(f));
   const video = found && statSync(found).size <= MAX_BYTES ? found : undefined;
-  if (!video) return withWatch(reading, ytUrl, undefined, wantWatch, wantVision, have);
+  if (!video) {
+    reading.reason ??= dl.timedOut ? `download took longer than ${TIMEOUTS.download / 1000} s` : lastLine(dl.stderr) || "no video file came back";
+    return withWatch(reading, ytUrl, undefined, wantWatch, wantVision, have);
+  }
 
   if (tools.tesseract) {
-    const ocr = await onScreenText(video, dir, deps, env, () => have());
+    const ocr = await onScreenText(video, dir, deps, env, () => have(), cjk);
     if (ocr) {
       reading.sections.push({ label: "on-screen text", text: ocr });
       reading.steps.push("ocr");
@@ -546,9 +612,18 @@ export const resetVideoCaches = (): void => { langCache = new Map(); };
 
 type Ctx = Required<Pick<VideoDeps, "spawn" | "tools" | "env">>;
 
-/** ~1 frame every 2 s (max 40, scaled down) -> tesseract, repeated lines dropped. */
-async function onScreenText(video: string, dir: string, ctx: Ctx, env: NodeJS.ProcessEnv, have: () => number): Promise<string> {
+/**
+ * ~1 frame every 2 s (max 40, scaled down) -> tesseract, repeated lines dropped. A Chinese or Japanese clip read
+ * with an English-only tesseract comes back as pages of noise that count as "enough text" and keep speech from
+ * running, so when the source is CJK and no CJK language is installed, OCR is skipped.
+ */
+async function onScreenText(video: string, dir: string, ctx: Ctx, env: NodeJS.ProcessEnv, have: () => number, cjk: boolean): Promise<string> {
   const { spawn, tools } = ctx;
+  const langs = await ocrLanguages(tools.tesseract!, spawn, dir, env);
+  if (cjk && !langs?.includes("chi_")) {
+    console.warn("[driftnet] video: on-screen text skipped, tesseract has no chi_tra/chi_sim for a Chinese clip");
+    return "";
+  }
   const framesDir = join(dir, "frames");
   mkdirSync(framesDir);
   await spawn(tools.ffmpeg!, [
@@ -557,7 +632,6 @@ async function onScreenText(video: string, dir: string, ctx: Ctx, env: NodeJS.Pr
   ], { cwd: dir, env, timeoutMs: TIMEOUTS.frames });
   const frames = readdirSync(framesDir).filter((f) => f.endsWith(".png")).sort().slice(0, MAX_FRAMES);
   if (!frames.length) return "";
-  const langs = await ocrLanguages(tools.tesseract!, spawn, dir, env);
   const deadline = Date.now() + TIMEOUTS.ocr;
   const chunks: string[] = [];
   for (const f of frames) {
@@ -638,6 +712,7 @@ export async function enrichFromVideo(digest: Digest, deps: VideoDeps = {}): Pro
       const reading = await readVideo(digest.url, digest.text, dir, { spawn, tools, env, ...(deps.media ? { media: deps.media } : {}) });
       const extra = composeSections(reading.sections);
       if (!extra && !reading.attachments.length) {
+        if (reading.ran) console.warn(`[driftnet] video: nothing to read in ${digest.url}${reading.reason ? ` (${reading.reason})` : ""}`);
         return reading.ran ? { ...none, flags: ["needs-transcript"], needsTranscript: true } : none;
       }
       const text = !extra ? digest.text : digest.text.trim() ? `${digest.text.trim()}\n\n${extra}` : extra;

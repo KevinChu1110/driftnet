@@ -39,7 +39,7 @@ export function agentBrief(dn: Driftnet, leased: number, env: NodeJS.ProcessEnv 
   ].join("\n");
 }
 
-/** One leased item as an agent sees it. `hint` is set only when driftnet already tried the video and found nothing to read. */
+/** One leased item as an agent sees it. `hint` is set only when driftnet already tried (the video, or a login-walled post) and found nothing to read. */
 export function leaseRow(dn: Driftnet, i: Item) {
   return {
     id: i.id,
@@ -47,7 +47,7 @@ export function leaseRow(dn: Driftnet, i: Item) {
     title: i.title,
     kind: i.kind,
     category_guess: i.category,
-    ...(i.flags.includes("needs-transcript") ? { hint: "video: needs a transcript" } : {}),
+    ...(i.flags.includes("needs-transcript") ? { hint: "video: needs a transcript" } : i.flags.includes("needs-page") ? { hint: "post: needs the page (open it logged in)" } : {}),
     shared_with: dn.store.notes(i.id),
   };
 }

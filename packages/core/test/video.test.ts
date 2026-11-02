@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import {
   SECTIONS_CAP, THIN_TOKENS, TIMEOUTS, assertPublicVideoUrl, composeSections, dedupeLines, defaultSpawn, enrichFromVideo,
-  isThin, isVideoUrl, parseSubtitles, resetVideoCaches, scrubbedEnv, videoTools, wantsVideo,
+  isThin, isVideoUrl, parseSubtitles, pickSubtitleTrack, resetVideoCaches, scrubbedEnv, videoTitle, videoTools, wantsVideo,
   type RunOptions, type RunResult, type SpawnFn, type VideoTools,
 } from "../src/extractors/video.ts";
 import type { Digest } from "../src/types.ts";
@@ -22,6 +22,8 @@ interface Script {
   captions?: string; info?: Record<string, unknown>; video?: boolean; ocr?: string[]; speech?: string;
   /** Step name whose call never finishes in time. */
   timeoutOn?: "captions" | "download" | "frames" | "ocr" | "speech";
+  /** yt-dlp answers "Unsupported URL" (a photo post): not a video. */
+  unsupported?: boolean;
   tmpDirs?: string[];
 }
 
@@ -34,12 +36,19 @@ function fake(script: Script): { spawn: SpawnFn; calls: Call[] } {
     script.tmpDirs?.push(opts.cwd);
     const timedOut = (step: string): RunResult | undefined => (script.timeoutOn === step ? { code: null, stdout: "", stderr: "", timedOut: true } : undefined);
     if (bin.endsWith("yt-dlp")) {
+      if (args.includes("--load-info-json")) {
+        // The second, subtitle-only call: one language, as the info listed it.
+        const lang = args[args.indexOf("--sub-langs") + 1]!;
+        if (script.captions) writeFileSync(join(opts.cwd, `meta.${lang}.vtt`), script.captions);
+        return ok();
+      }
       if (args.includes("--skip-download")) {
         const t = timedOut("captions");
         if (t) return t;
-        if (script.info) writeFileSync(join(opts.cwd, "meta.info.json"), JSON.stringify(script.info));
-        if (script.captions) writeFileSync(join(opts.cwd, "meta.en.vtt"), script.captions);
-        return script.info || script.captions ? ok() : { code: 1, stdout: "", stderr: "unsupported", timedOut: false };
+        // A clip with captions lists an English track, as yt-dlp's info.json would.
+        const info = script.info && script.captions && !script.info.subtitles ? { ...script.info, subtitles: { en: [{ ext: "vtt" }] } } : script.info;
+        if (info) writeFileSync(join(opts.cwd, "meta.info.json"), JSON.stringify(info));
+        return info ? ok() : { code: 1, stdout: "", stderr: script.unsupported ? "ERROR: Unsupported URL: https://x" : "ERROR: [facebook] login required", timedOut: false };
       }
       const t = timedOut("download");
       if (t) return t;
@@ -153,7 +162,46 @@ test("captions are enough: no download, no OCR, no whisper", async () => {
   assert.match(r.digest.text, /^\[captions\]\nword0 /);
   assert.deepEqual(r.flags, ["video-read", "video-captions"]);
   assert.equal(r.digest.title, "Cursor agent demo", "an untitled page takes the video's title");
-  assert.deepEqual(r.calls.map((c) => c.bin), ["/t/yt-dlp"]);
+  assert.deepEqual(r.calls.map((c) => c.bin), ["/t/yt-dlp", "/t/yt-dlp"], "info, then the one subtitle track");
+  const subs = r.calls[1]!.args;
+  assert.ok(subs.includes("--load-info-json") && subs.includes("--write-subs") && !subs.includes("--write-auto-subs"), "a track written by a person is fetched as such");
+  assert.equal(subs[subs.indexOf("--sub-langs") + 1], "en", "one language, never a list");
+});
+
+test("the subtitle track: the video's own language first, a person's track before auto, the untranslated auto track before translations", () => {
+  assert.deepEqual(pickSubtitleTrack({ language: "zh-TW", subtitles: { en: [], "zh-TW": [] }, automatic_captions: { "zh-TW-orig": [] } }), { lang: "zh-TW", auto: false });
+  assert.deepEqual(pickSubtitleTrack({ language: "ja", subtitles: { "en-US": [] } }), { lang: "en-US", auto: false });
+  assert.deepEqual(pickSubtitleTrack({ language: "es", subtitles: {}, automatic_captions: { en: [], de: [], "es-orig": [], es: [] } }), { lang: "es-orig", auto: true });
+  assert.deepEqual(pickSubtitleTrack({ automatic_captions: { de: [], en: [] } }), { lang: "en", auto: true });
+  assert.equal(pickSubtitleTrack({ subtitles: {}, automatic_captions: {} }), undefined, "nothing to fetch: no second call");
+  assert.equal(pickSubtitleTrack({ subtitles: ["bad"], automatic_captions: 3 }), undefined);
+});
+
+test("a Facebook title loses its view counts and keeps its first line; a short clip is fetched whole", async () => {
+  assert.equal(videoTitle("119K views · 2.4K reactions | 1分鐘帶你看完｜本週 AI 大事\n1. 龍蝦"), "1分鐘帶你看完｜本週 AI 大事");
+  assert.equal(videoTitle("Plain title"), "Plain title");
+  assert.equal(videoTitle("x".repeat(200)).length, 118);
+  const short = await run(digest(), { info: { title: "t", duration: 98 }, video: true, ocr: ["Some words"] });
+  assert.ok(!short.calls[1]!.args.includes("--download-sections"), "98 s: no length cap, so no slow ffmpeg streaming");
+  const long = await run(digest(), { info: { title: "t", duration: 600 }, video: true, ocr: ["Some words"] });
+  assert.equal(long.calls[1]!.args[long.calls[1]!.args.indexOf("--download-sections") + 1], "*0-180");
+});
+
+test("a Chinese clip with an English-only tesseract skips OCR and goes to speech", async () => {
+  const f = fake({ info: { title: "工具介紹", description: "" }, video: true, ocr: ["Lis biiFl Sh SB aACEO AS"], speech: "這個工具可以把 PDF 轉成 Markdown" });
+  const engOnly: SpawnFn = async (bin, args, opts) => (bin.endsWith("tesseract") && args[0] === "--list-langs" ? ok("eng\nosd\n") : f.spawn(bin, args, opts));
+  const r = await enrichFromVideo(digest(), { tools: TOOLS, spawn: engOnly, tmpRoot: mkdtempSync(join(tmpdir(), "dn-video-test-")), resolveHost: publicHost, env: {} });
+  assert.deepEqual(r.flags, ["video-read", "video-speech"]);
+  assert.ok(!f.calls.some((c) => c.bin.endsWith("tesseract") && c.args[0] !== "--list-langs"), "no frame was OCR'd");
+});
+
+test("a YouTube page that is not thin still gets its captions, and nothing more", async () => {
+  const yt = digest({ url: "https://youtube.com/watch?v=abcdefghijk", kind: "video", title: "A talk", text: words(200) });
+  assert.equal(wantsVideo(yt, {}), true);
+  const r = await run(yt, { info: { title: "A talk" }, captions: `WEBVTT\n\n00:00:00.000 --> 00:00:09.000\nwhat the speaker actually says\n`, video: true, ocr: ["never"] });
+  assert.deepEqual(r.flags, ["video-read", "video-captions"]);
+  assert.deepEqual(r.calls.map((c) => c.bin), ["/t/yt-dlp", "/t/yt-dlp"], "no download for a page that already says plenty");
+  assert.equal(r.digest.title, "A talk");
 });
 
 test("thin captions: OCR runs, then speech; steps and sections recorded in order", async () => {
@@ -173,7 +221,7 @@ test("DRIFTNET_VIDEO=captions: thin captions still stop after yt-dlp, no downloa
     ocr: ["Cursor"], speech: "This tool is called Cursor agent.",
   }, { env: { DRIFTNET_VIDEO: "captions" } });
   assert.deepEqual(r.flags, ["video-read", "video-captions"]);
-  assert.deepEqual(r.calls.map((c) => c.bin), ["/t/yt-dlp"]);
+  assert.deepEqual(r.calls.map((c) => c.bin), ["/t/yt-dlp", "/t/yt-dlp"]);
 });
 
 test("plenty of on-screen text skips speech", async () => {
@@ -188,7 +236,7 @@ test("commands are argument arrays: URL after --, size/length/quality caps, per-
   const f = fake({ info: {}, video: true, ocr: ["Some words here"], speech: "spoken words about a tool and what it does for you every day" });
   const tmpRoot = mkdtempSync(join(tmpdir(), "dn-video-test-"));
   await enrichFromVideo(digest({ url: hostile }), { tools: TOOLS, spawn: f.spawn, tmpRoot, resolveHost: publicHost, env: { ...secrets } });
-  const [captions, download, ffFrames, , ocr, ffAudio, whisper] = f.calls;
+  const [captions, download, , ffFrames, ocr, ffAudio, whisper] = f.calls; // the third call lists tesseract's languages
   for (const c of f.calls) {
     assert.ok(Array.isArray(c.args));
     for (const k of ["DRIFTNET_TOKEN", "TYPESAFE_API_KEY", "SLACK_BOT_TOKEN", "ANTHROPIC_API_KEY"]) assert.equal(c.opts.env[k], undefined, `${c.bin} leaks ${k}`);
@@ -230,6 +278,9 @@ test("the temp dir is deleted after success, on a timeout, on a crash and when n
   const none = await run(digest(), {});
   assert.deepEqual(none.flags, ["needs-transcript"], "yt-dlp ran and found nothing: left for an agent");
   assert.deepEqual(left(none.tmpRoot), []);
+  const photo = await run(digest({ url: "https://facebook.com/share/1EBVCuujZF" }), { unsupported: true });
+  assert.deepEqual(photo.flags, [], "a share link that turns out not to be a video is not a video waiting for a transcript");
+  assert.equal(photo.needsTranscript, false);
 });
 
 test("a timed-out download stops the pipeline: nothing downstream runs on a half file", async () => {

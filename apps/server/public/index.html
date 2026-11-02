@@ -1213,7 +1213,7 @@
   // Warnings (injection, hidden characters, low reputation) keep ⚠; "read from video" is good news, not a warning.
   function flagLines(i, t) {
     const flags = i.flags ?? [];
-    const warn = flags.filter((f) => !f.startsWith("video-") && f !== "needs-transcript");
+    const warn = flags.filter((f) => !f.startsWith("video-") && f !== "needs-transcript" && f !== "needs-page");
     const steps = flags.filter((f) => f.startsWith("video-") && f !== "video-read");
     return (warn.length ? `<div class="flag">⚠ ${esc(warn.map((f) => t.flags[f] ?? f).join(", "))}</div>` : "")
       + (flags.includes("video-read") ? `<div class="vflag">🎬 ${esc(t.flags["video-read"])}${steps.length ? ` · ${esc(steps.map((f) => t.flags[f] ?? f).join(", "))}` : ""}</div>` : "");

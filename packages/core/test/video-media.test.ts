@@ -112,10 +112,13 @@ function rig(opts: { media?: MediaSupport; env?: Record<string, string>; tools?:
   const spawn: SpawnFn = async (bin, args, o) => {
     spawned.push({ bin, args });
     if (bin.endsWith("yt-dlp")) {
+      if (args.includes("--load-info-json")) {
+        if (script.captions) writeFileSync(join(o.cwd, "meta.en.vtt"), script.captions);
+        return ok();
+      }
       if (args.includes("--skip-download")) {
         if (script.ytdlpFails) return { code: 1, stdout: "", stderr: "login required", timedOut: false };
-        writeFileSync(join(o.cwd, "meta.info.json"), JSON.stringify({ title: "A clip" }));
-        if (script.captions) writeFileSync(join(o.cwd, "meta.en.vtt"), script.captions);
+        writeFileSync(join(o.cwd, "meta.info.json"), JSON.stringify({ title: "A clip", ...(script.captions ? { subtitles: { en: [{ ext: "vtt" }] } } : {}) }));
         return ok();
       }
       if (script.video !== false) writeFileSync(join(o.cwd, "video.mp4"), Buffer.alloc(script.video ?? 10, 1));
@@ -155,8 +158,8 @@ function rig(opts: { media?: MediaSupport; env?: Record<string, string>; tools?:
     llm.complete = ((orig) => async (r: StructuredRequest<z.ZodType>) => ({ ...((await orig(r)) as object), primary_url: url }) as never)(llm.complete);
     return pipeline.ingest(url, { platform: "t", chatId: "c" });
   };
-  const bins = () => spawned.map((s) => `${s.bin.split("/").pop()}${s.args.includes("--skip-download") ? ":captions" : s.args.some((a) => a.endsWith("v%03d.jpg")) ? ":vision" : s.args.some((a) => a.endsWith("f%03d.png")) ? ":ocr-frames" : ""}`);
-  return { ingest, seen, spawned, bins, store };
+  const bins = () => spawned.map((s) => `${s.bin.split("/").pop()}${s.args.includes("--load-info-json") ? ":subs" : s.args.includes("--skip-download") ? ":captions" : s.args.some((a) => a.endsWith("v%03d.jpg")) ? ":vision" : s.args.some((a) => a.endsWith("f%03d.png")) ? ":ocr-frames" : ""}`);
+  return { ingest, seen, spawned, bins, store, pipeline };
 }
 
 const GEMINI_LIKE: MediaSupport = GEMINI_MEDIA;
@@ -246,7 +249,7 @@ test("vision is not used: flag off, text-only model, enough text already, or a p
   assert.equal(enough.seen[0]!.attachments, undefined);
   const captioned = rig({ media: { images: true }, env: { DRIFTNET_VIDEO_FRAMES: "vision" }, tools, script: { captions: `WEBVTT\n\n00:00:00.000 --> 00:00:09.000\n${long}\n` } });
   await captioned.ingest(REEL);
-  assert.deepEqual(captioned.bins(), ["yt-dlp:captions"], "captions were enough: no download, no frames");
+  assert.deepEqual(captioned.bins(), ["yt-dlp:captions", "yt-dlp:subs"], "captions were enough: no download, no frames");
 });
 
 test("fallback order: captions, then OCR and speech, then watch/vision; watch wins over frames", async () => {
@@ -255,7 +258,7 @@ test("fallback order: captions, then OCR and speech, then watch/vision; watch wi
   const r = rig({ media: GEMINI_LIKE, env, tools, script: { ocr: ["ab"], speech: "" } });
   await r.ingest(YT);
   const b = r.bins();
-  assert.deepEqual(b.filter((x, i) => b.indexOf(x) === i).map((x) => x.split(":")[0] + (x.split(":")[1] ? `:${x.split(":")[1]}` : "")), ["yt-dlp:captions", "yt-dlp", "ffmpeg:ocr-frames", "tesseract", "ffmpeg", "whisper"]);
+  assert.deepEqual(b.filter((x, i) => b.indexOf(x) === i).map((x) => x.split(":")[0] + (x.split(":")[1] ? `:${x.split(":")[1]}` : "")), ["yt-dlp:captions", "yt-dlp", "tesseract", "ffmpeg:ocr-frames", "ffmpeg", "whisper"]);
   assert.ok(!b.includes("ffmpeg:vision"), "watch took it, frames not extracted");
   assert.equal(r.seen[0]!.attachments![0]!.type, "video_url");
   // A model that cannot watch falls through to frames.
@@ -276,12 +279,40 @@ test("queue hint: nothing readable at all means pending with needs-transcript an
   assert.equal(r.store.claimPending("agent:t", 5)[0]!.flags.includes("needs-transcript"), true);
 });
 
-test("no video tools at all: behaves as before (the model summarises what the page says), no hint", async () => {
+test("a login-walled post with nothing to read stays pending with needs-page: no model call, and a note or a capture lifts it", async () => {
+  const PHOTO = "https://facebook.com/photo.php?fbid=1";
+  registerExtractor({ name: "fixture-photo", matches: (x) => x === PHOTO, extract: async (url) => ({ url, kind: "post", title: "facebook.com", text: "", outlinks: [], meta: {} }) });
+  const r = rig({ tools: { ytdlp: "/t/yt-dlp" }, script: { ytdlpFails: true } });
+  const res = await r.ingest(PHOTO);
+  assert.ok(res.item.flags.includes("needs-page"));
+  assert.ok(!res.item.flags.includes("needs-transcript"), "a photo is not a video");
+  assert.equal(res.item.pending, true);
+  assert.equal(res.item.summary, null);
+  assert.equal(r.seen.length, 0, "no model call for a page nobody could see");
+  assert.notEqual(res.item.worth, "skip");
+  // What a person wrote next to the link is something to go on.
+  const noted = rig({ tools: { ytdlp: "/t/yt-dlp" }, script: { ytdlpFails: true } });
+  const withNote = await noted.pipeline.ingest(PHOTO, { platform: "t", chatId: "c", note: "the awesome-short-drama-skills list" });
+  assert.ok(!withNote.item.flags.includes("needs-page"));
+  assert.equal(noted.seen.length, 1);
+  // An ordinary page that says nothing is summarised from its title, as before.
+  const EMPTY = "https://example.com/empty";
+  registerExtractor({ name: "fixture-empty", matches: (x) => x === EMPTY, extract: async (url) => ({ url, kind: "other", title: "Empty", text: "", outlinks: [], meta: {} }) });
+  const plain = rig({});
+  assert.ok(!(await plain.ingest(EMPTY)).item.flags.includes("needs-page"));
+});
+
+test("no video tools at all: the model summarises what the page says (nothing: the post waits for its page), no transcript hint", async () => {
+  const CAPTIONED = "https://instagram.com/reel/Ccaptioned/";
+  registerExtractor({ name: "fixture-captioned", matches: (x) => x === CAPTIONED, extract: async (url) => ({ url, kind: "post", title: "a clip", text: "A tool that turns a sketch into a working web page in one step, free, by @someone", outlinks: [], meta: {} }) });
   const r = rig({ media: GEMINI_LIKE, env: { DRIFTNET_VIDEO: "watch" }, tools: {} });
-  const res = await r.ingest(REEL);
+  const res = await r.ingest(CAPTIONED);
   assert.equal(r.seen.length, 1);
   assert.equal(r.seen[0]!.attachments, undefined);
-  assert.ok(!res.item.flags.includes("needs-transcript"));
+  assert.ok(!res.item.flags.includes("needs-transcript") && !res.item.flags.includes("needs-page"));
+  const blank = await r.ingest(REEL);
+  assert.deepEqual(blank.item.flags, ["needs-page"], "a reel whose page said nothing, with no tools to read it: pending, not guessed");
+  assert.equal(r.seen.length, 1);
 });
 
 test("a model that rejects the attachments gets the text-only request once instead of failing the item", async () => {
