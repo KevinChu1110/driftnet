@@ -22,6 +22,14 @@ export interface Setting {
   shape?: string;
 }
 
+/** An absolute path (POSIX or Windows) whose file name is the tool, with a suffix at most ("whisper-cli", "yt-dlp.exe"). */
+function toolPath(name: string): Pick<Setting, "pattern" | "shape"> {
+  return {
+    pattern: new RegExp(`^(?:/|[a-z]:[\\\\/]).*[\\\\/]${name.replace(/[-.]/g, "\\$&")}[\\w.-]*$`, "i"),
+    shape: `is the full path of ${name} itself, e.g. /opt/homebrew/bin/${name}`,
+  };
+}
+
 export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_LLM_PROVIDER", group: "model", choices: ["", "anthropic", "openai", "gemini", "bedrock", "vertex", "claude-cli", "gemini-cli"] },
   { key: "DRIFTNET_LLM_MODEL", group: "model" },
@@ -60,10 +68,12 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_REPLY_STYLE", group: "chat", choices: ["", "rich", "text"] },
   // Video understanding (captions, on-screen text, speech) with local tools; see README "Reels and shorts".
   { key: "DRIFTNET_VIDEO", group: "rules", choices: ["", "auto", "captions", "watch", "off"] },
-  { key: "DRIFTNET_YTDLP", group: "rules", max: 500 },
-  { key: "DRIFTNET_FFMPEG", group: "rules", max: 500 },
-  { key: "DRIFTNET_TESSERACT", group: "rules", max: 500 },
-  { key: "DRIFTNET_WHISPER", group: "rules", max: 500 },
+  // The full path of the tool itself, nothing else: whoever holds the admin password must not be able to point
+  // driftnet at an arbitrary program (these run on strangers' links, with fixed arguments).
+  { key: "DRIFTNET_YTDLP", group: "rules", max: 500, ...toolPath("yt-dlp") },
+  { key: "DRIFTNET_FFMPEG", group: "rules", max: 500, ...toolPath("ffmpeg") },
+  { key: "DRIFTNET_TESSERACT", group: "rules", max: 500, ...toolPath("tesseract") },
+  { key: "DRIFTNET_WHISPER", group: "rules", max: 500, ...toolPath("whisper") },
   // Cloud providers (bedrock, vertex) and the rules judge. Keys are write-only like the other secrets;
   // the credentials setting is a file path, never the key itself.
   { key: "DRIFTNET_LLM_REGION", group: "model", max: 60 },

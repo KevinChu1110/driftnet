@@ -47,6 +47,15 @@ test("refused: unknown keys, environment-owned keys, bad choices, line breaks, b
   ]) assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
 });
 
+test("a video tool setting must be the full path of that tool, not any program", () => {
+  const { settings } = setup();
+  settings.update({ DRIFTNET_YTDLP: "/opt/homebrew/bin/yt-dlp", DRIFTNET_WHISPER: "/usr/local/bin/whisper-cli", DRIFTNET_FFMPEG: "C:\\tools\\ffmpeg.exe", DRIFTNET_TESSERACT: "" });
+  for (const bad of [
+    { DRIFTNET_YTDLP: "/bin/sh" }, { DRIFTNET_YTDLP: "yt-dlp" }, { DRIFTNET_TESSERACT: "/usr/bin/python3" },
+    { DRIFTNET_FFMPEG: "/tmp/ffmpeg/../../bin/sh" }, { DRIFTNET_WHISPER: "/usr/bin/env" }, { DRIFTNET_YTDLP: "/opt/yt-dlp/" },
+  ]) assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
+});
+
 test("the webhook URL is masked like a key and must be http(s)", () => {
   const { settings } = setup();
   settings.update({ DRIFTNET_WEBHOOK_URL: "https://n8n.example/hook/abc123", DRIFTNET_WEBHOOK_SECRET: "s" });
