@@ -779,6 +779,7 @@
       removed: (n) => `“${n}” moved to the trash`, restored: (n) => `“${n}” restored`, faved: (n) => `“${n}” added to favorites`,
       undo: "Undo", tokenPrompt: "This catalogue is private. Enter the admin password, or a read-only share key to just look.", tokenSave: "Open",
       tokenToEdit: "You're viewing with a read-only link. To change things, enter the admin password once.", back: "Back",
+      tokenForOne: "This link opens one card. For the rest of the catalogue, enter the admin password or a read-only share key.",
       failed: "Couldn't save — check your connection.", menu: "Menu", close: "Close menu", showing: "Showing:",
       folders: "Folders", newFolder: "New folder", newSub: "New folder inside", editFolder: "Edit folder", folderName: "Name",
       folderDesc: "What goes here? (driftnet's AI reads this to sort new links)", folderParent: "Inside", topLevel: "— Top level —",
@@ -1001,6 +1002,7 @@
       removed: (n) => `已將「${n}」移到垃圾桶`, restored: (n) => `已還原「${n}」`, faved: (n) => `已將「${n}」加入最愛`,
       undo: "復原", tokenPrompt: "這份清單是私人的。請輸入管理密碼；只想瀏覽的話，輸入唯讀分享碼也可以。", tokenSave: "開啟",
       tokenToEdit: "你是用唯讀連結在瀏覽。要修改的話，請輸入一次管理密碼。", back: "返回",
+      tokenForOne: "這個連結只開這一張卡片。要看整份清單，請輸入管理密碼或唯讀分享碼。",
       failed: "沒有存成功，請檢查網路。", menu: "選單", close: "關閉選單", showing: "目前顯示：",
       folders: "資料夾", newFolder: "新資料夾", newSub: "在裡面新增資料夾", editFolder: "編輯資料夾", folderName: "名稱",
       folderDesc: "放什麼？（driftnet 的 AI 會照這段說明把新連結分進來）", folderParent: "放在", topLevel: "— 最上層 —",
@@ -1276,6 +1278,16 @@
     u.searchParams.delete("key");
     history.replaceState(null, "", u.pathname + u.search + u.hash);
   })();
+  // A card's own signed link (?card=<id>&s=…, what a chat reply carries on a private catalogue) opens that one
+  // card without any key. The signature leaves the address bar at once; with a key or password the page is just the page.
+  const cardOnly = (() => {
+    const u = new URL(location.href);
+    const id = Number(u.searchParams.get("card")), s = u.searchParams.get("s");
+    if (!Number.isInteger(id) || id < 1 || !s) return null;
+    u.searchParams.delete("card"); u.searchParams.delete("s");
+    history.replaceState(null, "", u.pathname + u.search + `#item-${id}`);
+    return { id, s };
+  })();
 
   async function api(path, init = {}, meta = null) {
     // Reads work with the admin password or the share key; writes go through other helpers with the password.
@@ -1319,6 +1331,21 @@
       store.set(admin?.ok ? "driftnet-token" : "driftnet-key", v);
       (then ?? load)();
     };
+  }
+
+  /** The one card a signed link opens, over the sign-in form: the rest of the catalogue still needs a key. */
+  async function openSignedCard() {
+    const res = await fetch(`/api/items/${cardOnly.id}?s=${encodeURIComponent(cardOnly.s)}`).catch(() => null);
+    if (!res?.ok) return askToken();
+    const item = await res.json();
+    role = "reader";
+    document.body.classList.add("readonly");
+    $("lock").hidden = true;
+    extraItems.set(item.id, item);
+    relatedCache.set(item.id, []);
+    askToken();
+    $("list").querySelector("#token-form p").textContent = T().tokenForOne;
+    openModal(item.id, "link");
   }
 
   function applyLocale() {
@@ -1406,7 +1433,7 @@
       [stats, ui, folders, notes] = await Promise.all([api("/api/stats"), api("/api/ui"), api("/api/folders"), api("/api/notes")]);
       stats.notes = notes.length;
     } catch (err) {
-      if (err.unauthorized) return askToken();
+      if (err.unauthorized) return cardOnly ? openSignedCard() : askToken();
       throw err;
     }
     catLabels = ui.categories;

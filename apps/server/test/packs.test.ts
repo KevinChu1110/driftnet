@@ -263,3 +263,26 @@ test("import from a link: fetched through the guarded fetch, must be a pack, htt
   const blocked = await call("POST", "/api/import", auth, { url: "http://127.0.0.1:9/pack" });
   assert.equal(blocked.status, 400);
 });
+
+test("a card's signed link opens that card alone: no key, no neighbours, nothing else", async () => {
+  const { shareLinks } = await import("../src/access.ts");
+  const { linkTo } = await import("@driftnet/core");
+  const env = { DRIFTNET_ACCESS: "private", DRIFTNET_PUBLIC_URL: "https://dn.example.com" };
+  const { call, dn, readAuth } = await start(env);
+  seed(dn);
+  const [a, b] = dn.store.list({ limit: 2 });
+  const link = new URL(linkTo(shareLinks({ ...env, DRIFTNET_READ_KEY: READ_KEY }, dn.store), a!.id)!);
+  assert.equal(link.searchParams.get("card"), String(a!.id));
+  assert.ok(!link.href.includes(READ_KEY));
+  const sig = link.searchParams.get("s")!;
+  const one = await call("GET", `/api/items/${a!.id}?s=${sig}`);
+  assert.equal(one.status, 200);
+  assert.equal(one.json.id, a!.id);
+  assert.deepEqual(one.json.related, [], "the rest of the catalogue stays out of a signed read");
+  assert.ok((await call("GET", `/api/items/${a!.id}`, readAuth)).json.related !== undefined, "a reader with the key gets neighbours");
+  assert.equal((await call("GET", `/api/items/${a!.id}`)).status, 401, "no signature, no card");
+  assert.equal((await call("GET", `/api/items/${b!.id}?s=${sig}`)).status, 401, "another card");
+  assert.equal((await call("GET", `/api/items/${a!.id}?s=${sig.slice(0, -1)}A`)).status, 401, "tampered");
+  assert.equal((await call("GET", `/api/items?s=${sig}`)).status, 401, "not the list");
+  assert.equal((await call("GET", `/api/items/${a!.id}/history?s=${sig}`)).status, 401, "not its history");
+});

@@ -60,15 +60,24 @@ test("the tunnel reads cloudflared's URL, and stops with it", async () => {
   assert.equal(new Tunnel(8787, join(dir, "missing")).available(), false);
 });
 
-test("card links carry the share key only when reading is private", async () => {
-  const { shareBase } = await import("../src/access.ts");
-  const { cardLink } = await import("@driftnet/core");
+test("card links: the plain address in public, a per-card signature in private, never the share key", async () => {
+  const { shareBase, shareLinks } = await import("../src/access.ts");
+  const { cardLink, cardSigOk, createDriftnet, linkTo } = await import("@driftnet/core");
+  const dn = createDriftnet({ DRIFTNET_HOME: mkdtempSync(join(tmpdir(), "driftnet-links-")), DRIFTNET_JUDGE: "off" });
   assert.equal(shareBase({}), undefined);
   assert.equal(shareBase({ DRIFTNET_PUBLIC_URL: "https://dn.example/" }), "https://dn.example");
-  assert.equal(shareBase({ ...env, DRIFTNET_PUBLIC_URL: "https://dn.example" }), `https://dn.example/?key=${env.DRIFTNET_READ_KEY}`);
-  assert.equal(shareBase({ ...env, DRIFTNET_PUBLIC_URL: "https://dn.example", DRIFTNET_TUNNEL_URL: "https://t.trycloudflare.com" }), `https://t.trycloudflare.com/?key=${env.DRIFTNET_READ_KEY}`);
+  assert.equal(shareBase({ ...env, DRIFTNET_PUBLIC_URL: "https://dn.example", DRIFTNET_TUNNEL_URL: "https://t.trycloudflare.com" }), "https://t.trycloudflare.com");
+  assert.equal(shareLinks({}, dn.store), undefined);
+  assert.equal(linkTo(shareLinks({ DRIFTNET_PUBLIC_URL: "https://dn.example" }, dn.store), 6), "https://dn.example/#item-6");
+  const signed = linkTo(shareLinks({ ...env, DRIFTNET_PUBLIC_URL: "https://dn.example" }, dn.store), 6)!;
+  const u = new URL(signed);
+  assert.equal(u.origin + u.pathname + u.hash, "https://dn.example/#item-6");
+  assert.equal(u.searchParams.get("card"), "6");
+  assert.ok(cardSigOk(dn.store, 6, u.searchParams.get("s")), "signed for that card");
+  assert.ok(!cardSigOk(dn.store, 7, u.searchParams.get("s")), "and no other");
+  assert.ok(!signed.includes(env.DRIFTNET_READ_KEY), "the key stays out of chats");
   assert.equal(cardLink("https://dn.example", 6), "https://dn.example/#item-6");
-  assert.equal(cardLink("https://dn.example/?key=abc", 6), "https://dn.example/?key=abc#item-6");
+  assert.equal(cardLink("https://dn.example/?key=abc", 6), "https://dn.example/?key=abc#item-6", "an old key link still opens");
 });
 
 test("this machine on purpose is trusted; another site's page or a forwarded request is not", async () => {

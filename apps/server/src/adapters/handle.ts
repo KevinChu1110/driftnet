@@ -1,5 +1,5 @@
 import { extractUrls, messages, renderLink, renderText, type Driftnet, type ShareContext } from "@driftnet/core";
-import { shareBase } from "../access.ts";
+import { shareLinks } from "../access.ts";
 import { itemIds, replyStyle, richItems, type RichReply } from "./rich.ts";
 
 /** "👍 12", "👎#12 太舊了", "+#12", "-#12 wrong tool" — a bare "+1 for this" or "-3 degrees" is just chat. */
@@ -34,7 +34,7 @@ export async function handleChat(
 
   if (extractUrls(text).length === 0) return null;
   const results = await dn.pipeline.ingestMessage(text, ctx);
-  const base = shareBase(process.env);
+  const base = shareLinks(process.env, dn.store);
   // DRIFTNET_REPLY: link (one line + where to read it), full (the summary in chat), off.
   const mode = process.env.DRIFTNET_REPLY ?? "link";
   if (mode === "off" || !results.length) return null;

@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
-import { hashToken, type Store } from "@driftnet/core";
+import { cardLink, cardSig, hashToken, type CardLinker, type Store } from "@driftnet/core";
 
 /**
  * Who may do what. Two keys, both read from the environment on every request
@@ -177,16 +177,21 @@ export function role(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: Store
   return canRead(req, env, store) ? "reader" : "none";
 }
 
-/**
- * Where links to cards point: the public address, plus the read-only share key
- * when reading is private, so a link sent to a phone opens without a password.
- * The page stores the key and removes it from the address bar.
- */
+/** The public address links to cards start from (the tunnel while one runs), without any key. */
 export function shareBase(env: NodeJS.ProcessEnv): string | undefined {
-  const base = (env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL)?.replace(/\/$/, "");
+  return (env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL)?.replace(/\/$/, "") || undefined;
+}
+
+/**
+ * Where links to cards point. On a public catalogue the plain address; on a private
+ * one each card's link carries its own signature (`/?card=<id>&s=…`), which opens
+ * that card and nothing else. The share key never goes into a chat: a group is
+ * strangers, and a key in a message is a key for the whole catalogue, for good.
+ */
+export function shareLinks(env: NodeJS.ProcessEnv, store: Store): string | CardLinker | undefined {
+  const base = shareBase(env);
   if (!base) return undefined;
-  const k = readKey(env);
-  return isPrivate(env) && k ? `${base}/?key=${encodeURIComponent(k)}` : base;
+  return isPrivate(env) ? (id) => cardLink(base, id, cardSig(store, id)) : base;
 }
 
 /** 32 random characters, URL-safe. */

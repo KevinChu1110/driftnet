@@ -1,4 +1,4 @@
-import { cardLink, publicMedia, type IngestResult, type Messages } from "@driftnet/core";
+import { linkTo, publicMedia, type CardLinker, type IngestResult, type Messages } from "@driftnet/core";
 
 /**
  * Rich chat replies: the same IngestResult as the plain text, shaped per platform
@@ -59,7 +59,7 @@ export const itemIds = (results: IngestResult[]): number[] => [...new Set(flatte
 
 export function richItems(
   results: IngestResult[],
-  o: { base?: string; env?: NodeJS.ProcessEnv; t: Messages; label: (folder: string) => string; full: boolean },
+  o: { base?: string | CardLinker; env?: NodeJS.ProcessEnv; t: Messages; label: (folder: string) => string; full: boolean },
 ): RichItem[] {
   const pub = publicBase(o.env);
   return flatten(results).map((r) => {
@@ -69,7 +69,7 @@ export function richItems(
     return {
       id: item.id,
       name: (s?.name ?? item.title).slice(0, 80),
-      url: o.base ? cardLink(o.base, item.id) : s?.primaryUrl || item.url,
+      url: linkTo(o.base, item.id) ?? (s?.primaryUrl || item.url),
       oneLiner: s?.oneLiner ?? (item.pending ? (item.flags.includes("needs-page") ? o.t.needsPage : o.t.queued) : ""),
       mark: WORTH_MARK[item.worth],
       worthName: o.t.rich.worthName[item.worth],

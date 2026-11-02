@@ -14,8 +14,9 @@
 
 **In a chat**, messages without a link are ignored. Each link gets a reply that says what it is and where to read it on the web page,
 shaped for the platform (`DRIFTNET_REPLY_STYLE=rich`, the default): a Discord embed per item, Slack Block Kit, a LINE Flex card (one bubble, or a
-carousel of up to 12) and a Telegram message with links. Pictures appear only when a public `DRIFTNET_PUBLIC_URL` is set (never a localhost or
-private address, and never with the share key). Want the summary in the chat instead, or no reply at all? Set `DRIFTNET_REPLY=full` or `off`;
+carousel of up to 12) and a Telegram message with links. On a private catalogue each card link is signed for that card alone, so it opens on a
+phone without a password and shows nothing else; the share key never goes into a chat. Pictures appear only when a public `DRIFTNET_PUBLIC_URL`
+is set (never a localhost or private address, and never with the share key). Want the summary in the chat instead, or no reply at all? Set `DRIFTNET_REPLY=full` or `off`;
 `DRIFTNET_REPLY_STYLE=text` brings back plain messages. If a platform refuses the rich message (a missing permission), driftnet sends the plain
 text and logs it once.
 

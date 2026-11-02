@@ -1,6 +1,6 @@
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { LOCALES, resolveLocale, type Locale } from "@driftnet/core";
-import { actorOf, canRead, isLocal, isPrivate, readKey, role, token } from "../access.ts";
+import { actorOf, canRead, isLocal, role, shareBase, shareLinks, token } from "../access.ts";
 import { handleChatText } from "../adapters/handle.ts";
 import { handleLine } from "../adapters/line.ts";
 import { handleSlack } from "../adapters/slack.ts";
@@ -39,10 +39,9 @@ export const routes: Route[] = [
     handler: ({ url, send, app: { dn, env } }) => {
       const folder = url.searchParams.get("folder") || undefined;
       if (folder && !dn.store.folders().some((f) => f.id === folder)) return send(404, { error: "no such folder" });
-      const base = (env.DRIFTNET_TUNNEL_URL || env.DRIFTNET_PUBLIC_URL)?.replace(/\/$/, "") || undefined;
-      const k = readKey(env);
-      // Cards link to the page (with the share key when private, so a phone opens them), or to the tool itself.
-      const pageBase = base ? (isPrivate(env) && k ? `${base}/?key=${encodeURIComponent(k)}` : base) : undefined;
+      const base = shareBase(env);
+      // Cards link to the page (each signed for itself when private, so a phone opens them without the key), or to the tool itself.
+      const pageBase = shareLinks(env, dn.store);
       const self = `${base ?? `${url.protocol}//${url.host}`}/feed.xml${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`;
       return send(200, atomFeed(dn, { self, pageBase, folder }), "application/atom+xml; charset=utf-8");
     },

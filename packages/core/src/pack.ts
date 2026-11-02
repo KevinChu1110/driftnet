@@ -1,9 +1,9 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { guard } from "./guard.ts";
 import type { Store } from "./store.ts";
 import { WORTH, type Kind, type MediaRef, type Worth } from "./types.ts";
 import { canonicalize } from "./url.ts";
 import { normalizeMedia } from "./media.ts";
+import { linkSigOk, signLink } from "./sign.ts";
 
 /**
  * A folder pack: one folder (with its sub-folders) and the cards in it, as a single JSON file
@@ -116,22 +116,10 @@ export function packDisposition(name: string): string {
 
 // ---------- signed links ----------
 
-/**
- * A signed link opens one pack and nothing else, without the share key (like a media path opens one picture).
- * The secret is made once and kept in the catalogue's own state.
- */
-function secretOf(store: Store): string {
-  let s = store.getState("pack_secret");
-  if (!s) { s = randomBytes(32).toString("base64url"); store.setState("pack_secret", s); }
-  return s;
-}
-const sign = (store: Store, folderId: string) => createHmac("sha256", secretOf(store)).update(`pack/${folderId}`).digest("base64url").slice(0, 27);
+/** A signed link opens one pack and nothing else, without the share key (like a media path opens one picture). See sign.ts. */
+const sign = (store: Store, folderId: string) => signLink(store, `pack/${folderId}`);
 export const signPack = sign;
-export function packSigOk(store: Store, folderId: string, sig: string | null): boolean {
-  if (!sig) return false;
-  const want = Buffer.from(sign(store, folderId)), got = Buffer.from(sig);
-  return want.length === got.length && timingSafeEqual(want, got);
-}
+export const packSigOk = (store: Store, folderId: string, sig: string | null): boolean => linkSigOk(store, `pack/${folderId}`, sig);
 
 // ---------- import: parse and validate ----------
 

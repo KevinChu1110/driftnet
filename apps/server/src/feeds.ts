@@ -1,4 +1,4 @@
-import { cardLink, type Driftnet } from "@driftnet/core";
+import { linkTo, type CardLinker, type Driftnet } from "@driftnet/core";
 
 /**
  * /llms.txt — the catalogue as one plain-text page any agent can read without
@@ -34,16 +34,16 @@ const xml = (s: string) =>
 /**
  * /feed.xml — the newest 50 clean items as Atom 1.0, for feed readers and
  * automations (n8n, Zapier). Same filters as llms.txt. `pageBase` is the public
- * address of the web page (with the share key when private); without it entries
+ * address of the web page (or a signer of card links when private); without it entries
  * link straight to the tool.
  */
-export function atomFeed(dn: Driftnet, opts: { self: string; pageBase?: string | undefined; folder?: string | undefined }): string {
+export function atomFeed(dn: Driftnet, opts: { self: string; pageBase?: string | CardLinker | undefined; folder?: string | undefined }): string {
   const items = dn.store.list({ minWorth: "normal", sort: "newest", limit: 50, ...(opts.folder ? { category: opts.folder } : {}) });
   const label = dn.folderLabeler();
   const updated = items.reduce((m, i) => (i.updatedAt > m ? i.updatedAt : m), items[0]?.createdAt ?? new Date(0).toISOString());
   const entries = items.map((i) => {
     const name = i.summary?.name ?? i.title;
-    const link = opts.pageBase ? cardLink(opts.pageBase, i.id) : i.summary?.primaryUrl || i.url;
+    const link = linkTo(opts.pageBase, i.id) ?? (i.summary?.primaryUrl || i.url);
     const text = [i.summary?.oneLiner, i.summary?.demo, ...(i.summary?.highlights ?? []).map((h) => `• ${h}`)].filter(Boolean).join("\n");
     return [
       "  <entry>",

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { mediaSigOk, packSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@driftnet/core";
+import { cardSigOk, mediaSigOk, packSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@driftnet/core";
 import { canRead, clientIp, foreignOrigin, hostAllowed, isAdmin, isLocal, isPassword, isTrustedLocal, token, Tunnel } from "./access.ts";
 import { Settings } from "./settings.ts";
 import type { ChatManager } from "./chats.ts";
@@ -74,8 +74,13 @@ export function createApp(opts: AppOptions): Server {
     const m = /^\/api\/folders\/([^/]+)\/pack$/.exec(path);
     return !!m && packSigOk(dn.store, decodeURIComponent(m[1]!), sig);
   }
+  /** A card's signed link (what chat replies carry on a private catalogue) opens that card only. */
+  function signedCard(path: string, sig: string | null): boolean {
+    const m = /^\/api\/items\/(\d+)$/.exec(path);
+    return !!m && cardSigOk(dn.store, Number(m[1]), sig);
+  }
   const readOk = (req: IncomingMessage, path: string, url: URL) =>
-    canRead(req, env, dn.store) || isTrustedLocal(req) || signedMedia(path, url.searchParams.get("s")) || signedPack(path, url.searchParams.get("s"));
+    canRead(req, env, dn.store) || isTrustedLocal(req) || signedMedia(path, url.searchParams.get("s")) || signedPack(path, url.searchParams.get("s")) || signedCard(path, url.searchParams.get("s"));
 
   /**
    * Guessing passwords: after 20 refused attempts that carried a password or key,

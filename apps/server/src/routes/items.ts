@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { BlockedUrl, HistoryError, ItemError, RefreshBusy, RefreshTooSoon, canonicalize, extractUrls, FolderError, HEALTH, healthFor, type Health, suggestionsFor, driftnetHome, WORTH, publicItem, type Kind, type IngestResult, type PageContent, type Worth } from "@driftnet/core";
 import { bulkAction, bulkUndo } from "../bulk.ts";
 import { agentBrief, leaseRow } from "../brief.ts";
-import { actorOf, isAdmin, token } from "../access.ts";
+import { actorOf, canRead, isAdmin, isTrustedLocal, token } from "../access.ts";
 import { loadMedia, MediaError } from "../media.ts";
 import { BadRequest, type Route } from "../route.ts";
 
@@ -58,9 +58,12 @@ export const routes: Route[] = [
   },
   {
     method: "GET", pattern: /^\/api\/items\/(\d+)$/, example: "/api/items/1", access: "read",
-    handler: ({ m, send, app: { dn } }) => {
+    handler: ({ req, m, send, app: { dn, env } }) => {
       const item = dn.store.get(Number(m[1]));
-      return item ? send(200, { ...publicItem(item), related: item.flags.includes("injection") ? [] : dn.semantic.related(item.id, 5) }) : send(404, { error: "not found" });
+      if (!item) return send(404, { error: "not found" });
+      // A signed card link (app.ts) opens this card alone: no neighbours from the rest of the catalogue.
+      const reader = canRead(req, env, dn.store) || isTrustedLocal(req);
+      return send(200, { ...publicItem(item), related: !reader || item.flags.includes("injection") ? [] : dn.semantic.related(item.id, 5) });
     },
   },
   // A card's picture, through the proxy (same read rule as the card itself). The stored URL never reaches the page.

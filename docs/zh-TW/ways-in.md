@@ -14,7 +14,8 @@
 
 **在聊天室裡**，沒有連結的訊息一律忽略。每個連結會回覆它是什麼，以及在網頁上的哪裡看，並依平台呈現
 （`DRIFTNET_REPLY_STYLE=rich`，預設）：Discord 每個項目一張 embed、Slack Block Kit、LINE Flex 卡片（單張或最多 12 張的輪播）、Telegram 帶連結的訊息。
-只有設了公開的 `DRIFTNET_PUBLIC_URL` 才會附圖片（絕不用 localhost 或內網位址，也不帶分享金鑰）。想在聊天室直接看摘要，或完全不回？
+私人目錄裡每張卡片的連結都只為那一張簽章：手機點開不用密碼，也看不到其他卡片；分享碼絕不會進聊天室。
+只有設了公開的 `DRIFTNET_PUBLIC_URL` 才會附圖片（絕不用 localhost 或內網位址，也不帶分享碼）。想在聊天室直接看摘要，或完全不回？
 設 `DRIFTNET_REPLY=full` 或 `off`；`DRIFTNET_REPLY_STYLE=text` 則改回純文字。若平台拒絕豐富訊息（例如缺少權限），driftnet 會改送純文字並只記錄一次。
 
 **投票**：打 `👍12` 或 `👎12 原因`（也可用 `+#12`／`-#12`；含連結的訊息一定不會被當成投票），或一鍵完成：

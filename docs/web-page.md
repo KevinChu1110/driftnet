@@ -79,9 +79,9 @@ phone the sidebar folds into a ☰ drawer, and a line under the search box says 
   or import the file): the folders are recreated under a top-level folder named after the pack and the cards
   are stored as summarised, with no model call. Cards you already have keep your summary, text that looks like
   instructions to an AI drops the card, and importing the same pack twice adds nothing.
-- **Shared links open read-only.** A card link from a chat bot or an agent carries the read-only share
-  key, so it opens on a phone without a password; edit buttons appear after **Unlock** with the admin
-  password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
+- **Shared links open read-only.** A card link from a chat bot or an agent is signed for that one card, so
+  it opens on a phone without a password and shows nothing else (the share key never goes into a chat);
+  edit buttons appear after **Unlock** with the admin password. Forgot it? Open driftnet on the computer it runs on: Settings there sets a new one.
 - **Keyboard.** `⌘K` / `Ctrl+K` opens the command palette (jump to a folder or card, switch view,
   export, settings…). `j`/`k` step through cards, `f` favorite, `m` move (type to find the folder), `n` note,
   `#` trash, `x` select, `z` undo, `/` search, `g m` mind map, `?` the list. `1`–`9` file the focused card

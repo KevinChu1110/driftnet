@@ -9,7 +9,7 @@ const WORTH_MARK = { skip: "🗑", low: "·", normal: "📌", "must-see": "⭐" 
  */
 export function renderText(
   r: IngestResult,
-  baseUrl?: string,
+  baseUrl?: string | CardLinker,
   t: Messages = messages(),
   label: (folder: string) => string = (f) => categoryLabel(f, t.locale),
 ): string {
@@ -26,7 +26,8 @@ export function renderText(
   lines.push(s?.primaryUrl || item.url);
   if (s?.mentions?.length) lines.push(t.mentions + s.mentions.map((m) => m.name).join(t.listSep));
   if (r.cached) lines.push(t.cached(item.shareCount));
-  if (baseUrl) lines.push(cardLink(baseUrl, item.id));
+  const where = linkTo(baseUrl, item.id);
+  if (where) lines.push(where);
   for (const rel of r.related ?? []) lines.push("", "↳ " + renderText(rel, baseUrl, t, label).replace(/\n/g, "\n  "));
   return lines.join("\n");
 }
@@ -38,13 +39,13 @@ export function renderText(
  */
 export function renderLink(
   r: IngestResult,
-  baseUrl?: string,
+  baseUrl?: string | CardLinker,
   t: Messages = messages(),
   label: (folder: string) => string = (f) => categoryLabel(f, t.locale),
 ): string {
   const { item } = r;
   const name = (item.summary?.name ?? item.title).slice(0, 80);
-  const where = baseUrl ? cardLink(baseUrl, item.id) : item.summary?.primaryUrl || item.url;
+  const where = linkTo(baseUrl, item.id) ?? (item.summary?.primaryUrl || item.url);
   const found = (r.related ?? []).map((x) => x.item.summary?.name ?? x.item.title);
   return [
     `${WORTH_MARK[item.worth]} ${name}｜${label(item.category)}`,
@@ -58,9 +59,18 @@ export function renderLink(
 /**
  * The item's card on the web page. The base may carry a query (a read-only
  * share key, `https://host/?key=…`) so a phone can open it without a password.
+ * With `sig` (see sign.ts) the link opens that one card on a private catalogue
+ * and nothing else: `https://host/?card=12&s=…#item-12`.
  */
-export function cardLink(baseUrl: string, id: number): string {
+export function cardLink(baseUrl: string, id: number, sig?: string): string {
   const u = new URL(baseUrl.replace(/\/$/, "") + (baseUrl.includes("?") ? "" : "/"));
+  if (sig) { u.searchParams.set("card", String(id)); u.searchParams.set("s", sig); }
   u.hash = `item-${id}`;
   return u.toString();
+}
+
+/** Where a card's link points: a plain base (`cardLink`), or a function that signs each card (a private catalogue). */
+export type CardLinker = (id: number) => string;
+export function linkTo(base: string | CardLinker | undefined, id: number): string | undefined {
+  return typeof base === "function" ? base(id) : base ? cardLink(base, id) : undefined;
 }

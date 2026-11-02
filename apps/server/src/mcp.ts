@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BlockedUrl, canonicalize, cardLink, FolderError, HistoryError, ItemError, suggestionsFor, WORTH, type Driftnet, type Health, type Item } from "@driftnet/core";
-import { shareBase } from "./access.ts";
+import { BlockedUrl, canonicalize, linkTo, FolderError, HistoryError, ItemError, suggestionsFor, WORTH, type Driftnet, type Health, type Item } from "@driftnet/core";
+import { shareLinks } from "./access.ts";
 import { saveUndo, undoById } from "./bulk.ts";
 import { planForAgent } from "./plan.ts";
 import { agentBrief, DATA_NOTICE, leaseRow } from "./brief.ts";
@@ -99,7 +99,7 @@ export function createMcpServer(dn: Driftnet, agentName = "agent", opts: { readO
       if (!item || item.flags.includes("injection")) return fail(`No item ${id}.`);
       const found = dn.store.foundLinks().filter((l) => l.parent === id).map((l) => dn.store.get(l.child)).filter((x): x is Item => !!x && !x.trashedAt);
       const detail = {
-        ...row(item, dn.categories),
+        ...row(dn, item, dn.categories),
         trashed: !!item.trashedAt,
         favorite: item.favorite,
         // src is this server's proxy path; url is the original, for agents that can fetch it themselves.
@@ -512,7 +512,7 @@ const ITEM = z.object({
 });
 const ITEMS_OUTPUT = { notice: z.string(), corrected: z.string().optional(), items: z.array(ITEM) };
 
-function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
+function row(dn: Driftnet, i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
   return {
     id: i.id,
     name: i.summary?.name ?? i.title,
@@ -527,7 +527,7 @@ function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
     tags: i.summary?.tags ?? [],
     shared: i.shareCount,
     added: i.createdAt.slice(0, 10),
-    page_url: pageUrl(i.id),
+    page_url: pageUrl(dn, i.id),
     in_inbox: !i.placed,
     health: i.health ?? null,
     stars: i.stars ?? null,
@@ -536,15 +536,14 @@ function row(i: Item, choices: Record<string, string>): z.infer<typeof ITEM> {
 }
 
 /** The item's card on the web page, when this server has a public address; give it to the human to open. */
-function pageUrl(id: number): string | null {
-  const base = shareBase(process.env);
-  return base ? cardLink(base, id) : null;
+function pageUrl(dn: Driftnet, id: number): string | null {
+  return linkTo(shareLinks(process.env, dn.store), id) ?? null;
 }
 
 /** `corrected`: the query searched instead, when the one given matched nothing (a typo). */
 function itemsResult(dn: Driftnet, items: Item[], corrected?: string) {
   const choices = dn.categories;
-  const rows = items.map((i) => row(i, choices));
+  const rows = items.map((i) => row(dn, i, choices));
   const fixed = corrected ? `Nothing matched the query as written; showing results for "${corrected}".\n\n` : "";
   return {
     content: [{ type: "text" as const, text: `${DATA_NOTICE}\n\n${fixed}${JSON.stringify(rows, null, 1)}` }],
