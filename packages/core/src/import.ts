@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { isPublicAddress } from "./extractors/net.ts";
+import { attrs, Needle, stripTags, Tags } from "./html.ts";
 import { isPackJson, parsePack, type PackFolder, type PackItem, type ParsedPack } from "./pack.ts";
 import type { Pipeline } from "./pipeline.ts";
 import { FolderError, type Store } from "./store.ts";
@@ -39,7 +40,7 @@ function decode(s: string): string {
     return ENTITIES[e.toLowerCase()] ?? m;
   });
 }
-const text = (html: string) => decode(html.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+const text = (html: string) => decode(stripTags(html, "")).replace(/\s+/g, " ").trim();
 const clean = (s: unknown): string | undefined => (typeof s === "string" && s.trim() ? s.trim() : undefined);
 
 /** Seconds (or milliseconds) since 1970, or any date string → ISO; undefined if it isn't a date. */
@@ -53,11 +54,7 @@ function isoTime(v: unknown): string | undefined {
   return Number.isNaN(d.getTime()) || d.getFullYear() < 1990 || d.getFullYear() > 2100 ? undefined : d.toISOString();
 }
 
-function attrs(tag: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)) out[m[1]!.toLowerCase()] = decode(m[2] ?? m[3] ?? m[4] ?? "");
-  return out;
-}
+const tagAttrs = (raw: string): Record<string, string> => Object.fromEntries(Object.entries(attrs(raw)).map(([k, v]) => [k, decode(v)]));
 
 /** The browser's own top-level folders say nothing about where the reader put a bookmark. */
 const ROOT_FOLDER = /^(bookmarks( bar| menu| toolbar)?|favorites( bar)?|other bookmarks|mobile bookmarks|書籤列|書籤選單|書籤工具列|其他書籤|我的最愛)$/i;
@@ -69,24 +66,24 @@ export function parseHtml(html: string): ImportEntry[] {
   const stack: (string | null)[] = [];
   let pending: string | null = null;
   let last: ImportEntry | undefined;
-  const re = /<(\/?)(dl|ul|h3|a|dd)\b([^>]*)>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html))) {
-    const close = m[1] === "/";
-    const tag = m[2]!.toLowerCase();
+  // A linear walk (html.ts): a bookmark file is the reader's own, but a tag that never closes should still not stall the server.
+  const scan = new Tags(html);
+  const closers = { "</h3>": new Needle(scan.lower, "</h3>"), "</a>": new Needle(scan.lower, "</a>") };
+  const upTo = (closer: keyof typeof closers, from: number) => { const end = closers[closer].find(from); return html.slice(from, end < 0 ? from : end); };
+  const ddEnd = /<(dt|\/dl|dd|h3)\b/gi;
+  for (let t = scan.next(0); t; t = scan.next(t.end)) {
+    const { name: tag, closing: close } = t;
     if (tag === "dl" || tag === "ul") {
       if (close) stack.pop();
       else { stack.push(pending); pending = null; }
     } else if (tag === "h3") {
       if (close) continue;
-      const end = html.slice(re.lastIndex).search(/<\/h3>/i);
-      const name = text(html.slice(re.lastIndex, end < 0 ? re.lastIndex : re.lastIndex + end));
+      const name = text(upTo("</h3>", t.end));
       pending = name || null;
     } else if (tag === "a") {
       if (close) continue;
-      const a = attrs(m[3]!);
-      const end = html.slice(re.lastIndex).search(/<\/a>/i);
-      const title = text(html.slice(re.lastIndex, end < 0 ? re.lastIndex : re.lastIndex + end));
+      const a = tagAttrs(t.raw);
+      const title = text(upTo("</a>", t.end));
       if (!a.href) continue;
       const folders = stack.filter((f): f is string => !!f);
       if (folders.length && ROOT_FOLDER.test(folders[0]!)) folders.shift();
@@ -99,9 +96,9 @@ export function parseHtml(html: string): ImportEntry[] {
       out.push(last);
     } else if (tag === "dd" && !close && last) {
       // Netscape: the description of the bookmark just above.
-      const rest = html.slice(re.lastIndex);
-      const end = rest.search(/<(dt|\/dl|dd|h3)\b/i);
-      const note = text(end < 0 ? rest : rest.slice(0, end));
+      ddEnd.lastIndex = t.end;
+      const end = ddEnd.exec(html)?.index ?? html.length;
+      const note = text(html.slice(t.end, end));
       if (note) last.note = note;
     }
   }

@@ -197,3 +197,10 @@ test("1.5 MB of tags, blocks, comments or brackets that never close is handled i
   timed("readmeImages <img ", () => readmeImages(fill("<img "), "o", "r", "main"));
   timed("outlineMarkdown <<<<", () => outlineMarkdown(fill("<"), 350));
 });
+
+test("a bookmark file whose tags never close is parsed in linear time", async () => {
+  const { parseHtml } = await import("../src/import.ts");
+  timed("parseHtml <a ", () => parseHtml("<a ".repeat(Math.ceil(MB / 3))));
+  timed("parseHtml <dd>", () => parseHtml(`<a href="https://x.test/">x</a>${"<dd>".repeat(Math.ceil(MB / 4))}`));
+  timed("parseHtml <h3>", () => parseHtml("<h3>".repeat(Math.ceil(MB / 4))));
+});
