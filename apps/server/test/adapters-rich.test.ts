@@ -3,10 +3,11 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
+import { createHmac } from "node:crypto";
 import { createDriftnet, messages, registerExtractor, type IngestResult } from "@driftnet/core";
 import { handleChat } from "../src/adapters/handle.ts";
 import { onDiscordReaction, sendDiscordReply } from "../src/adapters/discord.ts";
-import { onLinePostback, sendLineReply } from "../src/adapters/line.ts";
+import { handleLine, onLinePostback, sendLineReply } from "../src/adapters/line.ts";
 import { repliedItems, reactionVote, rememberReply, REPLY_TTL_MS } from "../src/adapters/reactions.ts";
 import { discordEmbeds, lineFlex, publicBase, replyStyle, resetWarnings, richItems, slackBlocks, telegramRich, type RichReply } from "../src/adapters/rich.ts";
 import { onSlackReaction, sendSlackReply } from "../src/adapters/slack.ts";
@@ -16,6 +17,11 @@ registerExtractor({
   name: "rich-fixture",
   matches: (u) => u.startsWith("https://rich.test/"),
   extract: async (url) => ({ url, kind: "repo", title: "Fixture tool", text: "", outlinks: [], meta: {} }),
+});
+registerExtractor({
+  name: "slow-fixture",
+  matches: (u) => u.startsWith("https://slow.test/"),
+  extract: async (url) => { await new Promise((r) => setTimeout(r, 150)); return { url, kind: "repo", title: "Slow tool", text: "", outlinks: [], meta: {} }; },
 });
 
 const t = messages("en");
@@ -297,6 +303,32 @@ test("line: a Flex reply; a rejected Flex retries the same token with plain text
   const plain = await replyFor(dn, "https://rich.test/c");
   await sendLineReply("tok", "rt3", plain);
   assert.deepEqual(sent.at(-1), { replyToken: "rt3", messages: [{ type: "text", text: plain.text }] });
+});
+
+test("line webhook: a quick link is answered with the reply token; a slow one gets 'reading' now and the card as a push", async () => {
+  const dn = fresh();
+  const sent: { url: string; body: any }[] = [];
+  globalThis.fetch = (async (u: any, init: any) => { sent.push({ url: String(u), body: JSON.parse(init.body) }); return new Response("{}", { status: 200 }); }) as typeof fetch;
+  const secret = "s3cret";
+  const post = (text: string) => {
+    const body = JSON.stringify({ events: [{ type: "message", replyToken: "rt-" + text.length, message: { type: "text", text }, source: { type: "group", groupId: "G1", userId: "U1" } }] });
+    return handleLine(dn, body, createHmac("sha256", secret).update(body).digest("base64"), secret, "tok", { quickMs: 60 });
+  };
+  const settle = async (n: number) => { for (let i = 0; i < 100 && sent.length < n; i++) await new Promise((r) => setTimeout(r, 10)); };
+  assert.equal(await handleLine(dn, "{}", "nope", secret, "tok"), 401, "a forged signature");
+  assert.equal(await post("https://rich.test/quick"), 200);
+  await settle(1);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]!.url, "https://api.line.me/v2/bot/message/reply");
+  assert.equal(sent[0]!.body.messages[0].type, "flex", "a quick link: the card, with the reply token");
+  sent.length = 0;
+  await post("https://slow.test/a");
+  await settle(2);
+  assert.deepEqual(sent.map((s) => s.url.split("/").pop()), ["reply", "push"]);
+  assert.equal(sent[0]!.body.messages[0].text, t.working, "the token is spent on 'reading' before it expires");
+  assert.equal(sent[1]!.body.to, "G1");
+  assert.equal(sent[1]!.body.messages[0].type, "flex", "then the card itself, pushed to the group");
+  assert.match(sent[1]!.body.messages[0].altText, /Slow tool/);
 });
 
 // ---- voting -------------------------------------------------------------------------

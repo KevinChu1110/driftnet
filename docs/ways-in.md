@@ -18,7 +18,8 @@ carousel of up to 12) and a Telegram message with links. On a private catalogue 
 phone without a password and shows nothing else; the share key never goes into a chat. Pictures appear only when a public `DRIFTNET_PUBLIC_URL`
 is set (never a localhost or private address, and never with the share key). Want the summary in the chat instead, or no reply at all? Set `DRIFTNET_REPLY=full` or `off`;
 `DRIFTNET_REPLY_STYLE=text` brings back plain messages. If a platform refuses the rich message (a missing permission), driftnet sends the plain
-text and logs it once.
+text and logs it once. LINE's reply token lasts about a minute: when a link takes longer (a video being read), the bot answers "reading this
+one" at once and pushes the card when it is ready.
 
 **Vote** with `👍12` or `👎12 reason` (`+#12` / `-#12` work too; a message with a link is never a vote), or with one tap:
 
