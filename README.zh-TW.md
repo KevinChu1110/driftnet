@@ -9,7 +9,7 @@
 
 **[▶ 線上試玩](https://kevinchu1110.github.io/driftnet/demo/)** · **[官方網站](https://kevinchu1110.github.io/driftnet/)** · **[Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[文件](#-文件)**
 
-🆕 **1.0 正式版：** `npx driftnet service install` 開機自動啟動、在 ⚙ 設定 → 聊天室 直接接機器人、搜尋打錯字也找得到。[更新內容](https://github.com/KevinChu1110/driftnet/releases/tag/v1.0.0) · [保持穩定的部分](docs/zh-TW/stability.md)
+🆕 **1.1 版：** YouTube 字幕與 Facebook reel 讀取更可靠、被登入牆擋住的貼文會等頁面而不是被判「略過」、壞掉的網頁不再卡住整個 driftnet、聊天室連結有上限。[更新內容](https://github.com/KevinChu1110/driftnet/releases/tag/v1.1.0) · [哪些不會變](docs/stability.md)
 
 [![npm](https://img.shields.io/npm/v/driftnet?logo=npm&color=CB3837)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
