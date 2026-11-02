@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import {
-  SECTIONS_CAP, THIN_TOKENS, TIMEOUTS, assertPublicVideoUrl, composeSections, dedupeLines, defaultSpawn, enrichFromVideo,
-  isThin, isVideoUrl, parseSubtitles, pickSubtitleTrack, resetVideoCaches, scrubbedEnv, videoTitle, videoTools, wantsVideo,
+  SECTIONS_CAP, THIN_TOKENS, TIMEOUTS, YTDLP_STALE_DAYS, assertPublicVideoUrl, checkYtdlp, composeSections, dedupeLines, defaultSpawn, enrichFromVideo,
+  isThin, isVideoUrl, parseSubtitles, pickSubtitleTrack, resetVideoCaches, scrubbedEnv, videoTitle, videoTools, wantsVideo, ytdlpAdvice, ytdlpAgeDays,
   type RunOptions, type RunResult, type SpawnFn, type VideoTools,
 } from "../src/extractors/video.ts";
 import type { Digest } from "../src/types.ts";
@@ -363,4 +363,43 @@ test("integration: a real short, end to end", { skip: process.env.DRIFTNET_VIDEO
   console.log(`[video-it] flags=${r.flags.join(",")} title=${r.digest.title}\n${r.digest.text.slice(0, 1200)}`);
   assert.ok(r.digest.text.length > 0, "some text came out of the video");
   assert.ok(r.flags.includes("video-read"));
+});
+
+test("DRIFTNET_YTDLP_COOKIES: every yt-dlp call carries --cookies <file>; without it, none does", async () => {
+  const withC = await run(digest(), { info: { title: "t", description: "" } }, { env: { DRIFTNET_YTDLP_COOKIES: "/home/me/cookies.txt" } });
+  const yt = withC.calls.filter((c) => c.bin.endsWith("yt-dlp"));
+  assert.ok(yt.length >= 1);
+  for (const c of yt) assert.equal(c.args[c.args.indexOf("--cookies") + 1], "/home/me/cookies.txt");
+  const without = await run(digest(), { info: { title: "t", description: "" } });
+  assert.ok(without.calls.filter((c) => c.bin.endsWith("yt-dlp")).every((c) => !c.args.includes("--cookies")));
+});
+
+test("an old yt-dlp is noticed once per binary and named when a video can't be read", async () => {
+  const now = Date.UTC(2026, 10, 3);
+  assert.equal(ytdlpAgeDays("2026.10.26", now), 8);
+  assert.equal(ytdlpAgeDays("2026.03.17\n", now), 231);
+  assert.equal(ytdlpAgeDays("nightly"), undefined);
+  assert.ok(YTDLP_STALE_DAYS >= 90);
+  const warnings: string[] = [];
+  const realWarn = console.warn;
+  console.warn = (...a: unknown[]) => void warnings.push(a.join(" "));
+  try {
+    let versions = 0;
+    const spawn: SpawnFn = async (_bin, args) => { versions++; assert.deepEqual(args, ["--version"]); return ok("2026.03.17\n"); };
+    assert.equal(await checkYtdlp("/t/yt-dlp", spawn, {}), "2026.03.17");
+    assert.equal(await checkYtdlp("/t/yt-dlp", spawn, {}), "2026.03.17");
+    assert.equal(versions, 1, "once per binary");
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0]!, /yt-dlp 2026\.03\.17 is \d+ months old/);
+    assert.match(ytdlpAdvice() ?? "", /brew upgrade yt-dlp/);
+    resetVideoCaches();
+    assert.equal(ytdlpAdvice(), undefined);
+    const fresh: SpawnFn = async () => ok("2099.01.01\n");
+    await checkYtdlp("/t/yt-dlp", fresh, {});
+    assert.equal(ytdlpAdvice(), undefined, "a recent one says nothing");
+    const missing: SpawnFn = async () => ({ code: null, stdout: "", stderr: "not found", timedOut: false });
+    assert.equal(await checkYtdlp("/t/other", missing, {}), undefined);
+  } finally {
+    console.warn = realWarn;
+  }
 });

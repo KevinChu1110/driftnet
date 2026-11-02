@@ -54,6 +54,13 @@ test("a video tool setting must be the full path of that tool, not any program",
     { DRIFTNET_YTDLP: "/bin/sh" }, { DRIFTNET_YTDLP: "yt-dlp" }, { DRIFTNET_TESSERACT: "/usr/bin/python3" },
     { DRIFTNET_FFMPEG: "/tmp/ffmpeg/../../bin/sh" }, { DRIFTNET_WHISPER: "/usr/bin/env" }, { DRIFTNET_YTDLP: "/opt/yt-dlp/" },
   ]) assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
+  // The cookies setting is a file path (any name), never the cookies themselves.
+  settings.update({ DRIFTNET_YTDLP_COOKIES: "/Users/me/cookies.txt" });
+  settings.update({ DRIFTNET_YTDLP_COOKIES: "C:\\Users\\me\\yt.cookies" });
+  settings.update({ DRIFTNET_YTDLP_COOKIES: "" });
+  for (const bad of [{ DRIFTNET_YTDLP_COOKIES: "cookies.txt" }, { DRIFTNET_YTDLP_COOKIES: "/tmp/" }, { DRIFTNET_YTDLP_COOKIES: "# Netscape HTTP Cookie File\n.x.com\tTRUE" }]) {
+    assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
+  }
 });
 
 test("the webhook URL is masked like a key and must be http(s)", () => {

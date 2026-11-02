@@ -55,6 +55,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `DRIFTNET_VIDEO` | `auto` | `auto` uses whichever of `yt-dlp`, `ffmpeg`, `tesseract` and `whisper` are installed; `captions` only reads captions and descriptions (light on battery); `watch` is `auto`, then, if the item is still thin, lets Gemini or Vertex watch the video (sends the video or its YouTube link to that model); `off` never reads videos (see Reels and shorts) |
 | `DRIFTNET_VIDEO_FRAMES` | `off` | `vision` attaches up to 8 distinct frames to the same summary request when the item is still thin (only to your configured model, which must accept pictures, e.g. an Ollama vision model) |
 | `DRIFTNET_YTDLP`, `DRIFTNET_FFMPEG`, `DRIFTNET_TESSERACT`, `DRIFTNET_WHISPER` | found on `PATH` | Full path of a tool that is not on `PATH` (`whisper` may also be `whisper-cli`; whisper.cpp needs `DRIFTNET_WHISPER_MODEL`, a model file) |
+| `DRIFTNET_YTDLP_COOKIES` | — | Path of a `cookies.txt` (Netscape format, exported from a logged-in browser) that yt-dlp sends: for Facebook and Instagram posts shown to nobody anonymous, and YouTube's "sign in to confirm you're not a bot" |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | Folder of plugins: extractors, providers, judges (`.js` / `.mjs`), see [`examples/plugins`](../examples/plugins) |
 | `DRIFTNET_TOKEN` | — | Admin password: writes, settings, agent tokens, MCP with every tool, the agent queue. Settable on the page |
 | `DRIFTNET_READ_KEY` | — | Read-only share key (header or `?key=`): reading and the read-only MCP tools |

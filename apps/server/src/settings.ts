@@ -76,6 +76,8 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_FFMPEG", group: "rules", max: 500, ...toolPath("ffmpeg") },
   { key: "DRIFTNET_TESSERACT", group: "rules", max: 500, ...toolPath("tesseract") },
   { key: "DRIFTNET_WHISPER", group: "rules", max: 500, ...toolPath("whisper") },
+  // A cookies.txt for yt-dlp (sites that show anonymous visitors nothing). A file path, never the cookies themselves.
+  { key: "DRIFTNET_YTDLP_COOKIES", group: "rules", max: 500, pattern: /^(?:\/|[a-z]:[\\/])(?:[^\\/\0]+[\\/])*[^\\/\0]+$/i, shape: "is the full path of a cookies.txt file (Netscape format), e.g. /Users/me/cookies.txt" },
   // Cloud providers (bedrock, vertex) and the rules judge. Keys are write-only like the other secrets;
   // the credentials setting is a file path, never the key itself.
   { key: "DRIFTNET_LLM_REGION", group: "model", max: 60 },

@@ -54,6 +54,7 @@
 | `DRIFTNET_VIDEO` | `auto` | `auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`；`captions` 只讀字幕和說明（省電）；`watch` 在 `auto` 之後，仍太少時讓 Gemini／Vertex 直接看影片（會把影片或 YouTube 連結送給該模型）；`off` 完全不讀影片（見「Reels 與 Shorts」） |
 | `DRIFTNET_VIDEO_FRAMES` | `off` | `vision` 在內容仍太少時，把最多 8 張不重複的畫面附在同一次摘要請求裡（只送給你設定的模型，模型必須看得懂圖片，例如 Ollama 的視覺模型） |
 | `DRIFTNET_YTDLP`、`DRIFTNET_FFMPEG`、`DRIFTNET_TESSERACT`、`DRIFTNET_WHISPER` | 從 `PATH` 找 | 不在 `PATH` 的工具的完整路徑（`whisper` 也可指向 `whisper-cli`；whisper.cpp 還需要 `DRIFTNET_WHISPER_MODEL`，指向模型檔） |
+| `DRIFTNET_YTDLP_COOKIES` | — | 給 yt-dlp 用的 `cookies.txt` 路徑（Netscape 格式，從已登入的瀏覽器匯出）：Facebook、Instagram 不給匿名訪客看的貼文，以及 YouTube 的「登入以確認你不是機器人」都靠它 |
 | `DRIFTNET_PLUGINS` | `~/.driftnet/plugins` | 外掛（擷取器、供應商、判斷器；`.js`／`.mjs`）的資料夾，範例見 [`examples/plugins`](../../examples/plugins) |
 | `DRIFTNET_TOKEN` | — | 管理密碼：寫入、改設定、管理 agent 金鑰、完整的 MCP 工具、agent 佇列。可以在網頁上設定 |
 | `DRIFTNET_READ_KEY` | — | 唯讀分享碼（放 header 或 `?key=`）：只能讀，MCP 也只有讀取類工具 |

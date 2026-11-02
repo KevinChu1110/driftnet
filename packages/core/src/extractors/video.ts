@@ -458,7 +458,9 @@ export async function readVideo(url: string, page: string, dir: string, deps: Re
   const ffArgs = tools.ffmpeg ? ["--ffmpeg-location", tools.ffmpeg] : [];
   const have = () => estimateTokens(substance(page)) + reading.sections.reduce((n, s) => n + estimateTokens(s.text), 0);
   // No --no-warnings: with --ignore-errors a refused subtitle or a login wall is reported as a warning, and that line is the reason we log.
-  const base = ["--ignore-config", "--no-playlist", "--no-progress", "--socket-timeout", "15", "--retries", "1"];
+  // DRIFTNET_YTDLP_COOKIES: a cookies.txt exported from a logged-in browser, for sites that show anonymous visitors nothing.
+  const cookies = deps.env.DRIFTNET_YTDLP_COOKIES?.trim();
+  const base = ["--ignore-config", "--no-playlist", "--no-progress", "--socket-timeout", "15", "--retries", "1", ...(cookies ? ["--cookies", cookies] : [])];
   const out = ["-o", join(dir, "meta.%(ext)s"), "--", url];
 
   // 1. title, description, duration and the list of subtitle tracks: no download, one request.
@@ -608,7 +610,44 @@ async function ocrLanguages(bin: string, spawn: SpawnFn, cwd: string, env: NodeJ
   return langs || undefined;
 }
 /** Tests only. */
-export const resetVideoCaches = (): void => { langCache = new Map(); };
+export const resetVideoCaches = (): void => { langCache = new Map(); ytdlpChecked = new Map(); staleYtdlp = undefined; };
+
+// --- yt-dlp age ---------------------------------------------------------------------------------
+
+/** Days since a yt-dlp release (versions are dates, YYYY.MM.DD); undefined for anything else. */
+export function ytdlpAgeDays(version: string, now = Date.now()): number | undefined {
+  const m = /^(\d{4})\.(\d{1,2})\.(\d{1,2})/.exec(version.trim());
+  if (!m) return undefined;
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(t) ? undefined : Math.floor((now - t) / 86_400_000);
+}
+/** Sites change their pages every few weeks; a yt-dlp older than this mostly fails on them. */
+export const YTDLP_STALE_DAYS = 120;
+let ytdlpChecked = new Map<string, Promise<string | undefined>>();
+let staleYtdlp: string | undefined;
+
+/**
+ * `yt-dlp --version`, once per binary. An old one is logged at the first video, and
+ * named again every time a video cannot be read: that is usually why.
+ */
+export function checkYtdlp(bin: string, spawn: SpawnFn = defaultSpawn, env: NodeJS.ProcessEnv = process.env): Promise<string | undefined> {
+  let p = ytdlpChecked.get(bin);
+  if (!p) {
+    p = spawn(bin, ["--version"], { cwd: tmpdir(), env: scrubbedEnv(env), timeoutMs: 10_000 }).then((r) => {
+      const version = r.code === 0 ? (r.stdout.trim().split("\n")[0] ?? "") : "";
+      const days = ytdlpAgeDays(version);
+      if (days !== undefined && days > YTDLP_STALE_DAYS) {
+        staleYtdlp = `yt-dlp ${version} is ${Math.round(days / 30)} months old; sites change often, so update it (brew upgrade yt-dlp / pip install -U yt-dlp)`;
+        console.warn(`[driftnet] ${staleYtdlp}`);
+      }
+      return version || undefined;
+    }, () => undefined);
+    ytdlpChecked.set(bin, p);
+  }
+  return p;
+}
+/** The stale-version line, when there is one, to append to a "could not read" warning. */
+export const ytdlpAdvice = (): string | undefined => staleYtdlp;
 
 type Ctx = Required<Pick<VideoDeps, "spawn" | "tools" | "env">>;
 
@@ -706,13 +745,16 @@ export async function enrichFromVideo(digest: Digest, deps: VideoDeps = {}): Pro
     return none;
   }
   const spawn = deps.spawn ?? defaultSpawn;
+  // The real binary only (tests inject a spawn): is it recent enough to still know the sites?
+  if (!deps.spawn) void checkYtdlp(tools.ytdlp, defaultSpawn, env);
+  const stale = () => (ytdlpAdvice() ? ` — ${ytdlpAdvice()}` : "");
   return gate.run(async () => {
     const dir = mkdtempSync(join(deps.tmpRoot ?? tmpdir(), "driftnet-video-"));
     try {
       const reading = await readVideo(digest.url, digest.text, dir, { spawn, tools, env, ...(deps.media ? { media: deps.media } : {}) });
       const extra = composeSections(reading.sections);
       if (!extra && !reading.attachments.length) {
-        if (reading.ran) console.warn(`[driftnet] video: nothing to read in ${digest.url}${reading.reason ? ` (${reading.reason})` : ""}`);
+        if (reading.ran) console.warn(`[driftnet] video: nothing to read in ${digest.url}${reading.reason ? ` (${reading.reason})` : ""}${stale()}`);
         return reading.ran ? { ...none, flags: ["needs-transcript"], needsTranscript: true } : none;
       }
       const text = !extra ? digest.text : digest.text.trim() ? `${digest.text.trim()}\n\n${extra}` : extra;
@@ -725,7 +767,7 @@ export async function enrichFromVideo(digest: Digest, deps: VideoDeps = {}): Pro
         needsTranscript: false,
       };
     } catch (err) {
-      console.warn(`[driftnet] video read failed for ${digest.url}: ${(err as Error).message}`);
+      console.warn(`[driftnet] video read failed for ${digest.url}: ${(err as Error).message}${stale()}`);
       return none;
     } finally {
       rmSync(dir, { recursive: true, force: true });
