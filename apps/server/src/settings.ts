@@ -41,6 +41,8 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_PROFILE", group: "model", multiline: true, max: 600 },
   { key: "DRIFTNET_UPDATE_CHECK", group: "updates", choices: ["", "0", "1"] },
   { key: "DRIFTNET_BLOCK_DOMAINS", group: "rules", max: 2000 },
+  { key: "DRIFTNET_LINKS_PER_MESSAGE", group: "rules", pattern: /^[1-9]\d{0,2}$/, shape: "a number from 1 to 999" },
+  { key: "DRIFTNET_LINKS_PER_HOUR", group: "rules", pattern: /^[1-9]\d{0,3}$/, shape: "a number from 1 to 9999" },
   // Outgoing webhook: the URL is secret-ish (tokens often live in it), so it is masked like a key.
   { key: "DRIFTNET_WEBHOOK_URL", group: "webhook", secret: true },
   { key: "DRIFTNET_WEBHOOK_SECRET", group: "webhook", secret: true, max: 200 },

@@ -12,6 +12,12 @@ import { keywordSuggestions } from "./suggest.ts";
 import { canonicalize, extractUrls, hostOf } from "./url.ts";
 import { clipTokens, digestBudget } from "./digest.ts";
 
+/** A positive whole number from a setting, else the default. */
+function limitFrom(v: string | undefined, dflt: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : dflt;
+}
+
 /** A refresh of this item is already running. */
 export class RefreshBusy extends Error {}
 /** The same item was refreshed less than a minute ago. */
@@ -76,9 +82,27 @@ export class Pipeline {
     return (this.opts.blockedDomains ?? []).some((d) => host === d || host.endsWith(`.${d}`));
   }
 
-  /** Ingest every link in a chat message. The rest of the message becomes the note. */
+  /** When each chat's links were read in the last hour, for the quota below. */
+  private readonly recent = new Map<string, number[]>();
+
+  /**
+   * Ingest the links in a chat message. The rest of the message becomes the note.
+   * Every link may cost a model call, and anyone in the chat can paste links, so a message is read up to
+   * DRIFTNET_LINKS_PER_MESSAGE links (10) and a chat up to DRIFTNET_LINKS_PER_HOUR (60); the rest is logged and left.
+   */
   async ingestMessage(text: string, ctx: Omit<ShareContext, "note">): Promise<IngestResult[]> {
-    const urls = extractUrls(text);
+    let urls = extractUrls(text);
+    const who = `${ctx.platform}:${ctx.chatId}`;
+    const perMessage = limitFrom(process.env.DRIFTNET_LINKS_PER_MESSAGE, 10);
+    if (urls.length > perMessage) {
+      console.warn(`[driftnet] ${who}: ${urls.length} links in one message, reading the first ${perMessage}`);
+      urls = urls.slice(0, perMessage);
+    }
+    const room = this.quota(who, urls.length, limitFrom(process.env.DRIFTNET_LINKS_PER_HOUR, 60));
+    if (room < urls.length) {
+      console.warn(`[driftnet] ${who}: over the hourly link quota, ${urls.length - room} link(s) left unread`);
+      urls = urls.slice(0, room);
+    }
     const note = urls.reduce((t, u) => t.replace(u, ""), text).replace(/https?:\/\/\S+/g, "").trim() || undefined;
     // A few links at a time: five links in one message shouldn't take five times
     // as long (LINE reply tokens expire), nor hit every API at once. Order is kept.
@@ -97,6 +121,18 @@ export class Pipeline {
     };
     await Promise.all(Array.from({ length: Math.min(3, urls.length) }, worker));
     return results.filter((r): r is IngestResult => r !== null);
+  }
+
+  /** How many of `n` links this chat may still read this hour; those are counted as read. */
+  private quota(who: string, n: number, limit: number): number {
+    const now = Date.now();
+    const times = (this.recent.get(who) ?? []).filter((t) => now - t < 3600_000);
+    const room = Math.max(0, Math.min(n, limit - times.length));
+    for (let i = 0; i < room; i++) times.push(now);
+    if (times.length) this.recent.set(who, times); else this.recent.delete(who);
+    // Chats that went quiet an hour ago are forgotten, so the map cannot grow without bound.
+    if (this.recent.size > 1000) for (const [k, v] of this.recent) if (now - (v[v.length - 1] ?? 0) >= 3600_000) this.recent.delete(k);
+    return room;
   }
 
   async ingest(url: string, ctx: ShareContext, depth = 0, page?: PageContent): Promise<IngestResult> {

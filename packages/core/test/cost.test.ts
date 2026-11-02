@@ -82,6 +82,37 @@ test("non-text responses are not downloaded or parsed", async () => {
   }
 });
 
+test("a message is read up to DRIFTNET_LINKS_PER_MESSAGE links, a chat up to DRIFTNET_LINKS_PER_HOUR", async () => {
+  registerExtractor({
+    name: "cost-many",
+    matches: (u) => u.startsWith("https://many.test/"),
+    extract: async (url) => ({ url, kind: "article", title: url.split("/").pop()!, text: "", outlinks: [], meta: {} }),
+  });
+  const links = (n: number, from = 0) => Array.from({ length: n }, (_, i) => `https://many.test/${from + i}`).join(" ");
+  const p = new Pipeline({ store: new Store(":memory:"), categories: DEFAULT_CATEGORIES });
+  const ctx = { platform: "t", chatId: "busy" };
+  const warned: string[] = [];
+  const orig = console.warn;
+  console.warn = (...a: unknown[]) => { warned.push(String(a[0])); };
+  try {
+    const first = await p.ingestMessage(links(12), ctx);
+    assert.deepEqual(first.map((r) => r.item.title), Array.from({ length: 10 }, (_, i) => String(i)), "the first ten of twelve");
+    assert.match(warned.at(-1)!, /12 links in one message, reading the first 10/);
+    process.env.DRIFTNET_LINKS_PER_HOUR = "14";
+    const second = await p.ingestMessage(links(6, 100), ctx);
+    assert.equal(second.length, 4, "10 already read this hour: 4 of 6 fit the quota of 14");
+    assert.match(warned.at(-1)!, /over the hourly link quota, 2 link\(s\) left unread/);
+    assert.equal((await p.ingestMessage(links(1, 200), ctx)).length, 0, "the quota is spent");
+    assert.equal((await p.ingestMessage(links(1, 300), { platform: "t", chatId: "quiet" })).length, 1, "another chat has its own quota");
+    process.env.DRIFTNET_LINKS_PER_MESSAGE = "2";
+    assert.equal((await p.ingestMessage(links(5, 400), { platform: "t", chatId: "other" })).length, 2);
+  } finally {
+    console.warn = orig;
+    delete process.env.DRIFTNET_LINKS_PER_HOUR;
+    delete process.env.DRIFTNET_LINKS_PER_MESSAGE;
+  }
+});
+
 test("links in one message are processed a few at a time, replies kept in order", async () => {
   let active = 0;
   let peak = 0;

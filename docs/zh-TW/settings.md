@@ -47,6 +47,8 @@
 | `DRIFTNET_PROFILE` | — | 你是誰、關心什麼，最多 600 字（⚙ 設定 › AI › 關於你）。模型用它判斷什麼值得你花時間，並寫每張卡片的「為什麼值得看」；agent 也會收到。它只在模型的 system prompt 放一次（約 150 token，所以 prompt caching 照常命中），也不會被抄進卡片 |
 | `DRIFTNET_UPDATE_CHECK` | 關閉 | 設 `1` 才會每天向 `registry.npmjs.org` 查一次最新版本號，有新版就在網頁標題列顯示小提示「driftnet x.y.z 已發布」（`driftnet status` 也會顯示）。不會傳送任何與你有關的資料。預設關閉，設 `1` 才開啟 |
 | `DRIFTNET_BLOCK_DOMAINS` | — | 永遠不收錄的網域（含子網域），用逗號分隔 |
+| `DRIFTNET_LINKS_PER_MESSAGE` | `10` | 一則聊天訊息最多讀幾條連結，其餘不讀（每條連結都可能花一次模型呼叫，而群組裡任何人都能貼連結） |
+| `DRIFTNET_LINKS_PER_HOUR` | `60` | 每個聊天室／頻道每小時最多讀幾條連結，超過的不讀，等這一小時過去 |
 | `DRIFTNET_HEALTH` | `off` | `weekly` 約每週重新檢查連結，並標記失效、封存、久未更新的卡片（見「連結健康檢查」）。預設關閉：會對外發送請求 |
 | `DRIFTNET_VIDEO` | `auto` | `auto` 使用已安裝的 `yt-dlp`、`ffmpeg`、`tesseract`、`whisper`；`captions` 只讀字幕和說明（省電）；`watch` 在 `auto` 之後，仍太少時讓 Gemini／Vertex 直接看影片（會把影片或 YouTube 連結送給該模型）；`off` 完全不讀影片（見「Reels 與 Shorts」） |
 | `DRIFTNET_VIDEO_FRAMES` | `off` | `vision` 在內容仍太少時，把最多 8 張不重複的畫面附在同一次摘要請求裡（只送給你設定的模型，模型必須看得懂圖片，例如 Ollama 的視覺模型） |
