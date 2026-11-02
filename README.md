@@ -9,7 +9,7 @@
 
 **[▶ Try the demo](https://kevinchu1110.github.io/driftnet/demo/)** · **[Website](https://kevinchu1110.github.io/driftnet/)** · **[Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[Docs](#-docs)**
 
-🆕 **1.1 is out:** YouTube captions and Facebook reels are read reliably, a walled post waits for its page instead of being judged "skip", a broken page can no longer freeze driftnet, and links per chat are capped. [What's new](https://github.com/KevinChu1110/driftnet/releases/tag/v1.1.0) · [What stays stable](docs/stability.md)
+🆕 **1.2 is out:** chat replies link each card with its own signature instead of the share key, LINE answers before its reply token expires, model and embedding endpoints go through the SSRF guard, and yt-dlp gets a cookies file and a stale-version warning. [What's new](https://github.com/KevinChu1110/driftnet/releases/tag/v1.2.0) · [What stays stable](docs/stability.md)
 
 [![npm](https://img.shields.io/npm/v/driftnet?logo=npm&color=CB3837)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
