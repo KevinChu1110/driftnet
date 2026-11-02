@@ -1,3 +1,4 @@
+import { endpointFetch } from "../extractors/net.ts";
 import { createHash } from "node:crypto";
 
 /**
@@ -29,6 +30,8 @@ export interface Embedder {
 }
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+/** The guarded fetch for an endpoint (loopback always; other private hosts with DRIFTNET_LLM_ALLOW_LOCAL=1). */
+const guarded = (baseUrl: string, env: NodeJS.ProcessEnv): FetchLike => endpointFetch(baseUrl, env);
 
 export const DEFAULT_MODELS = { ollama: "nomic-embed-text", openai: "text-embedding-3-small", gemini: "gemini-embedding-001" } as const;
 export const OLLAMA_URL = "http://127.0.0.1:11434";
@@ -149,10 +152,11 @@ function localCandidates(env: NodeJS.ProcessEnv): string[] {
 export async function createEmbedder(env: NodeJS.ProcessEnv, opts: { fetch?: FetchLike } = {}): Promise<Embedder | undefined> {
   const mode = (env.DRIFTNET_EMBED ?? "auto").trim().toLowerCase();
   if (mode === "off") return undefined;
-  const f = opts.fetch ?? fetch;
   const named = env.DRIFTNET_EMBED_PROVIDER?.trim().toLowerCase();
   const llm = env.DRIFTNET_LLM_PROVIDER?.trim().toLowerCase();
   const model = (d: string) => env.DRIFTNET_EMBED_MODEL?.trim() || d;
+  // Tests pass a fetch; otherwise each endpoint gets the guarded one for its own address.
+  const fetchFor = (baseUrl: string): FetchLike => opts.fetch ?? guarded(baseUrl, env);
   const withBase = (v: { fetch?: FetchLike }) => (opts.fetch ? { ...v, fetch: opts.fetch } : v);
 
   if (named === "gemini") {
@@ -165,10 +169,11 @@ export async function createEmbedder(env: NodeJS.ProcessEnv, opts: { fetch?: Fet
     const baseUrl = env.DRIFTNET_EMBED_BASE_URL?.trim() || (sameVendor ? env.DRIFTNET_LLM_BASE_URL?.trim() : "") || "https://api.openai.com/v1";
     const key = env.DRIFTNET_EMBED_API_KEY || (sameVendor ? env.DRIFTNET_LLM_API_KEY : "");
     if (!key && !isLocalUrl(baseUrl)) throw new EmbedConfigError("DRIFTNET_EMBED_PROVIDER=openai needs DRIFTNET_EMBED_API_KEY (a local base URL needs none)");
-    return openaiEmbedder({ baseUrl, model: model(DEFAULT_MODELS.openai), apiKey: key || undefined, ...withBase({}) });
+    return openaiEmbedder({ baseUrl, model: model(DEFAULT_MODELS.openai), apiKey: key || undefined, fetch: fetchFor(baseUrl) });
   }
   if (named === "ollama") {
-    return ollamaEmbedder({ baseUrl: env.DRIFTNET_EMBED_BASE_URL?.trim() || localCandidates(env)[0]!, model: model(DEFAULT_MODELS.ollama), ...withBase({}) });
+    const baseUrl = env.DRIFTNET_EMBED_BASE_URL?.trim() || localCandidates(env)[0]!;
+    return ollamaEmbedder({ baseUrl, model: model(DEFAULT_MODELS.ollama), fetch: fetchFor(baseUrl) });
   }
   if (named) throw new EmbedConfigError(`Unknown DRIFTNET_EMBED_PROVIDER=${named} (expected openai, ollama or gemini)`);
 
@@ -176,6 +181,7 @@ export async function createEmbedder(env: NodeJS.ProcessEnv, opts: { fetch?: Fet
   const want = model(DEFAULT_MODELS.ollama);
   for (const base of env.DRIFTNET_EMBED_BASE_URL && isLocalUrl(env.DRIFTNET_EMBED_BASE_URL) ? [env.DRIFTNET_EMBED_BASE_URL.replace(/\/+$/, "")] : localCandidates(env)) {
     try {
+      const f = fetchFor(base);
       const res = await f(`${base}/api/tags`, { method: "GET", signal: AbortSignal.timeout(1000) });
       if (!res.ok) continue;
       const { models } = (await res.json()) as { models?: { name?: string }[] };

@@ -103,22 +103,17 @@ test("rules judge reads DRIFTNET_JUDGE_RULES and judges items end to end", async
 
 test("Jev: the endpoint is a constructor option", async () => {
   const urls: string[] = [];
-  const real = globalThis.fetch;
-  globalThis.fetch = (async (u: string) => {
+  const fake = async (u: string | URL) => {
     urls.push(String(u));
     return new Response(JSON.stringify({ answers: {
       ai_tool: { type: "noul", noul: 0.9 }, category: { type: "choice", choice: "coding", confidence: 0.9 },
       kind: { type: "choice", choice: "repo", confidence: 0.9 }, worth: { type: "score", score: 2 },
     } }));
-  }) as typeof fetch;
-  try {
-    const r1 = await new JevJudge("k", 1000, "https://jev.example.test/x").judge(digest("https://github.com/a/b"), undefined, cats);
-    assert.equal(r1?.judgement.category, "coding");
-    await new JevJudge("k").judge(digest("https://github.com/a/b"), undefined, cats);
-    assert.deepEqual(urls, ["https://jev.example.test/x", "https://api.typesafe.ai/v1/systemone"]);
-  } finally {
-    globalThis.fetch = real;
-  }
+  };
+  const r1 = await new JevJudge("k", 1000, "https://jev.example.test/x", fake).judge(digest("https://github.com/a/b"), undefined, cats);
+  assert.equal(r1?.judgement.category, "coding");
+  await new JevJudge("k", undefined, undefined, fake).judge(digest("https://github.com/a/b"), undefined, cats);
+  assert.deepEqual(urls, ["https://jev.example.test/x", "https://api.typesafe.ai/v1/systemone"]);
 });
 
 test("plugins: { extractors, providers, judges } register; old shapes keep working", async () => {

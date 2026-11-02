@@ -34,6 +34,8 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_LLM_PROVIDER", group: "model", choices: ["", "anthropic", "openai", "gemini", "bedrock", "vertex", "claude-cli", "gemini-cli"] },
   { key: "DRIFTNET_LLM_MODEL", group: "model" },
   { key: "DRIFTNET_LLM_BASE_URL", group: "model" },
+  // The model endpoints go through the SSRF guard: this machine is always allowed, another private host only with this.
+  { key: "DRIFTNET_LLM_ALLOW_LOCAL", group: "model", choices: ["", "1"] },
   { key: "DRIFTNET_LLM_API_KEY", group: "model", secret: true },
   { key: "DRIFTNET_LLM_EFFORT", group: "model", choices: ["", "low", "medium", "high", "xhigh"] },
   { key: "TYPESAFE_API_KEY", group: "model", secret: true },

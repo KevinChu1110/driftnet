@@ -1,3 +1,4 @@
+import { endpointFetch, type EndpointFetch } from "../extractors/net.ts";
 import { WORTH, type Digest, type Kind } from "../types.ts";
 import { judgeState, WORTH_CRITERIA, type Judge, type JudgeResult } from "./index.ts";
 
@@ -25,7 +26,10 @@ type JevAnswer =
  */
 export class JevJudge implements Judge {
   readonly name = "jev" as const;
-  constructor(private readonly apiKey: string, private readonly timeoutMs = 4000, private readonly endpoint: string = JEV_ENDPOINT) {}
+  private readonly fetch: EndpointFetch;
+  constructor(private readonly apiKey: string, private readonly timeoutMs = 4000, private readonly endpoint: string = JEV_ENDPOINT, fetchImpl?: EndpointFetch) {
+    this.fetch = fetchImpl ?? endpointFetch(endpoint);
+  }
 
   async judge(digest: Digest, note: string | undefined, categories: Record<string, string>): Promise<JudgeResult | null> {
     const questions = {
@@ -39,7 +43,7 @@ export class JevJudge implements Judge {
       },
     };
     try {
-      const res = await fetch(this.endpoint, {
+      const res = await this.fetch(this.endpoint, {
         method: "POST",
         headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
         body: JSON.stringify({ model: "jev-latest", state: judgeState(digest, note), questions }),

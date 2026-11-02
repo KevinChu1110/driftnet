@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { endpointFetch, type EndpointFetch } from "../extractors/net.ts";
 import { IncompleteOutput, parseStructured, type LlmProvider, type StructuredRequest } from "./types.ts";
 
 export interface OpenAICompatibleOptions {
@@ -8,6 +9,8 @@ export interface OpenAICompatibleOptions {
   /** Passed as reasoning_effort; only some models accept it. */
   reasoningEffort?: string;
   timeoutMs?: number;
+  /** Tests. By default the guarded fetch for this base URL (net.ts endpointFetch). */
+  fetch?: EndpointFetch;
 }
 
 /**
@@ -20,12 +23,15 @@ export class OpenAICompatibleProvider implements LlmProvider {
   /** Pictures only, and only used when the reader asked for them (DRIFTNET_VIDEO_FRAMES=vision): the model must be a vision model. */
   readonly media = { images: true };
 
+  private readonly fetch: EndpointFetch;
+
   constructor(private readonly opts: OpenAICompatibleOptions) {
     this.label = `openai:${opts.model}${opts.baseUrl.includes("api.openai.com") ? "" : ` @ ${new URL(opts.baseUrl).host}`}`;
+    this.fetch = opts.fetch ?? endpointFetch(opts.baseUrl);
   }
 
   async complete<T extends z.ZodType>(req: StructuredRequest<T>): Promise<z.infer<T>> {
-    const res = await fetch(`${this.opts.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+    const res = await this.fetch(`${this.opts.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

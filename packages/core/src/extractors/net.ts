@@ -142,3 +142,24 @@ export async function safeFetch(input: string, init: RequestInit = {}, allowHost
   }
   throw new BlockedUrl("too many redirects");
 }
+
+const LOOPBACK_NAME = /^(localhost|127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/i;
+/** This very machine: localhost, 127.x, ::1 (brackets or not). */
+export const isLoopbackHost = (host: string): boolean => LOOPBACK_NAME.test(host.replace(/^\[|\]$/g, ""));
+
+export type EndpointFetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
+
+/**
+ * fetch for an endpoint the settings name: the summary model, embeddings, the judge.
+ * Same guard as safeFetch, with one difference: this machine itself is always
+ * reachable (Ollama, LM Studio on localhost), another private host only with
+ * DRIFTNET_LLM_ALLOW_LOCAL=1, and then only that one host. So a base URL that
+ * someone with the admin password points at the LAN or a cloud metadata
+ * address gets nowhere, and the API key and the catalogue's text with it.
+ */
+export function endpointFetch(baseUrl: string, env: NodeJS.ProcessEnv = process.env): EndpointFetch {
+  let host = "";
+  try { host = new URL(baseUrl).hostname; } catch { /* a bad URL fails on use, with the usual error */ }
+  const allow = host && (isLoopbackHost(host) || env.DRIFTNET_LLM_ALLOW_LOCAL === "1") ? host : undefined;
+  return (input, init = {}) => safeFetch(String(input), init, allow);
+}

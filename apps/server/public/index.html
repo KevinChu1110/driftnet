@@ -908,6 +908,7 @@
           DRIFTNET_LLM_PROVIDER: ["Model provider", "Writes the summaries and sorts links into folders. None: links are saved and wait in Other / the Inbox for you to file; an agent can write the summaries."],
           DRIFTNET_LLM_MODEL: ["Model", "e.g. claude-haiku-5-5, gpt-5-mini, gemini-3.8-flash, qwen3"],
           DRIFTNET_LLM_BASE_URL: ["API URL", "For OpenAI-compatible APIs: Gemini, Grok, OpenRouter, Ollama (http://127.0.0.1:11434/v1)…"],
+          DRIFTNET_LLM_ALLOW_LOCAL: ["Allow a model on your network", "This computer (localhost) always works. Needed only when the model or embeddings run on another machine on your LAN; only that exact address is allowed."],
           DRIFTNET_LLM_API_KEY: ["API key", ""],
           DRIFTNET_LLM_EFFORT: ["Reasoning effort", ""],
           TYPESAFE_API_KEY: ["Jev key", "Optional: a ~100 ms classifier that saves model calls (console.typesafe.ai)"],
@@ -974,6 +975,7 @@
           DRIFTNET_DIGEST: { "": "Off (default)", off: "Off", daily: "Every day", weekly: "Every week" },
           DRIFTNET_DIGEST_DAY: { "": "Monday (default)", mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "No (public addresses only)", 1: "Yes" },
+          DRIFTNET_LLM_ALLOW_LOCAL: { "": "No (this computer and public addresses only)", 1: "Yes" },
           DRIFTNET_HEALTH: { "": "Off (default)", off: "Off", weekly: "Weekly (recommended)" },
           DRIFTNET_EMBED: { "": "Automatic (default): on when a local model is found", auto: "Automatic: on when a local model is found", off: "Off" },
           DRIFTNET_EMBED_PROVIDER: { "": "Automatic (local Ollama only)", ollama: "Ollama (on this computer)", openai: "OpenAI", gemini: "Gemini" },
@@ -1131,6 +1133,7 @@
           DRIFTNET_LLM_PROVIDER: ["模型來源", "用來寫摘要，並把連結分進資料夾。選「不使用」：連結照樣存下來，放在「其他」／收件匣等你歸檔；接上的 agent 也能幫忙寫摘要。"],
           DRIFTNET_LLM_MODEL: ["模型", "例如 claude-haiku-5-5、gpt-5-mini、gemini-3.8-flash、qwen3"],
           DRIFTNET_LLM_BASE_URL: ["API 網址", "OpenAI 相容 API 用：Gemini、Grok、OpenRouter、Ollama（http://127.0.0.1:11434/v1）…"],
+          DRIFTNET_LLM_ALLOW_LOCAL: ["允許區網裡的模型", "這台電腦（localhost）一律可用。只有模型或 embedding 跑在區網另一台機器時才需要；只放行你填的那個位址。"],
           DRIFTNET_LLM_API_KEY: ["API 金鑰", ""],
           DRIFTNET_LLM_EFFORT: ["推理強度", ""],
           TYPESAFE_API_KEY: ["Jev 金鑰", "選填：約 100ms 的分類器，可以省下模型呼叫（console.typesafe.ai）"],
@@ -1197,6 +1200,7 @@
           DRIFTNET_DIGEST: { "": "關閉（預設）", off: "關閉", daily: "每天", weekly: "每週" },
           DRIFTNET_DIGEST_DAY: { "": "週一（預設）", mon: "週一", tue: "週二", wed: "週三", thu: "週四", fri: "週五", sat: "週六", sun: "週日" },
           DRIFTNET_WEBHOOK_ALLOW_LOCAL: { "": "否（只允許公開位址）", 1: "是" },
+          DRIFTNET_LLM_ALLOW_LOCAL: { "": "否（只有這台電腦和公開位址）", 1: "是" },
           DRIFTNET_HEALTH: { "": "關閉（預設）", off: "關閉", weekly: "每週（建議）" },
           DRIFTNET_EMBED: { "": "自動（預設）：找到本機模型就開", auto: "自動：找到本機模型就開", off: "關閉" },
           DRIFTNET_EMBED_PROVIDER: { "": "自動（只找本機 Ollama）", ollama: "Ollama（在這台電腦上）", openai: "OpenAI", gemini: "Gemini" },
@@ -2005,7 +2009,7 @@
     chatPoll = setTimeout(tick, 2000);
   }
   /** Settings › AI: the chosen provider's own fields sit under it; other providers', embeddings and tool paths fold into Advanced. */
-  const PROVIDER_FIELDS = { DRIFTNET_LLM_MODEL: "anthropic openai gemini bedrock vertex claude-cli gemini-cli", DRIFTNET_LLM_BASE_URL: "openai",
+  const PROVIDER_FIELDS = { DRIFTNET_LLM_MODEL: "anthropic openai gemini bedrock vertex claude-cli gemini-cli", DRIFTNET_LLM_BASE_URL: "openai", DRIFTNET_LLM_ALLOW_LOCAL: "openai",
     DRIFTNET_LLM_API_KEY: "anthropic openai gemini vertex", DRIFTNET_LLM_EFFORT: "anthropic openai gemini", DRIFTNET_LLM_REGION: "bedrock vertex",
     AWS_ACCESS_KEY_ID: "bedrock", AWS_SECRET_ACCESS_KEY: "bedrock", AWS_SESSION_TOKEN: "bedrock", AWS_BEARER_TOKEN_BEDROCK: "bedrock",
     GOOGLE_CLOUD_PROJECT: "vertex", DRIFTNET_VERTEX_CREDENTIALS: "vertex" };

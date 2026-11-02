@@ -21,6 +21,7 @@ set by the environment itself (systemd, Docker, your shell) wins and shows there
 | `GOOGLE_CLOUD_PROJECT` | from the key file | `vertex` project |
 | `GEMINI_API_KEY` | — | `gemini` key when `DRIFTNET_LLM_API_KEY` is empty |
 | `DRIFTNET_LLM_BASE_URL` | OpenAI | Endpoint for the `openai` provider |
+| `DRIFTNET_LLM_ALLOW_LOCAL` | — | Model and embedding endpoints go through the SSRF guard: this machine (localhost) always works; `1` also allows the one private host named in a base URL (Ollama on another LAN box) |
 | `DRIFTNET_LLM_EFFORT` | `anthropic`: `low` | `anthropic`: `low`–`xhigh`; `openai`: `reasoning_effort`; `claude-cli`: `--effort` |
 | `DRIFTNET_CLI_PATH` | `claude` / `gemini` | CLI binary for `claude-cli` / `gemini-cli` |
 | `DRIFTNET_CLI_CONCURRENCY` | `1` | CLI processes at once |

@@ -20,6 +20,7 @@
 | `GOOGLE_CLOUD_PROJECT` | 取自金鑰檔 | `vertex` 的專案 |
 | `GEMINI_API_KEY` | — | `DRIFTNET_LLM_API_KEY` 沒填時，`gemini` 用這個 |
 | `DRIFTNET_LLM_BASE_URL` | OpenAI | `openai` 供應商的端點 |
+| `DRIFTNET_LLM_ALLOW_LOCAL` | — | 模型與 embedding 端點都經過 SSRF 守門：這台電腦（localhost）一律可用；設 `1` 才放行 base URL 裡填的那一台內網主機（例如區網另一台跑 Ollama 的機器） |
 | `DRIFTNET_LLM_EFFORT` | `anthropic`：`low` | `anthropic`：`low`～`xhigh`；`openai`：`reasoning_effort`；`claude-cli`：`--effort` |
 | `DRIFTNET_CLI_PATH` | `claude`／`gemini` | `claude-cli`／`gemini-cli` 使用的執行檔 |
 | `DRIFTNET_CLI_CONCURRENCY` | `1` | 同時最多跑幾個 CLI |
