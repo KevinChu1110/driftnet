@@ -1,4 +1,5 @@
 import { decodeEntities } from "./extractors/http.ts";
+import { bodyBlock, firstBlock, Needle, stripBlocks, stripComments, stripFences, stripTags, Tags } from "./html.ts";
 
 /**
  * Structure first, prose second (the idea behind agent browsers such as Moli):
@@ -112,23 +113,33 @@ const keepText = (text: string) =>
   (text.match(/ [>›»\/] /g)?.length ?? 0) < 2 && // breadcrumbs
   !(text.length < 100 && /^[^·|•]{1,25}([·|•][^·|•]{1,25})+$/.test(text)); // menus: "Docs · Blog · GitHub"
 
-/** HTML page → outline within `budget` tokens. Falls back to plain text for div-soup pages. */
+const CHROME = ["script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form", "iframe", "template", "pre"];
+const BLOCK_TAGS = new Set(["h1", "h2", "h3", "h4", "p", "li", "blockquote", "dd", "figcaption"]);
+
+/**
+ * HTML page → outline within `budget` tokens. Falls back to plain text for div-soup pages.
+ * Every pass is linear (see html.ts): a page of tags that never close is a shared link like any other.
+ */
 export function outlineHtml(html: string, budget: number): string {
-  const body = (
-    /<(article|main)[\s>][\s\S]*?<\/\1>/i.exec(html)?.[0] ??
-    /<body[\s>][\s\S]*<\/body>/i.exec(html)?.[0] ??
-    html
-  )
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<(script|style|noscript|svg|nav|footer|header|aside|form|iframe|template|pre)[\s>][\s\S]*?<\/\1>/gi, " ");
+  const body = stripBlocks(stripComments(firstBlock(html, ["article", "main"]) ?? bodyBlock(html) ?? html), CHROME);
 
   const blocks: Block[] = [];
-  for (const m of body.matchAll(/<(h[1-4]|p|li|blockquote|dd|figcaption)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
-    const tag = m[1]!.toLowerCase();
-    const text = inlineText(m[2]!);
+  const scan = new Tags(body);
+  const closers = new Map<string, Needle>();
+  const unclosed = new Set<string>();
+  for (let t = scan.next(0), from = 0; t; t = scan.next(from)) {
+    from = t.end;
+    if (t.closing || !BLOCK_TAGS.has(t.name) || unclosed.has(t.name)) continue;
+    let closer = closers.get(t.name);
+    if (!closer) closers.set(t.name, (closer = new Needle(scan.lower, `</${t.name}>`)));
+    // The block ends at the first closer after it; a tag that never closes is not a block (and neither is any later one of its kind).
+    const j = closer.find(t.end);
+    if (j < 0) { unclosed.add(t.name); continue; }
+    from = j + t.name.length + 3;
+    const text = inlineText(body.slice(t.end, j));
     if (!keepText(text)) continue;
-    if (tag.startsWith("h")) blocks.push({ kind: "heading", text: `${"#".repeat(Number(tag[1]))} ${text}` });
-    else if (tag === "li") {
+    if (t.name.startsWith("h")) blocks.push({ kind: "heading", text: `${"#".repeat(Number(t.name[1]))} ${text}` });
+    else if (t.name === "li") {
       if (text.length <= 200) blocks.push({ kind: "item", text: `- ${text}` });
     } else if (estimateTokens(text) >= 8) blocks.push({ kind: "text", text });
   }
@@ -144,11 +155,7 @@ export function outlineHtml(html: string, budget: number): string {
 
 /** README / Markdown → outline within `budget` tokens. Code blocks and tables are left out. */
 export function outlineMarkdown(md: string, budget: number): string {
-  const lines = md
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<[^>]+>/g, " ")
-    .split("\n");
+  const lines = stripTags(stripComments(stripFences(md), "")).split("\n");
   const blocks: Block[] = [];
   let para: string[] = [];
   const flush = () => {
@@ -179,6 +186,6 @@ export function outlineMarkdown(md: string, budget: number): string {
 }
 
 function inlineText(html: string, keepNewlines = false): string {
-  const text = decodeEntities(html.replace(/<[^>]+>/g, " "));
+  const text = decodeEntities(stripTags(html));
   return keepNewlines ? text.replace(/[ \t\f\v]+/g, " ") : text.replace(/\s+/g, " ").trim();
 }

@@ -3,6 +3,7 @@ import { decodeEntities, fetchText, metaTags } from "./http.ts";
 import { mediaKindOf, normalizeMedia } from "../media.ts";
 import { clipTokens, digestBudget, outlineHtml } from "../digest.ts";
 import { canonicalize, extractUrls, hostOf } from "../url.ts";
+import { attrs, bodyBlock, firstBlock, stripBlocks, Tags } from "../html.ts";
 
 
 /** Sites that hide the post behind a login wall for anonymous fetches. */
@@ -83,19 +84,19 @@ export function pageImages(html: string, base: string, meta: Record<string, stri
     if (url) out.push({ url, kind: video ? "video" : mediaKindOf(url), alt: meta["og:image:alt"] ?? meta["twitter:image:alt"] ?? "" });
   }
   if (!social) {
-    const main = /<(article|main)[\s>][\s\S]*?<\/\1>/i.exec(html)?.[0] ?? "";
-    const body = main.replace(/<(nav|header|footer|aside|script|style)[\s>][\s\S]*?<\/\1>/gi, " ");
+    const body = stripBlocks(firstBlock(html, ["article", "main"]) ?? "", SIDE_BLOCKS);
+    const scan = new Tags(body);
     let n = 0;
-    for (const m of body.matchAll(/<img\b[^>]*>/gi)) {
-      const tag = m[0];
-      const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    for (let t = scan.next(0); t; t = scan.next(t.end)) {
+      if (t.closing || t.name !== "img") continue;
+      const a = attrs(t.raw);
+      const src = a["src"];
       if (!src || src.startsWith("data:") || JUNK_IMG.test(src)) continue;
-      const dim = (k: string) => Number(new RegExp(`\\b${k}\\s*=\\s*["']?(\\d+)`, "i").exec(tag)?.[1] ?? NaN);
-      const w = dim("width"), h = dim("height");
+      const w = pixels(a["width"]), h = pixels(a["height"]);
       if (w < 300 || h < 150) continue; // unknown size (NaN) passes
       const url = abs(src);
       if (url) {
-        out.push({ url, kind: mediaKindOf(url), alt: decodeEntities(/\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? "") });
+        out.push({ url, kind: mediaKindOf(url), alt: decodeEntities(a["alt"] ?? "") });
         if (++n >= 2) break;
       }
     }
@@ -103,15 +104,22 @@ export function pageImages(html: string, base: string, meta: Record<string, stri
   return normalizeMedia(out);
 }
 
+const SIDE_BLOCKS = ["nav", "header", "footer", "aside", "script", "style"];
+
+/** The leading number of a width/height attribute ("640", "640px"); NaN when absent. */
+const pixels = (v: string | undefined) => Number(/^\s*(\d+)/.exec(v ?? "")?.[1] ?? NaN);
+
 /** Links inside the main content (not nav, header, footer, sidebars), absolute and canonical. */
 function contentLinks(html: string, base: string): string[] {
-  const main =
-    /<(article|main)[\s>][\s\S]*?<\/\1>/i.exec(html)?.[0] ?? /<body[\s>][\s\S]*<\/body>/i.exec(html)?.[0] ?? html;
-  const body = main.replace(/<(nav|header|footer|aside|script|style)[\s>][\s\S]*?<\/\1>/gi, " ");
+  const body = stripBlocks(firstBlock(html, ["article", "main"]) ?? bodyBlock(html) ?? html, SIDE_BLOCKS);
   const out: string[] = [];
-  for (const m of body.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"'#][^"']*)["']/gi)) {
+  const scan = new Tags(body);
+  for (let t = scan.next(0); t; t = scan.next(t.end)) {
+    if (t.closing || t.name !== "a") continue;
+    const href = attrs(t.raw)["href"];
+    if (!href || href.startsWith("#")) continue;
     try {
-      const u = canonicalize(new URL(decodeEntities(m[1]!), base).href);
+      const u = canonicalize(new URL(decodeEntities(href), base).href);
       if (u) out.push(u);
     } catch {
       // relative junk, javascript: links

@@ -3,7 +3,7 @@ import { decodeEntities, fetchText, metaTags } from "./http.ts";
 import { digestBudget, outlineMarkdown } from "../digest.ts";
 import { mediaKindOf, normalizeMedia } from "../media.ts";
 import { extractUrls } from "../url.ts";
-
+import { attrs, markdownImages, stripComments, stripFences, stripImages, stripLinkedBadges, Tags, unlinkLinks } from "../html.ts";
 
 export function matchGithub(url: string): { owner: string; repo: string } | null {
   const m = /^https:\/\/github\.com\/([^/]+)\/([^/?#]+)/.exec(url);
@@ -72,15 +72,23 @@ const BADGE_PATH = /badge|sponsor|buy-?me-?a-?coffee|donate|\/workflows\/.*\.svg
  * buttons, SVGs (never proxied) and tiny icons are dropped. At most 6.
  */
 export function readmeImages(md: string, owner: string, repo: string, branch: string): MediaRef[] {
-  const text = md.replace(/<!--[\s\S]*?-->/g, "").replace(/```[\s\S]*?```/g, "");
+  const text = stripFences(stripComments(md, ""));
   const found: { at: number; src: string; alt: string; w?: number; h?: number }[] = [];
-  for (const m of text.matchAll(/!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+["'][^)]*)?\)/g)) found.push({ at: m.index!, src: m[2]!, alt: m[1]! });
-  for (const m of text.matchAll(/<img\b[^>]*>/gi)) {
-    const tag = m[0];
-    const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+  for (const img of markdownImages(text)) {
+    // ![alt](src "title"), ![alt](<src>); a "source" longer than a few KB is not a picture.
+    if (img.inner.length > 4096) continue;
+    const src = /^\s*<?([^)\s>]+)>?(?:\s+["'][^)]*)?$/.exec(img.inner)?.[1];
+    if (src) found.push({ at: img.start, src, alt: img.alt });
+  }
+  const scan = new Tags(text);
+  for (let t = scan.next(0); t; t = scan.next(t.end)) {
+    if (t.closing || t.name !== "img") continue;
+    const a = attrs(t.raw);
+    const src = a["src"];
     if (!src) continue;
-    const num = (k: string) => { const v = new RegExp(`\\b${k}\\s*=\\s*["']?(\\d+)(?!%)`, "i").exec(tag)?.[1]; return v ? Number(v) : undefined; };
-    found.push({ at: m.index!, src: decodeEntities(src), alt: decodeEntities(/\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? ""), w: num("width"), h: num("height") });
+    // A pixel size ("40", "40px"); a percentage is not a size.
+    const num = (k: string) => { const m = /^\s*(\d+)(%?)/.exec(a[k] ?? ""); return m && !m[2] ? Number(m[1]) : undefined; };
+    found.push({ at: t.start, src: decodeEntities(src), alt: decodeEntities(a["alt"] ?? ""), w: num("width"), h: num("height") });
   }
   found.sort((a, b) => a.at - b.at);
   const base = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/`;
@@ -106,16 +114,32 @@ export function readmeImages(md: string, owner: string, repo: string, branch: st
  * costs tokens.
  */
 export function cleanReadme(md: string): string {
-  return md
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(picture|img|source|br|p|div|a|h\d)[^>]*>|<\/(picture|p|div|a|h\d)>/gi, "")
-    .replace(/\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)/g, "") // linked badges
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // keep link text only
-    .replace(/```[\s\S]*?```/g, (block) => (block.length > 400 ? "```…```" : block))
-    .replace(/^\s*[-*]\s*$/gm, "")
+  let out = stripComments(md, "");
+  out = stripHtmlTags(out);
+  out = unlinkLinks(stripImages(stripLinkedBadges(out))); // linked badges and images go; links keep their text
+  out = stripFences(out, (block) => (block.length > 400 ? "```…```" : block));
+  return out
+    .replace(/^[ \t]*[-*][ \t]*$/gm, "") // a bullet with nothing on it ([ \t], not \s: \s would run across blank lines, quadratically)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+const LAYOUT_OPEN = /^(picture|img|source|br|p|div|a|h\d)/;
+const LAYOUT_CLOSE = /^(picture|p|div|a|h\d)/;
+
+/** Layout tags READMEs open with (centred logos, pictures, line breaks) removed; text and other markup stay. */
+function stripHtmlTags(md: string): string {
+  const scan = new Tags(md);
+  const parts: string[] = [];
+  let pos = 0;
+  for (let t = scan.next(0); t; t = scan.next(t.end)) {
+    if (!(t.closing ? LAYOUT_CLOSE : LAYOUT_OPEN).test(t.name)) continue;
+    parts.push(md.slice(pos, t.start));
+    pos = t.end;
+  }
+  if (!parts.length) return md;
+  parts.push(md.slice(pos));
+  return parts.join("");
 }
 
 /**

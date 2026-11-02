@@ -1,3 +1,4 @@
+import { attrs, Tags } from "../html.ts";
 import { BlockedUrl, safeFetch } from "./net.ts";
 
 export interface FetchResult {
@@ -83,15 +84,24 @@ async function fetchOnce(
   return { status: res.status, url: res.url, contentType, body: Buffer.concat(chunks).toString("utf8") };
 }
 
+/** `<meta property|name|itemprop=… content=…>` as a map (first one wins), plus the `<title>` under "title". One linear pass. */
 export function metaTags(html: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of html.matchAll(/<meta\s[^>]*>/gi)) {
-    const tag = m[0];
-    const key = /(?:property|name|itemprop)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase();
-    const value = /content\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1];
-    if (key && value && !(key in out)) out[key] = decodeEntities(value);
+  const scan = new Tags(html);
+  let title: string | undefined;
+  for (let t = scan.next(0); t; t = scan.next(t.end)) {
+    if (t.closing) continue;
+    if (t.name === "meta") {
+      const a = attrs(t.raw);
+      const key = (a["property"] || a["name"] || a["itemprop"])?.toLowerCase();
+      const value = a["content"];
+      if (key && value && !(key in out)) out[key] = decodeEntities(value);
+    } else if (t.name === "title" && title === undefined) {
+      // The text up to the next tag, which must be the closing one.
+      const lt = scan.lower.indexOf("<", t.end);
+      if (lt >= 0 && scan.lower.startsWith("</title>", lt)) title = html.slice(t.end, lt);
+    }
   }
-  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1];
   if (title && !out["title"]) out["title"] = decodeEntities(title.trim());
   return out;
 }
