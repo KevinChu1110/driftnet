@@ -949,6 +949,7 @@
           DRIFTNET_HEALTH: ["Link health check", "Weekly: a few cards at a time, driftnet checks that links still work and repos aren't archived. Marks dead, archived and stale cards."],
           DRIFTNET_VIDEO: ["Read reels and shorts", "For Instagram, Facebook, Threads, TikTok, YouTube Shorts and X videos whose text says almost nothing, driftnet reads captions, on-screen text and speech with local tools (yt-dlp, ffmpeg, tesseract, whisper) if installed. One video at a time."],
           DRIFTNET_YTDLP: ["yt-dlp path", "Only if yt-dlp is not on PATH."],
+          DRIFTNET_YTDLP_IMPERSONATE: ["yt-dlp browser fingerprint", "Make yt-dlp look like a real browser (chrome, safari, firefox) to sites that refuse a bare client. Needs curl_cffi installed next to yt-dlp (Homebrew's yt-dlp has it; with pip: pip install 'yt-dlp[curl-cffi]'). Leave empty otherwise: an unsupported value makes every video fail."],
           DRIFTNET_YTDLP_COOKIES: ["yt-dlp cookies file", "A cookies.txt exported from a browser where you are logged in (a 'Get cookies.txt' extension). For Facebook, Instagram and YouTube's \"sign in to confirm you're not a bot\". The file stays on this machine."],
           DRIFTNET_FFMPEG: ["ffmpeg path", "Only if ffmpeg is not on PATH."],
           DRIFTNET_TESSERACT: ["tesseract path", "Only if tesseract (on-screen text) is not on PATH."],
@@ -1175,6 +1176,7 @@
           DRIFTNET_HEALTH: ["連結健康檢查", "每週：每次幾張，檢查連結是否還能開、儲存庫是否已封存，並標記失效、封存、久未更新的卡片。"],
           DRIFTNET_VIDEO: ["讀影片（reels、shorts）", "Instagram、Facebook、Threads、TikTok、YouTube Shorts、X 的影片，若頁面文字幾乎沒內容，就用本機工具（yt-dlp、ffmpeg、tesseract、whisper，有裝才用）讀字幕、畫面文字和語音。一次只處理一支影片。"],
           DRIFTNET_YTDLP: ["yt-dlp 路徑", "只有 yt-dlp 不在 PATH 時才需要。"],
+          DRIFTNET_YTDLP_IMPERSONATE: ["yt-dlp 瀏覽器指紋", "讓 yt-dlp 看起來像真的瀏覽器（chrome、safari、firefox），給拒絕一般程式連線的網站用。需要 yt-dlp 旁邊裝有 curl_cffi（Homebrew 版已內建；用 pip 的話：pip install 'yt-dlp[curl-cffi]'）。沒有就留空：填了不支援的值會讓每支影片都失敗。"],
           DRIFTNET_YTDLP_COOKIES: ["yt-dlp cookies 檔", "從已登入的瀏覽器匯出的 cookies.txt（用「Get cookies.txt」之類的擴充功能）。給 Facebook、Instagram 和 YouTube 的「登入以確認你不是機器人」用。檔案只留在這台機器上。"],
           DRIFTNET_FFMPEG: ["ffmpeg 路徑", "只有 ffmpeg 不在 PATH 時才需要。"],
           DRIFTNET_TESSERACT: ["tesseract 路徑", "只有 tesseract（讀畫面文字）不在 PATH 時才需要。"],
@@ -2016,7 +2018,7 @@
     AWS_ACCESS_KEY_ID: "bedrock", AWS_SECRET_ACCESS_KEY: "bedrock", AWS_SESSION_TOKEN: "bedrock", AWS_BEARER_TOKEN_BEDROCK: "bedrock",
     GOOGLE_CLOUD_PROJECT: "vertex", DRIFTNET_VERTEX_CREDENTIALS: "vertex" };
   const AI_ADVANCED = ["TYPESAFE_API_KEY", "GITHUB_TOKEN", "DRIFTNET_EMBED", "DRIFTNET_EMBED_PROVIDER", "DRIFTNET_EMBED_MODEL", "DRIFTNET_EMBED_BASE_URL",
-    "DRIFTNET_EMBED_API_KEY", "DRIFTNET_EMBED_FLOOR", "DRIFTNET_YTDLP", "DRIFTNET_FFMPEG", "DRIFTNET_TESSERACT", "DRIFTNET_WHISPER", "DRIFTNET_YTDLP_COOKIES"];
+    "DRIFTNET_EMBED_API_KEY", "DRIFTNET_EMBED_FLOOR", "DRIFTNET_YTDLP", "DRIFTNET_FFMPEG", "DRIFTNET_TESSERACT", "DRIFTNET_WHISPER", "DRIFTNET_YTDLP_COOKIES", "DRIFTNET_YTDLP_IMPERSONATE"];
   function aiPanel(sv, field) {
     const st = T().st, all = sv.settings;
     const adv = new Set(AI_ADVANCED);

@@ -460,7 +460,9 @@ export async function readVideo(url: string, page: string, dir: string, deps: Re
   // No --no-warnings: with --ignore-errors a refused subtitle or a login wall is reported as a warning, and that line is the reason we log.
   // DRIFTNET_YTDLP_COOKIES: a cookies.txt exported from a logged-in browser, for sites that show anonymous visitors nothing.
   const cookies = deps.env.DRIFTNET_YTDLP_COOKIES?.trim();
-  const base = ["--ignore-config", "--no-playlist", "--no-progress", "--socket-timeout", "15", "--retries", "1", ...(cookies ? ["--cookies", cookies] : [])];
+  // DRIFTNET_YTDLP_IMPERSONATE: a browser for yt-dlp to look like (chrome, safari, firefox…); needs curl_cffi next to yt-dlp.
+  const impersonate = deps.env.DRIFTNET_YTDLP_IMPERSONATE?.trim();
+  const base = ["--ignore-config", "--no-playlist", "--no-progress", "--socket-timeout", "15", "--retries", "1", ...(cookies ? ["--cookies", cookies] : []), ...(impersonate ? ["--impersonate", impersonate] : [])];
   const out = ["-o", join(dir, "meta.%(ext)s"), "--", url];
 
   // 1. title, description, duration and the list of subtitle tracks: no download, one request.

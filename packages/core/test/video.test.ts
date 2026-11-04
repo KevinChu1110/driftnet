@@ -374,6 +374,15 @@ test("DRIFTNET_YTDLP_COOKIES: every yt-dlp call carries --cookies <file>; withou
   assert.ok(without.calls.filter((c) => c.bin.endsWith("yt-dlp")).every((c) => !c.args.includes("--cookies")));
 });
 
+test("DRIFTNET_YTDLP_IMPERSONATE: every yt-dlp call carries --impersonate <browser>", async () => {
+  const r = await run(digest(), { info: { title: "t", description: "" } }, { env: { DRIFTNET_YTDLP_IMPERSONATE: "chrome" } });
+  const yt = r.calls.filter((c) => c.bin.endsWith("yt-dlp"));
+  assert.ok(yt.length >= 1);
+  for (const c of yt) assert.equal(c.args[c.args.indexOf("--impersonate") + 1], "chrome");
+  const none = await run(digest(), { info: { title: "t", description: "" } });
+  assert.ok(none.calls.filter((c) => c.bin.endsWith("yt-dlp")).every((c) => !c.args.includes("--impersonate")));
+});
+
 test("an old yt-dlp is noticed once per binary and named when a video can't be read", async () => {
   const now = Date.UTC(2026, 10, 3);
   assert.equal(ytdlpAgeDays("2026.10.26", now), 8);

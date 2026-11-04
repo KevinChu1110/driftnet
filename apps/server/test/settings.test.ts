@@ -58,6 +58,12 @@ test("a video tool setting must be the full path of that tool, not any program",
   settings.update({ DRIFTNET_YTDLP_COOKIES: "/Users/me/cookies.txt" });
   settings.update({ DRIFTNET_YTDLP_COOKIES: "C:\\Users\\me\\yt.cookies" });
   settings.update({ DRIFTNET_YTDLP_COOKIES: "" });
+  settings.update({ DRIFTNET_YTDLP_IMPERSONATE: "chrome" });
+  settings.update({ DRIFTNET_YTDLP_IMPERSONATE: "chrome-136:macos" });
+  settings.update({ DRIFTNET_YTDLP_IMPERSONATE: "" });
+  for (const bad of [{ DRIFTNET_YTDLP_IMPERSONATE: "--cookies /etc/passwd" }, { DRIFTNET_YTDLP_IMPERSONATE: "chrome;rm" }, { DRIFTNET_YTDLP_IMPERSONATE: "-chrome" }]) {
+    assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
+  }
   for (const bad of [{ DRIFTNET_YTDLP_COOKIES: "cookies.txt" }, { DRIFTNET_YTDLP_COOKIES: "/tmp/" }, { DRIFTNET_YTDLP_COOKIES: "# Netscape HTTP Cookie File\n.x.com\tTRUE" }]) {
     assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
   }

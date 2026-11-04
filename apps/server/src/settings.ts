@@ -77,6 +77,8 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_TESSERACT", group: "rules", max: 500, ...toolPath("tesseract") },
   { key: "DRIFTNET_WHISPER", group: "rules", max: 500, ...toolPath("whisper") },
   // A cookies.txt for yt-dlp (sites that show anonymous visitors nothing). A file path, never the cookies themselves.
+  // A browser for yt-dlp to impersonate (TLS fingerprint): sites that answer a bare client with 403/400. Needs curl_cffi (`yt-dlp --list-impersonate-targets`).
+  { key: "DRIFTNET_YTDLP_IMPERSONATE", group: "rules", max: 40, pattern: /^[a-z][a-z0-9]{1,19}(?:[-:][\w.]{1,20}){0,2}$/i, shape: "is a browser name yt-dlp knows, e.g. chrome, safari, firefox or chrome-136:macos" },
   { key: "DRIFTNET_YTDLP_COOKIES", group: "rules", max: 500, pattern: /^(?:\/|[a-z]:[\\/])(?:[^\\/\0]+[\\/])*[^\\/\0]+$/i, shape: "is the full path of a cookies.txt file (Netscape format), e.g. /Users/me/cookies.txt" },
   // Cloud providers (bedrock, vertex) and the rules judge. Keys are write-only like the other secrets;
   // the credentials setting is a file path, never the key itself.
