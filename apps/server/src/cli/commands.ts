@@ -165,10 +165,10 @@ export async function open(ctx: Ctx, argv: string[]): Promise<number> {
   });
 }
 
-async function allItemsJson(ctx: Ctx, c: Connection): Promise<PubItem[]> {
+async function allItemsJson(ctx: Ctx, c: Connection, includeDownvoted = false): Promise<PubItem[]> {
   const all: PubItem[] = [];
   for (;;) {
-    const r = await call(c, ctx.fetch, "GET", `/api/items?limit=200&offset=${all.length}`, { timeoutMs: 60_000 });
+    const r = await call(c, ctx.fetch, "GET", `/api/items?limit=200&offset=${all.length}${includeDownvoted ? "&all=1" : ""}`, { timeoutMs: 60_000 });
     const page = ok<PubItem[]>(r);
     all.push(...page);
     const total = Number(r.headers.get("x-total-count") ?? page.length);
@@ -215,7 +215,7 @@ async function exportSite(ctx: Ctx, c: Connection, outDir: string, opts: { folde
   let built;
   try {
     const [items, folders, ui] = await Promise.all([
-      allItemsJson(ctx, c) as Promise<Parameters<typeof toShowcaseFromApi>[0]>,
+      allItemsJson(ctx, c, true) as Promise<Parameters<typeof toShowcaseFromApi>[0]>,
       call(c, ctx.fetch, "GET", "/api/folders", { timeoutMs: 30_000 }).then((r) => ok<Parameters<typeof toShowcaseFromApi>[1]>(r)),
       call(c, ctx.fetch, "GET", "/api/ui", { timeoutMs: 30_000 }).then((r) => ok<{ locale?: Locale }>(r)).catch(() => ({ locale: undefined })),
     ]);
