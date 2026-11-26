@@ -9,7 +9,7 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 | `driftnet add <url> [--note "…"]` | `npx driftnet add https://github.com/acme/widget --note "demo 要用"` |
 | `driftnet search [關鍵字…] [--folder id] [--kind …] [--view inbox\|favorites\|trash] [--limit N] [--json]` | `npx driftnet search 向量資料庫 --kind repo --limit 5` |
 | `driftnet open [id]` | `npx driftnet open 12` |
-| `driftnet export [--format json\|md\|vault] [-o 檔案]` | `npx driftnet export --format vault -o links.zip` |
+| `driftnet export [--format json\|md\|vault\|site] [-o 檔案或目錄]` | `npx driftnet export --format vault -o links.zip` |
 | `driftnet import <檔案或資料夾包連結> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
 | `driftnet backup [-o file] [--secrets]` | `npx driftnet backup -o driftnet.zip` |
 | `driftnet restore <file> [--print-settings]` | `npx driftnet restore driftnet.zip` |
@@ -17,6 +17,8 @@ driftnet 在跑的時候（`npx driftnet`），同一個指令就能跟它說話
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 | `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
 | `driftnet service install\|uninstall\|status [--dry-run]` | `npx driftnet service install` |
+
+`driftnet export --format site -o ./docs` 會建立靜態展示站。加上 `--folder <id>` 可只匯出該資料夾及其子資料夾，或用 `--title <文字>` 設定標題。線上和離線匯出都包含被倒讚的項目，但不包含垃圾桶與標記為提示注入的項目；公開前請先檢查輸出內容。
 
 連到別台機器：加 `--url http://host:8787 --token <密碼>`（或設 `DRIFTNET_URL`、`DRIFTNET_TOKEN`；密碼也會從 `~/.driftnet/.env` 讀）。
 

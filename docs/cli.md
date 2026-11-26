@@ -9,7 +9,7 @@ With driftnet running (`npx driftnet`), the same command talks to it. `search`, 
 | `driftnet add <url> [--note "…"]` | `npx driftnet add https://github.com/acme/widget --note "for the demo"` |
 | `driftnet search [query…] [--folder id] [--kind …] [--view inbox\|favorites\|trash] [--limit N] [--json]` | `npx driftnet search vector database --kind repo --limit 5` |
 | `driftnet open [id]` | `npx driftnet open 12` |
-| `driftnet export [--format json\|md\|vault] [-o file]` | `npx driftnet export --format vault -o links.zip` |
+| `driftnet export [--format json\|md\|vault\|site] [-o file or directory]` | `npx driftnet export --format vault -o links.zip` |
 | `driftnet import <file or pack link> [--keep-folders] [--yes]` | `npx driftnet import bookmarks.html --keep-folders` |
 | `driftnet backup [-o file] [--secrets]` | `npx driftnet backup -o driftnet.zip` |
 | `driftnet restore <file> [--print-settings]` | `npx driftnet restore driftnet.zip` |
@@ -17,6 +17,8 @@ With driftnet running (`npx driftnet`), the same command talks to it. `search`, 
 | `driftnet completion bash\|zsh` | `eval "$(driftnet completion zsh)"` |
 | `driftnet init [--client claude-code\|claude-desktop\|cursor\|windsurf\|codex\|all] [--remote URL --token T] [--yes] [--dry-run]` | `npx driftnet init --yes` |
 | `driftnet service install\|uninstall\|status [--dry-run]` | `npx driftnet service install` |
+
+`driftnet export --format site -o ./docs` builds a static showcase. Add `--folder <id>` to include only that folder and its descendants, or `--title <text>` to name the site. Online and offline exports include downvoted items but exclude trash and items flagged for prompt injection. Review the output before publishing it.
 
 For a server elsewhere, add `--url http://host:8787 --token <password>` (or set `DRIFTNET_URL` and `DRIFTNET_TOKEN`; the password is also read from `~/.driftnet/.env`).
 

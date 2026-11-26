@@ -1,4 +1,4 @@
-import type { Driftnet, Item, Locale } from "@driftnet/core";
+import { categoryLabel, type Driftnet, type Item, type Locale } from "@driftnet/core";
 
 /**
  * Static Showcase exporter: turns the whole catalogue (or one folder subtree)
@@ -61,6 +61,16 @@ export interface ShowcaseOptions {
   builtAt?: string;
 }
 
+type ShowcaseSourceItem = {
+  id: number; url: string; title: string; kind: string; category: string; worth: string;
+  createdAt: string; summary?: Item["summary"];
+  stars?: number | null;
+  flags?: string[];
+  trashedAt?: string | null;
+};
+
+type ShowcaseSourceFolder = { id: string; parent: string | null; name: string | null };
+
 export class ShowcaseError extends Error {}
 
 const safeHttpUrl = (raw: string | undefined): string => {
@@ -89,27 +99,37 @@ function escHtml(s: string): string {
 
 /** Collect public-safe showcase data from a local Driftnet instance. */
 export function buildShowcaseData(dn: Driftnet, opts: ShowcaseOptions = {}): ShowcaseData {
+  return buildData(dn.store.exportable(), dn.store.folders(), opts);
+}
+
+function buildData(rawItems: ShowcaseSourceItem[], rawFolders: ShowcaseSourceFolder[], opts: ShowcaseOptions): ShowcaseData {
   const locale: Locale = opts.locale ?? "en";
-  const allFolders = dn.store.folders();
-  const byId = new Map(allFolders.map((f) => [f.id, f]));
-  const labelOf = dn.folderLabeler(locale);
+  const byId = new Map(rawFolders.map((f) => [f.id, f]));
+  const labelOf = (id: string) => byId.get(id)?.name ?? categoryLabel(id, locale);
 
   let allowedFolders: Set<string> | null = null;
   let defaultTitle = "driftnet";
 
   if (opts.folder) {
     if (!byId.has(opts.folder)) {
-      const ids = allFolders.map((f) => f.id).join(", ");
+      const ids = rawFolders.map((f) => f.id).join(", ");
       throw new ShowcaseError(`unknown folder "${opts.folder}". Valid folders: ${ids}`);
     }
+    const children = new Map<string, string[]>();
+    for (const f of rawFolders) {
+      if (f.parent) {
+        const siblings = children.get(f.parent) ?? [];
+        siblings.push(f.id);
+        children.set(f.parent, siblings);
+      }
+    }
     allowedFolders = new Set<string>([opts.folder]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const f of allFolders) {
-        if (f.parent && allowedFolders.has(f.parent) && !allowedFolders.has(f.id)) {
-          allowedFolders.add(f.id);
-          grew = true;
+    const queue = [opts.folder];
+    for (let n = 0; n < queue.length; n++) {
+      for (const id of children.get(queue[n]!) ?? []) {
+        if (!allowedFolders.has(id)) {
+          allowedFolders.add(id);
+          queue.push(id);
         }
       }
     }
@@ -125,17 +145,20 @@ export function buildShowcaseData(dn: Driftnet, opts: ShowcaseOptions = {}): Sho
     return out;
   };
 
-  const rawItems = dn.store.exportable().filter((i) => !allowedFolders || allowedFolders.has(i.category));
   const counts = new Map<string, number>();
   const items: ShowcaseItem[] = [];
   for (const i of rawItems) {
+    if (i.trashedAt || i.flags?.some((flag) => /injection/i.test(flag))) continue;
+    if (allowedFolders && !allowedFolders.has(i.category)) continue;
     const href = safeHttpUrl(i.summary?.primaryUrl || i.url);
     if (!href) continue;
     counts.set(i.category, (counts.get(i.category) ?? 0) + 1);
     items.push(toShowcaseItem(i, href, labelOf(i.category)));
   }
+  const worthRank = (worth: string) => worth === "skip" ? 0 : worth === "low" ? 1 : worth === "normal" ? 2 : 3;
+  items.sort((a, b) => worthRank(b.worth) - worthRank(a.worth) || a.id - b.id);
 
-  const folders: ShowcaseFolder[] = allFolders
+  const folders: ShowcaseFolder[] = rawFolders
     .filter((f) => (!allowedFolders || allowedFolders.has(f.id)) && (counts.get(f.id) ?? 0) > 0)
     .map((f) => ({
       id: f.id,
@@ -154,7 +177,7 @@ export function buildShowcaseData(dn: Driftnet, opts: ShowcaseOptions = {}): Sho
   };
 }
 
-function toShowcaseItem(i: Item, href: string, folderLabel: string): ShowcaseItem {
+function toShowcaseItem(i: ShowcaseSourceItem, href: string, folderLabel: string): ShowcaseItem {
   const s = i.summary;
   return {
     id: i.id,
@@ -191,93 +214,11 @@ export function toShowcase(dn: Driftnet, opts: ShowcaseOptions = {}): ShowcaseRe
 
 /** Build static showcase files directly from pre-fetched API data (used when exporting via HTTP). */
 export function toShowcaseFromApi(
-  rawItems: Array<{
-    id: number; url: string; title: string; kind: string; category: string; worth: string;
-    stars?: number | null; createdAt: string; flags?: string[]; trashedAt?: string | null;
-    summary?: Item["summary"];
-  }>,
-  rawFolders: Array<{ id: string; parent: string | null; name: string | null }>,
+  rawItems: ShowcaseSourceItem[],
+  rawFolders: ShowcaseSourceFolder[],
   opts: ShowcaseOptions = {},
 ): ShowcaseResult {
-  const locale: Locale = opts.locale ?? "en";
-  const byId = new Map(rawFolders.map((f) => [f.id, f]));
-  const labelOf = (id: string) => byId.get(id)?.name || id;
-
-  let allowedFolders: Set<string> | null = null;
-  let defaultTitle = "driftnet";
-  if (opts.folder) {
-    if (!byId.has(opts.folder)) {
-      const ids = rawFolders.map((f) => f.id).join(", ");
-      throw new ShowcaseError(`unknown folder "${opts.folder}". Valid folders: ${ids}`);
-    }
-    allowedFolders = new Set<string>([opts.folder]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const f of rawFolders) {
-        if (f.parent && allowedFolders.has(f.parent) && !allowedFolders.has(f.id)) {
-          allowedFolders.add(f.id);
-          grew = true;
-        }
-      }
-    }
-    defaultTitle = labelOf(opts.folder);
-  }
-
-  const pathOf = (id: string): string[] => {
-    const out: string[] = [];
-    for (let cur: string | null = id, guard = 0; cur && guard < 20; cur = byId.get(cur)?.parent ?? null, guard++) {
-      out.unshift(labelOf(cur));
-      if (opts.folder && cur === opts.folder) break;
-    }
-    return out;
-  };
-
-  const counts = new Map<string, number>();
-  const items: ShowcaseItem[] = [];
-  for (const i of rawItems) {
-    if (i.trashedAt || i.flags?.includes("injection")) continue;
-    if (allowedFolders && !allowedFolders.has(i.category)) continue;
-    const href = safeHttpUrl(i.summary?.primaryUrl || i.url);
-    if (!href) continue;
-    counts.set(i.category, (counts.get(i.category) ?? 0) + 1);
-    items.push({
-      id: i.id,
-      name: i.summary?.name ?? i.title,
-      url: href,
-      folder: i.category,
-      folderLabel: labelOf(i.category),
-      kind: i.kind,
-      worth: i.worth,
-      oneLiner: i.summary?.oneLiner ?? null,
-      demo: i.summary?.demo ?? null,
-      why: i.summary?.why ?? null,
-      highlights: i.summary?.highlights ?? [],
-      useCases: i.summary?.useCases ?? [],
-      tryIt: i.summary?.tryIt ?? null,
-      tags: i.summary?.tags ?? [],
-      stars: i.stars ?? null,
-      added: (i.createdAt ?? "").slice(0, 10),
-    });
-  }
-
-  const folders: ShowcaseFolder[] = rawFolders
-    .filter((f) => (!allowedFolders || allowedFolders.has(f.id)) && (counts.get(f.id) ?? 0) > 0)
-    .map((f) => ({
-      id: f.id,
-      parent: opts.folder && f.id === opts.folder ? null : f.parent,
-      label: labelOf(f.id),
-      path: pathOf(f.id),
-      count: counts.get(f.id) ?? 0,
-    }));
-
-  const data: ShowcaseData = {
-    title: opts.title?.trim() || defaultTitle,
-    locale,
-    builtAt: opts.builtAt ?? new Date().toISOString(),
-    folders,
-    items,
-  };
+  const data = buildData(rawItems, rawFolders, opts);
   return {
     data,
     files: [
@@ -455,25 +396,30 @@ export function renderShowcaseHtml(data: ShowcaseData): string {
   const fmtStars = (n) => n == null ? "" : "★ " + (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\\.0$/, "") + "k" : n);
 
   const state = { q: "", folder: "", tag: "", sort: "best" };
+  const searchItems = DATA.items.map((item) => ({
+    item, text: [item.name, item.oneLiner, item.demo, item.why, item.url, item.folderLabel, ...(item.highlights || []), ...(item.tags || [])].join(" ").toLowerCase(),
+  }));
+  const sortedItems = new Map();
+  function sorted(sort) {
+    if (!sortedItems.has(sort)) {
+      sortedItems.set(sort, [...searchItems].sort(({ item: a }, { item: b }) => {
+        if (sort === "newest") return (b.added || "").localeCompare(a.added || "") || b.id - a.id;
+        if (sort === "stars") return (b.stars ?? -1) - (a.stars ?? -1) || b.id - a.id;
+        return (WORTH[b.worth] ?? 0) - (WORTH[a.worth] ?? 0) || (b.added || "").localeCompare(a.added || "") || b.id - a.id;
+      }));
+    }
+    return sortedItems.get(sort);
+  }
   $("q").placeholder = T.search;
   $("sort").innerHTML = [["best", T.sortBest], ["newest", T.sortNewest], ["stars", T.sortStars]]
     .map(([v, l]) => '<option value="' + v + '">' + esc(l) + "</option>").join("");
   $("updated").textContent = T.updated((DATA.builtAt || "").slice(0, 10));
 
-  function matches(it) {
+  function matches({ item: it, text }, words) {
     if (state.folder && it.folder !== state.folder) return false;
     if (state.tag && !(it.tags || []).includes(state.tag)) return false;
-    if (!state.q) return true;
-    const hay = [it.name, it.oneLiner, it.demo, it.why, it.url, it.folderLabel, ...(it.highlights || []), ...(it.tags || [])].join(" ").toLowerCase();
-    return state.q.toLowerCase().split(/\\s+/).filter(Boolean).every((w) => hay.includes(w));
-  }
-
-  function sorted(list) {
-    return [...list].sort((a, b) => {
-      if (state.sort === "newest") return (b.added || "").localeCompare(a.added || "") || b.id - a.id;
-      if (state.sort === "stars") return (b.stars ?? -1) - (a.stars ?? -1) || b.id - a.id;
-      return (WORTH[b.worth] ?? 0) - (WORTH[a.worth] ?? 0) || (b.added || "").localeCompare(a.added || "") || b.id - a.id;
-    });
+    for (const word of words) if (!text.includes(word)) return false;
+    return true;
   }
 
   function renderFolders() {
@@ -486,7 +432,8 @@ export function renderShowcaseHtml(data: ShowcaseData): string {
   }
 
   function render() {
-    const list = sorted(DATA.items.filter(matches));
+    const words = state.q.toLowerCase().split(/\\s+/).filter(Boolean);
+    const list = sorted(state.sort).filter((entry) => matches(entry, words)).map((entry) => entry.item);
     $("count").textContent = T.items(list.length);
     $("tag-bar").innerHTML = state.tag
       ? '<div class="active-tag">' + esc(T.tagFilter(state.tag)) + ' <button type="button" class="btn" id="clear-tag">' + esc(T.clear) + "</button></div>"
