@@ -1,0 +1,108 @@
+{
+  "name": {
+    "message": "driftnet"
+  },
+  "description": {
+    "message": "Envía la publicación que estás viendo (texto, comentarios, enlaces, incluso tras iniciar sesión) a tu propio driftnet. Compatible con Threads, X e Instagram."
+  },
+  "actionTitle": {
+    "message": "Enviar esta página a driftnet"
+  },
+  "menuLink": {
+    "message": "Enviar enlace a driftnet"
+  },
+  "menuPage": {
+    "message": "Enviar esta página a driftnet"
+  },
+  "menuSelection": {
+    "message": "Enviar selección a driftnet"
+  },
+  "sending": {
+    "message": "Enviando a driftnet…"
+  },
+  "saved": {
+    "message": "Guardado"
+  },
+  "alreadySaved": {
+    "message": "Ya estaba guardado"
+  },
+  "failed": {
+    "message": "No se pudo enviar"
+  },
+  "notConfigured": {
+    "message": "Configura primero tu servidor de driftnet."
+  },
+  "openSettings": {
+    "message": "Ajustes"
+  },
+  "openItem": {
+    "message": "Abrir en driftnet"
+  },
+  "cantReadPage": {
+    "message": "No se puede leer esta página (página interna del navegador o de la tienda)."
+  },
+  "settingsTitle": {
+    "message": "Ajustes de driftnet"
+  },
+  "serverUrl": {
+    "message": "URL del servidor"
+  },
+  "serverHint": {
+    "message": "Dirección donde tu servidor de driftnet es accesible desde este equipo, p. ej. http://localhost:8787"
+  },
+  "token": {
+    "message": "Token (DRIFTNET_TOKEN)"
+  },
+  "save": {
+    "message": "Guardar y probar"
+  },
+  "savedOk": {
+    "message": "Conectado: $COUNT$ elementos en el catálogo.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "permissionDenied": {
+    "message": "No se concedió permiso para acceder a este servidor."
+  },
+  "privacy": {
+    "message": "La extensión solo lee una pestaña cuando haces clic en ella o usas el menú contextual, y envía lo leído únicamente a tu servidor."
+  },
+  "worth_skip": {
+    "message": "omitir"
+  },
+  "worth_low": {
+    "message": "bajo"
+  },
+  "worth_normal": {
+    "message": "vale la pena"
+  },
+  "worth_must_see": {
+    "message": "★ imprescindible"
+  },
+  "httpsRequired": {
+    "message": "Solo localhost puede usar http. Usa una dirección https:// para cualquier otro servidor."
+  },
+  "tokenRejected": {
+    "message": "El servidor rechazó el token (HTTP 401); revísalo."
+  },
+  "unreachableLocal": {
+    "message": "No se puede conectar con driftnet en este equipo: inícialo con npx driftnet en una terminal y mantén esa ventana abierta."
+  },
+  "unreachableRemote": {
+    "message": "No se puede conectar con driftnet en $URL$: ¿está en ejecución y es correcta la dirección?",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "helpLink": {
+    "message": "¿Cómo?"
+  },
+  "helpUrl": {
+    "message": "https://github.com/KevinChu1110/driftnet/blob/main/README.md#-quick-start"
+  }
+}

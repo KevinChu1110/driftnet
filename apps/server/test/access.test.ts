@@ -111,11 +111,18 @@ test("only this machine's, the public and the allowed Host names get in, passwor
   for (const h of ["dn.example.org", "abc.trycloudflare.com", "nas.lan", "box.local:8787"]) assert.ok(ok(h, e), h);
   assert.ok(!ok("evil.example.com", e));
   // With a password set, reads were still open in public mode: a rebinding page could read everything. The password no longer waives the check.
-  const withPassword = { DRIFTNET_TOKEN: "admin-pass-123" };
+  const withPassword = { DRIFTNET_TOKEN: "admin-pass-123", DRIFTNET_READ_KEY: "share-key-abcdefghijkl" };
   assert.ok(!ok("evil.example.com", withPassword), "a password is not a reason to answer a foreign Host");
-  assert.ok(hostAllowed(req({ host: "proxy.example.net", auth: "whatever" }), withPassword), "a request carrying a credential was not made by a rebinding page");
-  assert.ok(hostAllowed(req({ host: "proxy.example.net", url: "/llms.txt?key=abc" }), withPassword), "the read key in the URL counts too");
+  // Bogus credentials must NOT bypass the DNS rebinding guard (neither with nor without a password).
+  assert.ok(!hostAllowed(req({ host: "evil.example.com", auth: "whatever" }), {}), "bogus Authorization without password");
+  assert.ok(!hostAllowed(req({ host: "evil.example.com", url: "/api/items?key=anything" }), {}), "bogus ?key= without password");
+  assert.ok(!hostAllowed(req({ host: "evil.example.com", auth: "whatever" }), withPassword), "bogus Authorization with password");
+  assert.ok(!hostAllowed(req({ host: "evil.example.com", url: "/llms.txt?key=wrong" }), withPassword), "bogus ?key= with password");
   assert.ok(!hostAllowed(req({ host: "proxy.example.net", url: "/?keyless=1" }), withPassword));
+  // Valid credentials vouch for a proxy under an unlisted Host name.
+  assert.ok(hostAllowed(req({ host: "proxy.example.net", auth: withPassword.DRIFTNET_TOKEN }), withPassword), "valid admin password vouches for the host");
+  assert.ok(hostAllowed(req({ host: "proxy.example.net", auth: withPassword.DRIFTNET_READ_KEY }), withPassword), "valid read key in header vouches for the host");
+  assert.ok(hostAllowed(req({ host: "proxy.example.net", url: `/llms.txt?key=${withPassword.DRIFTNET_READ_KEY}` }), withPassword), "valid read key in URL vouches for the host");
 });
 
 test("the throttle counts the socket peer; forwarded headers count only from a local proxy", () => {

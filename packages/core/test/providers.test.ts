@@ -30,6 +30,97 @@ function mockFetch(replies: (Response | ((c: Call) => Response))[]): { fetch: ty
 }
 const json = (data: unknown, status = 200): Response => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 const gem = (text: string, finishReason = "STOP") => json({ candidates: [{ finishReason, content: { parts: [{ text }] } }] });
+const anth = (text: string, stop_reason = "end_turn") => json({ stop_reason, content: [{ type: "text", text }] });
+
+// ---- Anthropic ----
+
+test("anthropic: request headers, body, output_config, strictJsonSchema, and response parsing", async () => {
+  const m = mockFetch([anth('{"name":"c","n":7}')]);
+  const p = new AnthropicProvider("sk-ant-secret-key", "claude-sonnet-4-6", "high", { fetch: m.fetch });
+  assert.equal(p.label, "anthropic:claude-sonnet-4-6 / high");
+  assert.deepEqual(await p.complete(req), { name: "c", n: 7 });
+  const c = m.calls[0]!;
+  assert.equal(c.url, "https://api.anthropic.com/v1/messages");
+  const h = c.init.headers as Record<string, string>;
+  assert.equal(h["content-type"], "application/json");
+  assert.equal(h["x-api-key"], "sk-ant-secret-key");
+  assert.equal(h["anthropic-version"], "2023-06-01");
+  assert.equal(c.body.model, "claude-sonnet-4-6");
+  assert.equal(c.body.max_tokens, 321);
+  assert.deepEqual(c.body.system, [{ type: "text", text: "SYS", cache_control: { type: "ephemeral" } }]);
+  assert.deepEqual(c.body.messages, [{ role: "user", content: "USER" }]);
+  assert.equal(c.body.output_config.effort, "high");
+  assert.equal(c.body.output_config.format.type, "json_schema");
+  assert.equal(c.body.output_config.format.schema.type, "object");
+  assert.equal(c.body.output_config.format.schema.additionalProperties, false);
+  assert.deepEqual(c.body.output_config.format.schema.required, ["name", "n"]);
+  assert.equal("$schema" in c.body.output_config.format.schema, false);
+});
+
+test("anthropic: image attachments, custom baseUrl, and stop_reason checks", async () => {
+  const m = mockFetch([
+    anth('{"name":"img","n":1}'),
+    anth('{"name":"cut"', "max_tokens"),
+    json({ stop_reason: "end_turn", content: [{ type: "thinking", thinking: "hmm" }] }),
+  ]);
+  const p = new AnthropicProvider("sk-ant-1234", "claude-haiku-4-5", undefined, {
+    baseUrl: "https://proxy.example.com/",
+    fetch: m.fetch,
+  });
+  assert.equal(p.label, "anthropic:claude-haiku-4-5 / low");
+  const withImg = {
+    ...req,
+    attachments: [
+      { type: "image" as const, mime: "image/jpeg", data: "AAAA" },
+      { type: "video_url" as const, mime: "video/mp4", url: "https://example.com/v.mp4" },
+    ],
+  };
+  assert.deepEqual(await p.complete(withImg), { name: "img", n: 1 });
+  assert.equal(m.calls[0]!.url, "https://proxy.example.com/v1/messages");
+  assert.deepEqual(m.calls[0]!.body.messages, [
+    {
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } },
+        { type: "text", text: "USER" },
+      ],
+    },
+  ]);
+  await assert.rejects(p.complete(req), (e: Error) => e instanceof IncompleteOutput && /stop_reason=max_tokens/.test(e.message));
+  await assert.rejects(p.complete(req), (e: Error) => e instanceof IncompleteOutput && /empty reply/.test(e.message));
+});
+
+test("anthropic: retries once on 500/429/network error; surfaces error and redacts key", async () => {
+  const m = mockFetch([
+    json({ error: { type: "api_error", message: "internal error" } }, 500),
+    anth('{"name":"ok","n":2}'),
+    json({ error: { type: "overloaded_error", message: "still down" } }, 503),
+    json({ error: { type: "overloaded_error", message: "still down" } }, 503),
+    json({ error: { type: "authentication_error", message: "bad key sk-ant-secret-key" } }, 401),
+  ]);
+  const p = new AnthropicProvider("sk-ant-secret-key", "claude-sonnet-4-6", "low", { fetch: m.fetch });
+  assert.deepEqual(await p.complete(req), { name: "ok", n: 2 });
+  assert.equal(m.calls.length, 2, "retried once after 500");
+
+  await assert.rejects(p.complete(req), (e: Error) => e instanceof IncompleteOutput && /HTTP 503: still down/.test(e.message));
+  assert.equal(m.calls.length, 4, "retried once then failed on second 503");
+
+  await assert.rejects(
+    p.complete(req),
+    (e: Error) => !(e instanceof IncompleteOutput) && /HTTP 401: bad key \*\*\*/.test(e.message) && !e.message.includes("secret"),
+  );
+  assert.equal(m.calls.length, 5, "did not retry 401");
+
+  let attempts = 0;
+  const flakyFetch: typeof fetch = async () => {
+    attempts++;
+    if (attempts === 1) throw new TypeError("fetch failed");
+    return anth('{"name":"net","n":9}');
+  };
+  const q = new AnthropicProvider("sk-ant-1234", "claude-sonnet-4-6", "low", { fetch: flakyFetch });
+  assert.deepEqual(await q.complete(req), { name: "net", n: 9 });
+  assert.equal(attempts, 2, "retried once after network error");
+});
 
 // ---- Gemini ----
 

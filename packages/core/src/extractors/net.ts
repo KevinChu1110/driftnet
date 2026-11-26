@@ -20,7 +20,7 @@ for (const [net, prefix] of [
   ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["224.0.0.0", 4], ["240.0.0.0", 4],
 ] as const) blocked.addSubnet(net, prefix, "ipv4");
 for (const [net, prefix] of [
-  ["::", 128], ["::1", 128], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8],
+  ["::", 96], ["100::", 64], ["2001::", 32], ["2002::", 16], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8],
 ] as const) blocked.addSubnet(net, prefix, "ipv6");
 
 export class BlockedUrl extends Error {}

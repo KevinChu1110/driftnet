@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { driftnetHome } from "@driftnet/core";
 import { DAYS, parseTargets, validTime } from "./digest.ts";
@@ -22,10 +22,13 @@ export interface Setting {
   shape?: string;
 }
 
+/** An absolute file path (POSIX or Windows) without traversal segments (".."). */
+const ABS_FILE_PATH = /^(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?:\/|[a-z]:[\\/])(?:[^\\/\0]+[\\/])*[^\\/\0]+$/i;
+
 /** An absolute path (POSIX or Windows) whose file name is the tool, with a suffix at most ("whisper-cli", "yt-dlp.exe"). */
 function toolPath(name: string): Pick<Setting, "pattern" | "shape"> {
   return {
-    pattern: new RegExp(`^(?:/|[a-z]:[\\\\/]).*[\\\\/]${name.replace(/[-.]/g, "\\$&")}[\\w.-]*$`, "i"),
+    pattern: new RegExp(`^(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?:/|[a-z]:[\\\\/]).*[\\\\/]${name.replace(/[-.]/g, "\\$&")}[\\w.-]*$`, "i"),
     shape: `is the full path of ${name} itself, e.g. /opt/homebrew/bin/${name}`,
   };
 }
@@ -42,7 +45,7 @@ export const SETTINGS: readonly Setting[] = [
   { key: "DRIFTNET_JUDGE", group: "model", choices: ["", "jev", "rules", "llm", "heuristic", "off"] },
   { key: "GITHUB_TOKEN", group: "model", secret: true },
   { key: "DRIFTNET_LANGUAGE", group: "language", max: 60 },
-  { key: "DRIFTNET_LOCALE", group: "language", choices: ["", "en", "zh-TW"] },
+  { key: "DRIFTNET_LOCALE", group: "language", choices: ["", "en", "zh-TW", "zh-CN", "ja", "ko", "es"] },
   { key: "DRIFTNET_REPLY", group: "chat", choices: ["", "link", "full", "off"] },
   { key: "DRIFTNET_PUBLIC_URL", group: "chat" },
   { key: "DRIFTNET_SUMMARY_DEPTH", group: "model", choices: ["", "brief", "standard", "detailed"] },
@@ -79,7 +82,7 @@ export const SETTINGS: readonly Setting[] = [
   // A cookies.txt for yt-dlp (sites that show anonymous visitors nothing). A file path, never the cookies themselves.
   // A browser for yt-dlp to impersonate (TLS fingerprint): sites that answer a bare client with 403/400. Needs curl_cffi (`yt-dlp --list-impersonate-targets`).
   { key: "DRIFTNET_YTDLP_IMPERSONATE", group: "rules", max: 40, pattern: /^[a-z][a-z0-9]{1,19}(?:[-:][\w.]{1,20}){0,2}$/i, shape: "is a browser name yt-dlp knows, e.g. chrome, safari, firefox or chrome-136:macos" },
-  { key: "DRIFTNET_YTDLP_COOKIES", group: "rules", max: 500, pattern: /^(?:\/|[a-z]:[\\/])(?:[^\\/\0]+[\\/])*[^\\/\0]+$/i, shape: "is the full path of a cookies.txt file (Netscape format), e.g. /Users/me/cookies.txt" },
+  { key: "DRIFTNET_YTDLP_COOKIES", group: "rules", max: 500, pattern: ABS_FILE_PATH, shape: "is the full path of a cookies.txt file (Netscape format), e.g. /Users/me/cookies.txt" },
   // Cloud providers (bedrock, vertex) and the rules judge. Keys are write-only like the other secrets;
   // the credentials setting is a file path, never the key itself.
   { key: "DRIFTNET_LLM_REGION", group: "model", max: 60 },
@@ -88,8 +91,8 @@ export const SETTINGS: readonly Setting[] = [
   { key: "AWS_SESSION_TOKEN", group: "model", secret: true, max: 4000 },
   { key: "AWS_BEARER_TOKEN_BEDROCK", group: "model", secret: true, max: 4000 },
   { key: "GOOGLE_CLOUD_PROJECT", group: "model", max: 100 },
-  { key: "DRIFTNET_VERTEX_CREDENTIALS", group: "model", max: 500 },
-  { key: "DRIFTNET_JUDGE_RULES", group: "rules", max: 500 },
+  { key: "DRIFTNET_VERTEX_CREDENTIALS", group: "model", max: 500, pattern: ABS_FILE_PATH, shape: "is the full path of a service-account JSON file" },
+  { key: "DRIFTNET_JUDGE_RULES", group: "rules", max: 500, pattern: ABS_FILE_PATH, shape: "is the full path of a rules JSON file" },
   // Search by meaning (optional embeddings). Off unless a local Ollama has the model or a provider is named.
   { key: "DRIFTNET_EMBED", group: "model", choices: ["", "auto", "off"] },
   { key: "DRIFTNET_EMBED_PROVIDER", group: "model", choices: ["", "ollama", "openai", "gemini"] },
@@ -216,8 +219,10 @@ export class Settings {
       }
     }
     for (const [key, value] of changes) if (!done.has(key) && value != null) out.push(`${key}=${serialize(value)}`);
-    writeFileSync(this.file, out.join("\n").replace(/\n*$/, "\n"), { mode: 0o600 });
-    chmodSync(this.file, 0o600);
+    const tmp = `${this.file}.${process.pid}.tmp`;
+    writeFileSync(tmp, out.join("\n").replace(/\n*$/, "\n"), { mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, this.file);
   }
 }
 

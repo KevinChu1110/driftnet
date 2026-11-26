@@ -105,16 +105,19 @@ const hostOf = (url: string | undefined): string | undefined => {
  * browser then treats driftnet as that page's own origin and lets it read the
  * catalogue (reads are open in public mode, password or not) or, with no password,
  * write to it. So the Host header must name this machine, the public or tunnel
- * address, or a host in DRIFTNET_ALLOWED_HOSTS. A request that carries a password,
- * key or token cannot have come from such a page (browsers add none of these on
- * their own), so a proxy under a name not listed here still serves whoever logs in.
+ * address, or a host in DRIFTNET_ALLOWED_HOSTS. A request that carries a *valid*
+ * password, read key or agent token cannot have come from a rebinding page, so a
+ * proxy under a name not listed here still serves whoever logs in.
  */
-export function hostAllowed(req: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
+export function hostAllowed(req: IncomingMessage, env: NodeJS.ProcessEnv, store?: Store): boolean {
   const host = (req.headers.host ?? "").toLowerCase();
   if (LOOPBACK_HOST.test(host)) return true;
   const allowed = [hostOf(env.DRIFTNET_PUBLIC_URL), hostOf(env.DRIFTNET_TUNNEL_URL), ...(env.DRIFTNET_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase())];
   if (host && allowed.includes(host)) return true;
-  return !!req.headers.authorization || /[?&]key=/.test(req.url ?? "");
+  const t = token(env);
+  const k = readKey(env);
+  const b = bearer(req);
+  return same(b, t) || same(b, k) || same(queryKey(req), k) || !!agentOf(req, store);
 }
 
 /**
@@ -169,6 +172,18 @@ export function foreignOrigin(req: IncomingMessage): boolean {
   if (!origin || origin.startsWith("chrome-extension://")) return false;
   const host = req.headers.host ?? "";
   return origin !== `http://${host}` && origin !== `https://${host}`;
+}
+
+/**
+ * Stricter origin check for sensitive admin routes (settings, agent tokens, pairing):
+ * no Origin (CLI/curl) or exact same-origin page only — never another website or any
+ * third-party browser extension.
+ */
+export function sameOrigin(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  const host = req.headers.host ?? "";
+  return origin === `http://${host}` || origin === `https://${host}`;
 }
 
 /** What the page may offer: admin (change things), reader (look only), none (asks for a key). */

@@ -4,7 +4,7 @@ export const COMMANDS: Record<string, string[]> = {
   add: ["--note", "--url", "--token"],
   search: ["--folder", "--kind", "--view", "--limit", "--json", "--url", "--token"],
   open: ["--url", "--token"],
-  export: ["--format", "--output", "--url", "--token"],
+  export: ["--format", "--output", "--folder", "--title", "--url", "--token"],
   import: ["--keep-folders", "--yes", "--url", "--token"],
   backup: ["--output", "--secrets", "--url", "--token"],
   restore: ["--print-settings"],
@@ -17,7 +17,7 @@ export const COMMANDS: Record<string, string[]> = {
 const GLOBAL = ["--help", "--version"];
 const KINDS = "repo product video article post other";
 const VIEWS = "inbox favorites trash";
-const FORMATS = "json md vault";
+const FORMATS = "json md vault site";
 
 export function completionScript(shell: string): string | undefined {
   const names = Object.keys(COMMANDS).join(" ");

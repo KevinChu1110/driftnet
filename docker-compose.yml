@@ -1,0 +1,24 @@
+services:
+  driftnet:
+    image: ghcr.io/kevinchu1110/driftnet:latest
+    command: ["start"]
+    restart: unless-stopped
+    ports:
+      # Safe default: only reachable from this machine.
+      # To expose on your LAN or behind a reverse proxy, change to "8787:8787"
+      # and set DRIFTNET_TOKEN below (otherwise remote requests return 421).
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - driftnet_data:/data
+    environment:
+      - DRIFTNET_HOST=0.0.0.0
+      # Uncomment when exposing driftnet beyond localhost:
+      # - DRIFTNET_TOKEN=change-me-to-a-strong-password
+      # - DRIFTNET_ACCESS=private
+      # - DRIFTNET_PUBLIC_URL=https://driftnet.example.com
+    # Optional: load API keys, bot tokens, and other settings from a local file:
+    # env_file:
+    #   - .env
+
+volumes:
+  driftnet_data:

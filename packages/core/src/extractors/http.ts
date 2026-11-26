@@ -24,8 +24,8 @@ export const UA =
   "Mozilla/5.0 (compatible; driftnet/0.1; +https://github.com/KevinChu1110/driftnet)";
 const MAX_BYTES = 1_500_000;
 
-/** Errors that mean "this host does not speak https" (not a slow server, not an HTTP answer). */
-const CONNECT_ERRORS = /^(ECONNREFUSED|ECONNRESET|EPROTO|ERR_SSL_.*|ERR_TLS_.*|CERT_.*|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT_IN_CHAIN|UNABLE_TO_(VERIFY_LEAF_SIGNATURE|GET_ISSUER_CERT.*)|HOSTNAME_MISMATCH)$/;
+/** Errors that mean "this host does not speak https" (never certificate verification failures, which must not silently downgrade to plaintext). */
+const CONNECT_ERRORS = /^(ECONNREFUSED|ECONNRESET|EPROTO|ERR_SSL_WRONG_VERSION_NUMBER)$/;
 
 function isConnectError(err: unknown): boolean {
   const e = err as { name?: string; code?: unknown; cause?: { code?: unknown } };

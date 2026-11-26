@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { driftnetHome } from "@driftnet/core";
+import { driftnetHome, type Locale } from "@driftnet/core";
 import { parseArgs, UsageError, type ArgSpec } from "./args.ts";
 import { call, HttpError, ok, resolveConnection, ServerDown, type Connection } from "./client.ts";
 import { completionScript } from "./completion.ts";
@@ -178,12 +178,16 @@ async function allItemsJson(ctx: Ctx, c: Connection): Promise<PubItem[]> {
 
 export async function exportCmd(ctx: Ctx, argv: string[]): Promise<number> {
   return guarded(ctx, async () => {
-    const { positional, flags } = parseArgs(argv, { value: ["format", "output"], short: { o: "output" } });
-    if (positional.length) throw new UsageError("usage: driftnet export [--format json|md|vault] [-o file]");
-    const format = oneOf("format", flags.format, ["json", "md", "vault"]) ?? "md";
+    const { positional, flags } = parseArgs(argv, { value: ["format", "output", "folder", "title"], short: { o: "output" } });
+    if (positional.length) throw new UsageError("usage: driftnet export [--format json|md|vault|site] [-o file|dir] [--folder id] [--title text]");
+    const format = oneOf("format", flags.format, ["json", "md", "vault", "site"]) ?? "md";
     const output = typeof flags.output === "string" ? flags.output : undefined;
+    const folder = typeof flags.folder === "string" ? flags.folder : undefined;
+    const title = typeof flags.title === "string" ? flags.title : undefined;
     if (format === "vault" && !output) throw new UsageError("a vault is a zip file: give it a name with -o vault.zip");
+    if (format === "site" && !output) throw new UsageError("a static site is a folder: give a directory with -o ./docs");
     const c = conn(ctx, flags);
+    if (format === "site") return await exportSite(ctx, c, output!, { folder, title });
     let bytes: Uint8Array;
     try {
       if (format === "json") bytes = new TextEncoder().encode(JSON.stringify(await allItemsJson(ctx, c), null, 2) + "\n");
@@ -203,6 +207,37 @@ export async function exportCmd(ctx: Ctx, argv: string[]): Promise<number> {
     } else ctx.writeBytes(bytes);
     return 0;
   });
+}
+
+async function exportSite(ctx: Ctx, c: Connection, outDir: string, opts: { folder?: string; title?: string }): Promise<number> {
+  const { ShowcaseError, toShowcase, toShowcaseFromApi } = await import("../showcase.ts");
+  const { resolveLocale } = await import("@driftnet/core");
+  let built;
+  try {
+    const [items, folders, ui] = await Promise.all([
+      allItemsJson(ctx, c) as Promise<Parameters<typeof toShowcaseFromApi>[0]>,
+      call(c, ctx.fetch, "GET", "/api/folders", { timeoutMs: 30_000 }).then((r) => ok<Parameters<typeof toShowcaseFromApi>[1]>(r)),
+      call(c, ctx.fetch, "GET", "/api/ui", { timeoutMs: 30_000 }).then((r) => ok<{ locale?: Locale }>(r)).catch(() => ({ locale: undefined })),
+    ]);
+    built = toShowcaseFromApi(items, folders, { ...opts, locale: ui.locale ?? resolveLocale(c.env) });
+  } catch (e) {
+    if (e instanceof ShowcaseError) throw new UsageError(e.message);
+    if (!(e instanceof ServerDown)) throw e;
+    ctx.err(FALLBACK_NOTE);
+    const { createDriftnet } = await import("@driftnet/core");
+    const dn = createDriftnet(c.env);
+    try {
+      built = toShowcase(dn, { ...opts, locale: resolveLocale(c.env) });
+    } catch (err) {
+      if (err instanceof ShowcaseError) throw new UsageError(err.message);
+      throw err;
+    }
+  }
+  mkdirSync(outDir, { recursive: true });
+  for (const f of built.files) writeFileSync(join(outDir, f.path), f.data);
+  ctx.out(`built static showcase in ${outDir} (${built.data.items.length} items, ${built.data.folders.length} folders)`);
+  ctx.out(`open ${join(outDir, "index.html")} or publish ${outDir} to GitHub Pages / Cloudflare Pages.`);
+  return 0;
 }
 
 async function exportDirect(c: Connection, format: string): Promise<Uint8Array> {

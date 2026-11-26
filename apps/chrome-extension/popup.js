@@ -9,8 +9,14 @@ async function categoryLabel(serverUrl, id) {
   try {
     const { token } = await chrome.storage.local.get("token");
     const ui = await (await fetch(`${serverUrl}/api/ui`, token ? { headers: { authorization: `Bearer ${token}` } } : {})).json();
-    const lang = chrome.i18n.getUILanguage().toLowerCase().startsWith("zh") ? "zh-TW" : "en";
-    return ui.categories?.[id]?.[lang] ?? id;
+    const uiLang = chrome.i18n.getUILanguage().toLowerCase().replace("_", "-");
+    const lang =
+      uiLang.startsWith("zh-cn") || uiLang.startsWith("zh-sg") || uiLang.startsWith("zh-hans") ? "zh-CN" :
+      uiLang.startsWith("zh") ? "zh-TW" :
+      uiLang.startsWith("ja") ? "ja" :
+      uiLang.startsWith("ko") ? "ko" :
+      uiLang.startsWith("es") ? "es" : "en";
+    return ui.categories?.[id]?.[lang] ?? ui.categories?.[id]?.en ?? id;
   } catch {
     return id;
   }

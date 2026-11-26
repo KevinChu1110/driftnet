@@ -7,9 +7,9 @@
 
 [English](README.md) · **繁體中文**
 
-**[▶ 線上試玩](https://kevinchu1110.github.io/driftnet/demo/)** · **[官方網站](https://kevinchu1110.github.io/driftnet/)** · **[Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[文件](#-文件)**
+**[▶ 線上試玩](https://kevinchu1110.github.io/driftnet/demo/)** · **[開始使用](#-開始使用)** · **[官方網站](https://kevinchu1110.github.io/driftnet/)** · **[Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[文件](#-文件)**
 
-🆕 **1.2 版：** 聊天回覆的卡片連結改為每張各自簽章、不再帶分享碼，LINE 會在 reply token 過期前先回覆，模型與 embedding 端點也經過 SSRF 守門，yt-dlp 可設 cookies 檔並在版本過舊時提醒。[更新內容](https://github.com/KevinChu1110/driftnet/releases/tag/v1.2.0) · [哪些不會變](docs/stability.md)
+🆕 **1.3 版：** 支援 6 種語系（EN / 繁中 / 简中 / 日本語 / 한국어 / ES）並按需載入、本機免費 AI 自動偵測與連線測試、`driftnet export --format site` 一鍵公開精選靜態頁、三平台桌面系統列 App 與手機 PWA 系統分享、`driftnet init` 新增 Gemini CLI 與 VS Code，以及移除重量級 SDK 瘦身 50 MB 並完成資安強化。[更新內容](https://github.com/KevinChu1110/driftnet/releases/tag/v1.3.0) · [哪些不會變](docs/stability.md)
 
 [![npm](https://img.shields.io/npm/v/driftnet?logo=npm&color=CB3837)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
@@ -30,6 +30,106 @@
 匯入舊書籤，或用指令列都可以。driftnet 攔下每個漂過的連結，追到貼文真正介紹的專案本體，濾掉雜訊、用你的語言寫成精簡摘要，
 歸進你自己的資料夾，放進支援中文全文搜尋的本機知識庫。你的 AI agent 也能透過 MCP 隨時來收網。
 它跑在你自己的電腦上，可以接任何模型，也可以完全不接。
+
+## 🚀 開始使用
+
+全部跑在你自己的電腦上——不用租伺服器，也不用註冊帳號。
+
+### 1. 10 秒試玩（免安裝）
+
+**[▶ 線上試玩](https://kevinchu1110.github.io/driftnet/demo/)** — 直接在瀏覽器裡跑真正的 driftnet 網頁。
+
+### 2. 在自己的電腦跑（一行指令）
+
+需要 [Node.js](https://nodejs.org) 22.13 以上。沒用過終端機？[Mac 和 Windows 一步一步教你](docs/zh-TW/install-beginners.md)。
+
+```bash
+npx driftnet
+```
+
+瀏覽器會自動打開 **http://localhost:8787**（*localhost* 就是「這台電腦」，別人看不到）。到 **⚙ 設定 → AI** 選一個供應商和模型，也可以先跳過（連結照樣會存下來，先放在「其他」等待整理；也可以讓 AI agent 幫你寫摘要，見 [Agent](docs/zh-TW/agents.md)）。
+
+- **一次接好這台電腦上的 AI 工具**（Claude Code、Claude Desktop、Cursor、Windsurf、Codex）：`npx driftnet init`
+- **開機自動啟動、在背景執行**（macOS、Linux、Windows；否則關掉終端機視窗 driftnet 就會停）：
+  ```bash
+  npx driftnet service install      # 看狀態：npx driftnet service status · 取消：npx driftnet service uninstall
+  ```
+
+設定存在 `~/.driftnet/.env`，清單存在 `~/.driftnet/driftnet.db`。
+
+### 3. 或交給你的 AI agent 安裝
+
+把下面這句複製給 Claude Code、Cursor、Codex，或任何能在你電腦上執行指令的 agent：
+
+```text
+Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
+```
+
+它會檢查 Node.js、啟動 driftnet、透過 MCP 把自己接上，完成後告訴你。
+
+<details>
+<summary><b>加入第一個連結</b></summary>
+
+任選一種：
+
+- **在網頁上：** 把連結貼進輸入框，按「收錄」。
+- **在終端機：** `npx driftnet add https://github.com/paperclipai/paperclip`
+- **在瀏覽器：** [Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)會送出你正在看的頁面。
+- **在聊天室：** 到 ⚙ 設定 → 聊天室 貼上 Discord、Telegram、Slack 或 LINE 機器人的 token（[怎麼取得](docs/zh-TW/ways-in.md)），直接把連結丟進去。
+
+5～30 秒內就會出現一張卡片：它是什麼、為什麼值得你看、放進了哪個資料夾。
+
+</details>
+
+<details>
+<summary><b>哪種用法適合你</b></summary>
+
+| 你是 | 從這裡開始 | 模型 |
+|---|---|---|
+| 只有我自己，用我的電腦 | [Chrome 擴充](docs/zh-TW/chrome-extension.md)加[網頁](docs/zh-TW/web-page.md) | 用 Ollama 跑本機模型（見[模型](docs/zh-TW/models.md)），或不接 |
+| 一個群組聊天室 | Discord、Telegram、Slack 或 LINE 機器人，見[接法](docs/zh-TW/ways-in.md) | 任選 |
+| 我的 agent | [MCP、Claude Code 外掛或 agent 佇列](docs/zh-TW/agents.md) | 不用接：由 agent 自己讀 |
+
+</details>
+
+<details>
+<summary><b>其他跑法：從原始碼、Docker</b></summary>
+
+從原始碼跑，想改程式或設成開機自動執行：
+
+```bash
+git clone https://github.com/KevinChu1110/driftnet && cd driftnet
+pnpm install
+pnpm start                                                 # http://localhost:8787
+pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
+```
+
+用 Docker（一行指令）：
+
+```bash
+docker run -d -p 127.0.0.1:8787:8787 -v driftnet_data:/data -e DRIFTNET_HOST=0.0.0.0 ghcr.io/kevinchu1110/driftnet:latest start
+```
+
+或用 Docker Compose（使用 [docker-compose.yml](docker-compose.yml)）：
+
+```bash
+docker compose up -d
+```
+
+不加 `start` 時，容器就是 stdio 的 MCP 伺服器（`docker run -i --rm -v driftnet_data:/data ghcr.io/kevinchu1110/driftnet:latest`）。
+用 `DRIFTNET_HOME` 可以把設定和清單一起搬到別的地方。
+
+</details>
+
+<details>
+<summary><b>沒反應？</b></summary>
+
+- **8787 埠被占用**：多半是已經有一個 driftnet 在跑；直接開 http://localhost:8787，或用 `PORT=8788` 啟動這一個。
+- **`driftnet needs Node 22.13 or newer`**：用 `nvm install 22` 或從 [nodejs.org](https://nodejs.org) 安裝。
+- **卡片一直是 ⏳、沒有摘要**：還沒設定模型。到 ⚙ 設定 → AI 選一個，或交給你的 agent 整理佇列（見 [Agent](docs/zh-TW/agents.md)）。
+- **從別台電腦打開得到 `421`**：沒設密碼時 driftnet 只回應本機。設一組密碼（`DRIFTNET_TOKEN`），或把網址加進 `DRIFTNET_ALLOWED_HOSTS`。
+
+</details>
 
 ## 🎥 實際看看
 
@@ -59,14 +159,14 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 
 - 🎯 **追到真正的工具。** 貼文附了 repo，就收錄 repo；貼文只提到專案名稱，就到 GitHub 用名稱完全比對。模型編出來的連結一律丟掉。
 - 💬 **看得懂「連結在留言」。** [Chrome 擴充](docs/zh-TW/chrome-extension.md)會打開留言找；一篇週報整理文，會拆成每個專案各一筆。
-- 📥 **很多種丟法。** Chrome 按鈕、Discord、Telegram、Slack 或 LINE 機器人、你的 agent，或一個 HTTP 請求（見[接法](docs/zh-TW/ways-in.md)）。
+- 📥 **很多種丟法。** Chrome 按鈕、手機 PWA 分享選單（Share Target）、Discord、Telegram、Slack 或 LINE 機器人、你的 agent，或一個 HTTP 請求（見[接法](docs/zh-TW/ways-in.md)）。
 
 ### 看懂、整理
 
 - 🖼️ **一眼看懂的卡片。** 圖片、一句話的答案、你會看到什麼、為什麼會在這裡。
 - 🗂️ **資料夾就是分類。** AI 照每個資料夾的路徑和說明分新連結，建議放在收件匣等你確認。
 - 🧠 **樹狀圖和並排檢視。** 把卡片拖到資料夾；✨ AI 整理建議會提一份方案，你套用之前什麼都不會動（見[網頁](docs/zh-TW/web-page.md)）。
-- 📱 **可以搜尋的網頁，手機也能用。** 筆記、復原和垃圾桶、鍵盤快捷鍵、唯讀分享連結。
+- 📱 **桌面 App、手機 PWA，還能匯出靜態展示站。** 提供桌面應用程式（macOS／Windows／Linux）與可安裝的行動版網頁；內建筆記、復原和垃圾桶、鍵盤快捷鍵、唯讀分享連結，以及靜態網站匯出（`driftnet export --format site -o ./docs`）。
 - 🚫 **不是稍後閱讀 App。** Pocket、Raindrop 存的是你給它的那個連結；driftnet 會順著貼文追到它在講的工具，只留一份簡短大綱而不是整頁內容，你的 agent 還能透過 MCP 讀寫同一份清單。
 
 ### 便宜、安全、資料是你的
@@ -76,99 +176,7 @@ bot ▸ 📌 本週 AI 大事彙整（3/11）｜新聞動態 ＋ Paperclip、Rea
 - 🗳️ **學會排除垃圾。** 按 👎，發布者的信譽就下降；一直被倒讚的來源之後就不再花錢處理。
 - 🛡️ **預設就安全。** 拒絕指向私有或本機位址的連結，提示詞注入永遠不會傳給 agent。
 - 🤖 **agent 也能用。** MCP、`/openapi.json`、`/llms.txt`、`/feed.xml` 和對外 Webhook；也可以讓它們自己來讀（見 [Agent](docs/zh-TW/agents.md)）。
-- 🧩 **模型任選或不接，資料屬於你。** 用 Ollama 跑免費的本機模型、你已經有的 Claude 或 Gemini 訂閱、付費 API 金鑰（花費很低），或完全不接（連結照樣存下來，先放在「其他」等待整理）。資料存在本機 SQLite；介面、回覆和摘要都支援英文與繁體中文。
-
-## 🚀 開始使用
-
-全部跑在你自己的電腦上：不用租伺服器，也不用註冊帳號。想先看看？
-**[線上試玩](https://kevinchu1110.github.io/driftnet/demo/)** 直接在瀏覽器跑真正的網頁。
-
-### 最簡單：交給你的 AI agent 安裝
-
-把下面這句複製給 Claude Code、Cursor、Codex，或任何能在你電腦上執行指令的 agent：
-
-```text
-Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
-```
-
-它會檢查 Node.js、啟動 driftnet、透過 MCP 把自己接上，完成後告訴你。
-
-### 或自己跑一行指令
-
-需要 [Node.js](https://nodejs.org) 22.13 以上。沒用過終端機？
-[Mac 和 Windows 一步一步教你](docs/zh-TW/install-beginners.md)。在終端機輸入：
-
-```bash
-npx driftnet
-```
-
-瀏覽器會自動打開 **http://localhost:8787**：這是你自己電腦提供的 driftnet 網頁
-（*localhost* 就是「這台電腦」，別人看不到）。到 ⚙ 設定 → AI：選一個供應商，填好它的金鑰和模型。
-也可以先跳過：連結照樣會存下來，先放在「其他」等待整理；也可以讓 AI agent 幫你寫摘要（[Agent](docs/zh-TW/agents.md)）。
-想一次接好這台電腦上的 AI 工具（Claude Code、Claude Desktop、Cursor、Windsurf、Codex）：`npx driftnet init`。
-
-**關掉那個終端機視窗，driftnet 就停了。** 想讓它開機自動啟動、在背景執行（macOS、Linux、Windows），
-執行一次：
-
-```bash
-npx driftnet service install      # 看狀態：npx driftnet service status · 取消：npx driftnet service uninstall
-```
-
-設定存在 `~/.driftnet/.env`，清單存在 `~/.driftnet/driftnet.db`。
-
-### 加入第一個連結
-
-任選一種：
-
-- **在網頁上：** 把連結貼進輸入框，按「收錄」。
-- **在終端機：** `npx driftnet add https://github.com/paperclipai/paperclip`
-- **在瀏覽器：** [Chrome 擴充](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)會送出你正在看的頁面。
-- **在聊天室：** 到 ⚙ 設定 → 聊天室 貼上 Discord、Telegram、Slack 或 LINE 機器人的 token（[怎麼取得](docs/zh-TW/ways-in.md)），直接把連結丟進去。
-
-5～30 秒內就會出現一張卡片：它是什麼、為什麼值得你看、放進了哪個資料夾。
-
-<details>
-<summary><b>其他跑法：從原始碼、Docker</b></summary>
-
-從原始碼跑，想改程式或設成開機自動執行：
-
-```bash
-git clone https://github.com/KevinChu1110/driftnet && cd driftnet
-pnpm install
-pnpm start                                                 # http://localhost:8787
-pnpm service:install                                       # 選用：登入後自動執行（macOS／Linux）
-```
-
-用 Docker：
-
-```bash
-docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
-docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 driftnet start
-```
-
-不加 `start` 時，容器就是 stdio 的 MCP 伺服器（`docker run -i --rm -v driftnet:/data driftnet`）。
-用 `DRIFTNET_HOME` 可以把設定和清單一起搬到別的地方。
-
-</details>
-
-<details>
-<summary><b>沒反應？</b></summary>
-
-- **8787 埠被占用**：多半是已經有一個 driftnet 在跑；直接開 http://localhost:8787，或用 `PORT=8788` 啟動這一個。
-- **`driftnet needs Node 22.13 or newer`**：用 `nvm install 22` 或從 [nodejs.org](https://nodejs.org) 安裝。
-- **卡片一直是 ⏳、沒有摘要**：還沒設定模型。到 ⚙ 設定 → AI 選一個，或交給你的 agent 整理佇列（見 [Agent](docs/zh-TW/agents.md)）。
-- **從別台電腦打開得到 `421`**：沒設密碼時 driftnet 只回應本機。設一組密碼（`DRIFTNET_TOKEN`），或把網址加進 `DRIFTNET_ALLOWED_HOSTS`。
-
-</details>
-
-### 哪種用法適合你
-
-| 你是 | 從這裡開始 | 模型 |
-|---|---|---|
-| 只有我自己，用我的電腦 | [Chrome 擴充](docs/zh-TW/chrome-extension.md)加[網頁](docs/zh-TW/web-page.md) | 用 Ollama 跑本機模型（見[模型](docs/zh-TW/models.md)），或不接 |
-| 一個群組聊天室 | Discord、Telegram、Slack 或 LINE 機器人，見[接法](docs/zh-TW/ways-in.md) | 任選 |
-| 我的 agent | [MCP、Claude Code 外掛或 agent 佇列](docs/zh-TW/agents.md) | 不用接：由 agent 自己讀 |
-
+- 🧩 **模型任選或不接，資料屬於你。** 用 Ollama 跑免費的本機模型、你已經有的 Claude 或 Gemini 訂閱、付費 API 金鑰（花費很低），或完全不接（連結照樣存下來，先放在「其他」等待整理）。資料存在本機 SQLite；介面與機器人回覆支援 6 種語言（**English、繁體中文、简体中文、日本語、한국어、Español**）。
 
 ## 📚 文件
 

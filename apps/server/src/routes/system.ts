@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { LOCALES, resolveLocale, type Locale } from "@driftnet/core";
 import { actorOf, canRead, isLocal, role, shareBase, shareLinks, token } from "../access.ts";
@@ -10,23 +12,42 @@ import { createMcpServer } from "../mcp.ts";
 import { updateNotice } from "../update.ts";
 import { BadRequest, type Route } from "../route.ts";
 
-const PAGE_HEADERS = {
-  "content-security-policy": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+const pageHeaders = (nonce: string) => ({
+  "content-security-policy": `default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'nonce-${nonce}'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`,
   "x-frame-options": "DENY",
   "referrer-policy": "no-referrer",
   "x-content-type-options": "nosniff",
-};
+  "vary": "accept-encoding",
+});
 
 /** The page, its icons, the machine-readable descriptions, export, chat webhooks and MCP. */
 export const routes: Route[] = [
   // The page itself holds no data; in private mode it asks for the token.
   {
     method: "GET", pattern: "/", access: "public", early: true,
-    handler: ({ send, app }) => send(200, app.indexHtml, "text/html; charset=utf-8", PAGE_HEADERS),
+    handler: ({ req, res, send, app }) => {
+      const nonce = randomBytes(16).toString("base64");
+      const html = app.indexHtml.replace("<script>", `<script nonce="${nonce}">`);
+      const headers = pageHeaders(nonce);
+      const ae = String(req.headers["accept-encoding"] ?? "");
+      if (/\bbr\b/i.test(ae)) {
+        const compressed = brotliCompressSync(Buffer.from(html), {
+          params: { [constants.BROTLI_PARAM_QUALITY]: 4 },
+        });
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...headers, "content-encoding": "br" });
+        return res.end(compressed);
+      }
+      if (/\bgzip\b/i.test(ae)) {
+        const compressed = gzipSync(Buffer.from(html), { level: 6 });
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", ...headers, "content-encoding": "gzip" });
+        return res.end(compressed);
+      }
+      return send(200, html, "text/html; charset=utf-8", headers);
+    },
   },
   // Icons are public even in private mode: the browser asks for them before any token.
   {
-    method: "GET", pattern: /^\/(favicon\.svg|apple-touch-icon\.png|icon-512\.png|qr\.js|manifest\.webmanifest)$/, example: "/favicon.svg", access: "public", early: true,
+    method: "GET", pattern: /^\/(favicon\.svg|apple-touch-icon\.png|icon-512\.png|qr\.js|manifest\.webmanifest|locales\/(zh-TW|zh-CN|ja|ko|es)\.js)$/, example: "/favicon.svg", access: "public", early: true,
     handler: ({ res, path, app }) => {
       const asset = app.assets[path]!;
       res.writeHead(200, { "content-type": asset[1], "cache-control": "public, max-age=86400" });
@@ -82,10 +103,20 @@ export const routes: Route[] = [
       const data = collect(dn, (LOCALES as readonly string[]).includes(lang ?? "") ? (lang as Locale) : resolveLocale());
       const day = new Date().toISOString().slice(0, 10);
       if (url.searchParams.get("format") === "vault") {
-        res.writeHead(200, { "content-type": "application/zip", "content-disposition": `attachment; filename="driftnet-${day}.zip"` });
+        res.writeHead(200, {
+          "content-type": "application/zip",
+          "content-disposition": `attachment; filename="driftnet-${day}.zip"`,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        });
         return res.end(zip(toVault(data)));
       }
-      res.writeHead(200, { "content-type": "text/markdown; charset=utf-8", "content-disposition": `attachment; filename="driftnet-${day}.md"` });
+      res.writeHead(200, {
+        "content-type": "text/markdown; charset=utf-8",
+        "content-disposition": `attachment; filename="driftnet-${day}.md"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
       return res.end(toMarkdown(data));
     },
   },

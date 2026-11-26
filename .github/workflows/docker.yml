@@ -1,0 +1,89 @@
+name: Docker
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "npm version of driftnet to install (e.g. 1.3.0 or latest)"
+        required: false
+        default: "latest"
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve driftnet version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            ver="${GITHUB_REF_NAME#v}"
+          else
+            ver="${INPUT_VERSION:-latest}"
+            ver="${ver#v}"
+          fi
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait until npm serves driftnet@${{ steps.version.outputs.version }}
+        if: steps.version.outputs.version != 'latest'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # release.yml publishes to npm on the same v* tag push; wait until it lands.
+          for i in $(seq 1 40); do
+            if [ "$(npm view "driftnet@${VERSION}" version 2>/dev/null)" = "${VERSION}" ]; then
+              echo "driftnet@${VERSION} is available on npm"
+              exit 0
+            fi
+            echo "Waiting for driftnet@${VERSION} on npm (${i}/40)..."
+            sleep 15
+          done
+          echo "Timed out waiting for driftnet@${VERSION} on npm"
+          exit 1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && steps.version.outputs.version != 'latest' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && steps.version.outputs.version == 'latest' }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            DRIFTNET_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

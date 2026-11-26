@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { z } from "zod";
 import type { Store } from "@driftnet/core";
-import { foreignOrigin, isAdmin, isLocal, isPassword, isTrustedLocal, token } from "./access.ts";
+import { isAdmin, isLocal, isPassword, isTrustedLocal, sameOrigin, token } from "./access.ts";
 
 type Reply = { status: number; body: unknown };
 
@@ -23,7 +23,7 @@ const json = (req: IncomingMessage) => /^application\/json\b/.test(req.headers["
  */
 export function pairRoute(store: Store, env: NodeJS.ProcessEnv, req: IncomingMessage, action: "create" | "claim", body?: unknown, now = Date.now()): Reply {
   if (req.method !== "POST") return { status: 405, body: { error: "method not allowed" } };
-  if (foreignOrigin(req)) return { status: 403, body: { error: "unauthorized" } };
+  if (!sameOrigin(req)) return { status: 403, body: { error: "unauthorized" } };
   if (!json(req)) return { status: 415, body: { error: "send application/json" } };
   if (action === "claim") {
     const parsed = claim.safeParse(body ?? {});

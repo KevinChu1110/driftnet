@@ -3,6 +3,15 @@
   "private": true,
   "type": "module",
   "description": "Drop links into any chat; get them sorted, explained and searchable, for you and your agents. Any model, or none.",
+  "author": "Kevin Chu <guanrung1110@gmail.com> (https://github.com/KevinChu1110)",
+  "homepage": "https://github.com/KevinChu1110/driftnet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KevinChu1110/driftnet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KevinChu1110/driftnet/issues"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=22.13"
@@ -33,5 +42,11 @@
     "tsx": "^4.23.15",
     "typescript": "^5.8.0",
     "ws": "^8.22.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "hono": ">=4.13.16",
+      "@hono/node-server": ">=2.1.6"
+    }
   }
 }

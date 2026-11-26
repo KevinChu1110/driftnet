@@ -64,6 +64,7 @@ for (const lang of Object.keys(data)) {
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 for (const f of ["favicon.svg", "apple-touch-icon.png", "icon-512.png", "qr.js", "manifest.webmanifest"]) cpSync(join(PUBLIC, f), join(OUT, f));
+cpSync(join(PUBLIC, "locales"), join(OUT, "locales"), { recursive: true });
 mkdirSync(join(OUT, "media"), { recursive: true });
 for (const [rel, from] of mediaFiles) cpSync(from, join(OUT, rel));
 cpSync(join(ROOT, "demo/demo-api.js"), join(OUT, "demo-api.js"));

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { cardSigOk, mediaSigOk, packSigOk, setMediaSecret, type Driftnet, type loadHomeEnv } from "@driftnet/core";
 import { canRead, clientIp, foreignOrigin, hostAllowed, isAdmin, isLocal, isPassword, isTrustedLocal, token, Tunnel } from "./access.ts";
@@ -24,7 +25,8 @@ import { routes as system } from "./routes/system.ts";
  */
 export const routes: Route[] = [...system, ...folders, ...packs, ...items, ...importRoutes, ...notes, ...digest, ...settingsRoutes, ...backup];
 
-const asset = (file: string) => readFileSync(new URL(`../public/${file}`, import.meta.url));
+const asset = (file: string, env: NodeJS.ProcessEnv = process.env) =>
+  env.DRIFTNET_PUBLIC_DIR ? readFileSync(join(env.DRIFTNET_PUBLIC_DIR, file)) : readFileSync(new URL(`../public/${file}`, import.meta.url));
 
 export interface AppOptions {
   dn: Driftnet;
@@ -122,14 +124,19 @@ export function createApp(opts: AppOptions): Server {
     plugins: opts.plugins ?? [],
     envFile: opts.envFile,
     chats: opts.chats,
-    indexHtml: readFileSync(new URL("../public/index.html", import.meta.url), "utf8"),
+    indexHtml: asset("index.html", env).toString("utf8"),
     /** Icons are public even in private mode: the browser asks for them before any token. */
     assets: {
-      "/favicon.svg": [asset("favicon.svg"), "image/svg+xml"],
-      "/apple-touch-icon.png": [asset("apple-touch-icon.png"), "image/png"],
-      "/icon-512.png": [asset("icon-512.png"), "image/png"],
-      "/qr.js": [asset("qr.js"), "text/javascript; charset=utf-8"],
-      "/manifest.webmanifest": [asset("manifest.webmanifest"), "application/manifest+json"],
+      "/favicon.svg": [asset("favicon.svg", env), "image/svg+xml"],
+      "/apple-touch-icon.png": [asset("apple-touch-icon.png", env), "image/png"],
+      "/icon-512.png": [asset("icon-512.png", env), "image/png"],
+      "/qr.js": [asset("qr.js", env), "text/javascript; charset=utf-8"],
+      "/manifest.webmanifest": [asset("manifest.webmanifest", env), "application/manifest+json"],
+      "/locales/zh-TW.js": [asset("locales/zh-TW.js", env), "text/javascript; charset=utf-8"],
+      "/locales/zh-CN.js": [asset("locales/zh-CN.js", env), "text/javascript; charset=utf-8"],
+      "/locales/ja.js": [asset("locales/ja.js", env), "text/javascript; charset=utf-8"],
+      "/locales/ko.js": [asset("locales/ko.js", env), "text/javascript; charset=utf-8"],
+      "/locales/es.js": [asset("locales/es.js", env), "text/javascript; charset=utf-8"],
     },
     authorized, settingsShape, throttled, miss,
   };
@@ -149,8 +156,12 @@ export function createApp(opts: AppOptions): Server {
       }
       // A signed chat webhook arrives under whatever address its platform was given; its signature is the guard.
       const signedWebhook = route?.access === "public" && path.startsWith("/webhooks/");
-      if (!signedWebhook && !hostAllowed(req, env)) {
-        return send(res, 421, { error: "unknown host; set DRIFTNET_PUBLIC_URL (or add it to DRIFTNET_ALLOWED_HOSTS) to use this address" });
+      if (!signedWebhook) {
+        if (triedCredentials(req) && throttled(req)) return send(res, 429, { error: "too many wrong passwords; try again in 15 minutes" });
+        if (!hostAllowed(req, env, dn.store)) {
+          if (triedCredentials(req)) miss(req);
+          return send(res, 421, { error: "unknown host; set DRIFTNET_PUBLIC_URL (or add it to DRIFTNET_ALLOWED_HOSTS) to use this address" });
+        }
       }
       const run = () => route!.handler({ req, res, url, path, m: m!, app, send: reply, json: () => readJson(req), body: (limit) => readBody(req, limit) } as Ctx);
       // The page and its icons: before the throttle and the read gate.

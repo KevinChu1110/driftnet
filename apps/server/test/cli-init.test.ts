@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,14 +10,14 @@ import { remoteUrl, type InitCtx, type RunResult } from "../src/cli/init.ts";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const TOKEN = "dnt_secret_token_123";
 
-function setup(opts: { claude?: "none" | "fresh" | "exists"; tty?: boolean; answer?: boolean } = {}) {
+function setup(opts: { claude?: "none" | "fresh" | "exists"; tty?: boolean; answer?: boolean; platform?: NodeJS.Platform; env?: Record<string, string> } = {}) {
   const home = mkdtempSync(join(tmpdir(), "driftnet-init-"));
   const out: string[] = [], err: string[] = [], calls: string[][] = [];
   const ctx: InitCtx = {
-    env: { HOME: home, DRIFTNET_HOME: join(home, ".driftnet") },
+    env: { HOME: home, DRIFTNET_HOME: join(home, ".driftnet"), ...opts.env },
     out: (s) => out.push(s), err: (s) => err.push(s), writeBytes: () => {}, fetch,
     isTTY: opts.tty ?? false, confirm: async () => opts.answer ?? true, open: () => {}, sleep: async () => {},
-    platform: "darwin",
+    platform: opts.platform ?? "darwin",
     skillSource: join(ROOT, "skills", "driftnet", "SKILL.md"),
     run: async (cmd, args): Promise<RunResult> => {
       calls.push([cmd, ...args]);
@@ -31,14 +31,18 @@ function setup(opts: { claude?: "none" | "fresh" | "exists"; tty?: boolean; answ
   return { home, ctx, out, err, calls, run, text };
 }
 const desktopFile = (home: string) => join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+const vscodeFile = (home: string) => join(home, "Library", "Application Support", "Code", "User", "mcp.json");
+const geminiFile = (home: string) => join(home, ".gemini", "settings.json");
 const baks = (dir: string) => readdirSync(dir).filter((f) => f.includes(".bak-driftnet-"));
 
 test("init: nothing installed -> every client skipped, exit 0", async () => {
   const t = setup();
   assert.equal(await t.run("--yes"), 0);
   const s = t.text();
-  for (const c of ["Claude Code", "Claude Desktop", "Cursor", "Windsurf", "Codex"]) assert.match(s, new RegExp(`${c}\\s+skipped`));
+  for (const c of ["Claude Code", "Claude Desktop", "Cursor", "Windsurf", "Codex", "Gemini CLI", "VS Code"]) assert.match(s, new RegExp(`${c}\\s+skipped`));
   assert.ok(!existsSync(join(t.home, ".cursor")));
+  assert.ok(!existsSync(join(t.home, ".gemini")));
+  assert.ok(!existsSync(dirname(vscodeFile(t.home))));
 });
 
 test("init: detects clients by their config dirs; JSON merge keeps other servers, backs up, is idempotent", async () => {
@@ -209,6 +213,100 @@ test("init: non-TTY without --yes prints the plan and exits 1; TTY asks", async 
   mkdirSync(join(yes.home, ".cursor"), { recursive: true });
   assert.equal(await yes.run(), 0);
   assert.ok(existsSync(join(yes.home, ".cursor", "mcp.json")));
+});
+
+test("init: Gemini CLI local and remote config, backup, idempotent, skips when not installed", async () => {
+  const t = setup();
+  mkdirSync(dirname(geminiFile(t.home)), { recursive: true });
+  writeFileSync(geminiFile(t.home), JSON.stringify({ theme: "dark", mcpServers: { other: { command: "foo" } } }, null, 2));
+
+  assert.equal(await t.run("--yes"), 0);
+  const localDoc = JSON.parse(readFileSync(geminiFile(t.home), "utf8"));
+  assert.equal(localDoc.theme, "dark");
+  assert.deepEqual(localDoc.mcpServers.other, { command: "foo" });
+  assert.deepEqual(localDoc.mcpServers.driftnet, { command: "npx", args: ["-y", "driftnet", "mcp"], env: { DRIFTNET_AGENT: "gemini-cli" } });
+  assert.equal(baks(dirname(geminiFile(t.home))).length, 1, "existing file backed up");
+  assert.match(t.text(), /Restart Gemini CLI to load driftnet/);
+
+  const before = readFileSync(geminiFile(t.home), "utf8");
+  t.out.length = 0;
+  assert.equal(await t.run("--yes", "--client", "gemini-cli"), 0);
+  assert.equal(readFileSync(geminiFile(t.home), "utf8"), before);
+  assert.equal(baks(dirname(geminiFile(t.home))).length, 1, "second run writes nothing");
+  assert.match(t.text(), /Gemini CLI\s+already set/);
+  assert.doesNotMatch(t.text(), /Restart/);
+
+  t.out.length = 0;
+  assert.equal(await t.run("--yes", "--client", "gemini-cli", "--remote", "https://dn.example.com/", "--token", TOKEN), 0);
+  const remoteDoc = JSON.parse(readFileSync(geminiFile(t.home), "utf8"));
+  assert.equal(remoteDoc.theme, "dark");
+  assert.deepEqual(remoteDoc.mcpServers.other, { command: "foo" });
+  assert.deepEqual(remoteDoc.mcpServers.driftnet, {
+    httpUrl: "https://dn.example.com/mcp",
+    headers: { Authorization: `Bearer ${TOKEN}`, "X-Driftnet-Agent": "gemini-cli" },
+  });
+  assert.ok(!t.text().includes(TOKEN), "token never printed");
+
+  // Explicit --client gemini-cli creates directory even when not installed.
+  const fresh = setup();
+  assert.equal(await fresh.run("--yes", "--client", "gemini-cli", "--remote", "https://dn.example.com", "--token", TOKEN), 0);
+  assert.ok(existsSync(geminiFile(fresh.home)));
+  assert.equal(statSync(geminiFile(fresh.home)).mode & 0o777, 0o600, "remote config gets 0600 permissions");
+});
+
+test("init: VS Code local and remote config uses top-level servers, backup, idempotent, platform paths", async () => {
+  const t = setup();
+  mkdirSync(dirname(vscodeFile(t.home)), { recursive: true });
+  writeFileSync(vscodeFile(t.home), JSON.stringify({ inputs: [{ id: "k" }], servers: { other: { type: "stdio", command: "foo" } } }, null, 2));
+
+  assert.equal(await t.run("--yes"), 0);
+  const localDoc = JSON.parse(readFileSync(vscodeFile(t.home), "utf8"));
+  assert.deepEqual(localDoc.inputs, [{ id: "k" }]);
+  assert.equal(localDoc.mcpServers, undefined, "must not create mcpServers");
+  assert.deepEqual(localDoc.servers.other, { type: "stdio", command: "foo" });
+  assert.deepEqual(localDoc.servers.driftnet, {
+    type: "stdio",
+    command: "npx",
+    args: ["-y", "driftnet", "mcp"],
+    env: { DRIFTNET_AGENT: "vscode" },
+  });
+  assert.equal(baks(dirname(vscodeFile(t.home))).length, 1, "existing file backed up");
+  assert.match(t.text(), /Restart VS Code to load driftnet/);
+
+  const before = readFileSync(vscodeFile(t.home), "utf8");
+  t.out.length = 0;
+  assert.equal(await t.run("--yes", "--client", "vscode"), 0);
+  assert.equal(readFileSync(vscodeFile(t.home), "utf8"), before);
+  assert.equal(baks(dirname(vscodeFile(t.home))).length, 1, "second run writes nothing");
+  assert.match(t.text(), /VS Code\s+already set/);
+  assert.doesNotMatch(t.text(), /Restart/);
+
+  t.out.length = 0;
+  assert.equal(await t.run("--yes", "--client", "vscode", "--remote", "https://dn.example.com", "--token", TOKEN), 0);
+  const remoteDoc = JSON.parse(readFileSync(vscodeFile(t.home), "utf8"));
+  assert.deepEqual(remoteDoc.inputs, [{ id: "k" }]);
+  assert.equal(remoteDoc.mcpServers, undefined);
+  assert.deepEqual(remoteDoc.servers.other, { type: "stdio", command: "foo" });
+  assert.deepEqual(remoteDoc.servers.driftnet, {
+    type: "http",
+    url: "https://dn.example.com/mcp",
+    headers: { Authorization: `Bearer ${TOKEN}`, "X-Driftnet-Agent": "vscode" },
+  });
+  assert.ok(!t.text().includes(TOKEN), "token never printed");
+
+  // Explicit --client vscode creates directory even when not installed, with 0600 on remote.
+  const fresh = setup();
+  assert.equal(await fresh.run("--yes", "--client", "vscode", "--remote", "https://dn.example.com", "--token", TOKEN), 0);
+  assert.ok(existsSync(vscodeFile(fresh.home)));
+  assert.equal(statSync(vscodeFile(fresh.home)).mode & 0o777, 0o600, "remote config gets 0600 permissions");
+
+  // Linux (XDG_CONFIG_HOME) and Windows (APPDATA) paths.
+  const lin = setup({ platform: "linux" });
+  assert.equal(await lin.run("--yes", "--client", "vscode"), 0);
+  assert.ok(existsSync(join(lin.home, ".config", "Code", "User", "mcp.json")));
+  const win = setup({ platform: "win32" });
+  assert.equal(await win.run("--yes", "--client", "vscode"), 0);
+  assert.ok(existsSync(join(win.home, "AppData", "Roaming", "Code", "User", "mcp.json")));
 });
 
 test("install doc: copies agree and name every MCP tool", () => {

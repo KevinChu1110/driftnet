@@ -28,8 +28,10 @@ await build({
   target: "node22",
   external: Object.keys(dependencies),
   define: { "process.env.DRIFTNET_VERSION": JSON.stringify(version) },
-  // Some bundled code still calls require() for Node built-ins.
-  banner: { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' },
+  // Preserve copyright attribution & require shim in the distributed bundle.
+  banner: {
+    js: `/*! driftnet v${version} | Copyright (c) 2026 Kevin Chu (KevinChu1110) | https://github.com/KevinChu1110/driftnet | SPDX-License-Identifier: MIT */\nimport { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);`,
+  },
   logLevel: "warning",
 });
 // The bin is a plain-JS shim that checks Node before loading the bundle (which needs node:sqlite).
@@ -42,7 +44,7 @@ if (major < 22 || (major === 22 && minor < 13)) {
 await import("./driftnet.mjs");
 `, { mode: 0o755 });
 cpSync(join(root, "apps/server/public"), join(out, "public"), { recursive: true });
-for (const f of ["LICENSE", ".env.example"]) cpSync(join(root, f), join(out, f));
+for (const f of ["LICENSE", "NOTICE", ".env.example"]) cpSync(join(root, f), join(out, f));
 // npmjs.com can't see the repo's assets/ folder: point images and links at GitHub.
 for (const f of ["README.md", "README.zh-TW.md"]) {
   writeFileSync(join(out, f), readFileSync(join(root, f), "utf8")
@@ -61,7 +63,7 @@ writeFileSync(join(out, "package.json"), JSON.stringify({
   license: rootPkg.license,
   type: "module",
   bin: { driftnet: "dist/cli.mjs" },
-  files: ["dist", "public", "examples", "skills", ".env.example", "README.zh-TW.md"],
+  files: ["dist", "public", "examples", "skills", "LICENSE", "NOTICE", ".env.example", "README.zh-TW.md"],
   engines: rootPkg.engines,
   repository: { type: "git", url: "git+https://github.com/KevinChu1110/driftnet.git" },
   homepage: "https://github.com/KevinChu1110/driftnet#readme",

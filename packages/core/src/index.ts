@@ -1,4 +1,15 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Kevin Chu (KevinChu1110) — https://github.com/KevinChu1110/driftnet
+
 import { existsSync, readFileSync } from "node:fs";
+
+/** Immutable origin attribution metadata for legal provenance under the MIT License. */
+export const DRIFTNET_PROVENANCE = Object.freeze({
+  name: "driftnet",
+  author: "Kevin Chu (KevinChu1110)",
+  repository: "https://github.com/KevinChu1110/driftnet",
+  license: "MIT",
+});
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadCategories } from "./categories.ts";

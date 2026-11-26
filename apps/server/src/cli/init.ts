@@ -8,10 +8,11 @@ import type { Ctx } from "./commands.ts";
 
 /** `driftnet init`: wire the driftnet MCP server (and the Claude Code skill) into the agents on this machine. */
 
-export const CLIENTS = ["claude-code", "claude-desktop", "cursor", "windsurf", "codex"] as const;
+export const CLIENTS = ["claude-code", "claude-desktop", "cursor", "windsurf", "codex", "gemini-cli", "vscode"] as const;
 export type Client = (typeof CLIENTS)[number];
 const LABEL: Record<Client, string> = {
   "claude-code": "Claude Code", "claude-desktop": "Claude Desktop", cursor: "Cursor", windsurf: "Windsurf", codex: "Codex",
+  "gemini-cli": "Gemini CLI", vscode: "VS Code",
 };
 
 export interface RunResult { code: number; stdout: string; stderr: string }
@@ -59,10 +60,15 @@ export function remoteUrl(raw: string): string {
 const stdioEntry = (client: Client) => ({ command: "npx", args: STDIO_ARGS, env: { DRIFTNET_AGENT: client } });
 
 function jsonEntry(client: Client, remote?: Remote): Record<string, unknown> {
+  if (client === "vscode") {
+    if (!remote) return { type: "stdio", ...stdioEntry(client) };
+    return { type: "http", url: remote.url, headers: { Authorization: `Bearer ${remote.token}`, "X-Driftnet-Agent": client } };
+  }
   if (!remote) return stdioEntry(client);
   const headers = { Authorization: `Bearer ${remote.token}`, "X-Driftnet-Agent": client };
   if (client === "cursor") return { url: remote.url, headers };
   if (client === "windsurf") return { serverUrl: remote.url, headers };
+  if (client === "gemini-cli") return { httpUrl: remote.url, headers };
   // Claude Desktop only speaks stdio: bridge with mcp-remote (the token goes in via env, not argv).
   return {
     command: "npx",
@@ -80,6 +86,12 @@ function jsonPath(ctx: InitCtx, client: Client): string {
   const platform = ctx.platform ?? process.platform;
   if (client === "cursor") return join(h, ".cursor", "mcp.json");
   if (client === "windsurf") return join(h, ".codeium", "windsurf", "mcp_config.json");
+  if (client === "gemini-cli") return join(h, ".gemini", "settings.json");
+  if (client === "vscode") {
+    if (platform === "darwin") return join(h, "Library", "Application Support", "Code", "User", "mcp.json");
+    if (platform === "win32") return join(ctx.env.APPDATA || join(h, "AppData", "Roaming"), "Code", "User", "mcp.json");
+    return join(ctx.env.XDG_CONFIG_HOME || join(h, ".config"), "Code", "User", "mcp.json");
+  }
   if (platform === "darwin") return join(h, "Library", "Application Support", "Claude", "claude_desktop_config.json");
   if (platform === "win32") return join(ctx.env.APPDATA || join(h, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
   return join(ctx.env.XDG_CONFIG_HOME || join(h, ".config"), "Claude", "claude_desktop_config.json");
@@ -110,7 +122,9 @@ function planJson(ctx: InitCtx, client: Client, force: boolean, remote?: Remote)
       return { client, state: "fail", detail: `${file} is not valid JSON (${(e as Error).message}); fix or remove it, nothing was changed` };
     }
   }
-  const servers = (doc.mcpServers && typeof doc.mcpServers === "object" ? doc.mcpServers : {}) as Record<string, unknown>;
+  const rootKey = client === "vscode" ? "servers" : "mcpServers";
+  const rawServers = doc[rootKey];
+  const servers = (rawServers && typeof rawServers === "object" && !Array.isArray(rawServers) ? rawServers : {}) as Record<string, unknown>;
   const entry = jsonEntry(client, remote);
   if (same(servers.driftnet, entry)) return { client, state: "same", detail: file };
   const state: State = servers.driftnet === undefined ? "add" : "update";
@@ -120,7 +134,7 @@ function planJson(ctx: InitCtx, client: Client, force: boolean, remote?: Remote)
     apply: async () => {
       const b = backup(file);
       mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, JSON.stringify({ ...doc, mcpServers: { ...servers, driftnet: entry } }, null, 2) + "\n", remote ? { mode: 0o600 } : undefined);
+      writeFileSync(file, JSON.stringify({ ...doc, [rootKey]: { ...servers, driftnet: entry } }, null, 2) + "\n", remote ? { mode: 0o600 } : undefined);
       return b ? `backup: ${b}` : undefined;
     },
   };

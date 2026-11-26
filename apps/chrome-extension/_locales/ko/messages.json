@@ -1,0 +1,108 @@
+{
+  "name": {
+    "message": "driftnet"
+  },
+  "description": {
+    "message": "지금 보고 있는 게시물(본문, 댓글, 링크, 로그인이 필요한 페이지 포함)을 나만의 driftnet으로 보냅니다. Threads, X, Instagram을 지원합니다."
+  },
+  "actionTitle": {
+    "message": "이 페이지를 driftnet으로 보내기"
+  },
+  "menuLink": {
+    "message": "링크를 driftnet으로 보내기"
+  },
+  "menuPage": {
+    "message": "이 페이지를 driftnet으로 보내기"
+  },
+  "menuSelection": {
+    "message": "선택 영역을 driftnet으로 보내기"
+  },
+  "sending": {
+    "message": "driftnet으로 보내는 중…"
+  },
+  "saved": {
+    "message": "저장됨"
+  },
+  "alreadySaved": {
+    "message": "이미 저장됨"
+  },
+  "failed": {
+    "message": "전송하지 못했습니다"
+  },
+  "notConfigured": {
+    "message": "먼저 driftnet 서버를 설정하세요."
+  },
+  "openSettings": {
+    "message": "설정"
+  },
+  "openItem": {
+    "message": "driftnet에서 열기"
+  },
+  "cantReadPage": {
+    "message": "이 페이지는 읽을 수 없습니다(브라우저 내부 페이지 또는 스토어 페이지)."
+  },
+  "settingsTitle": {
+    "message": "driftnet 설정"
+  },
+  "serverUrl": {
+    "message": "서버 URL"
+  },
+  "serverHint": {
+    "message": "이 컴퓨터에서 접속할 수 있는 driftnet 서버 주소(예: http://localhost:8787)"
+  },
+  "token": {
+    "message": "토큰 (DRIFTNET_TOKEN)"
+  },
+  "save": {
+    "message": "저장 및 테스트"
+  },
+  "savedOk": {
+    "message": "연결됨: 카탈로그에 $COUNT$개 항목이 있습니다.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "permissionDenied": {
+    "message": "이 서버에 접속할 권한이 허용되지 않았습니다."
+  },
+  "privacy": {
+    "message": "이 확장 프로그램은 버튼을 클릭하거나 오른쪽 클릭 메뉴를 사용할 때만 탭을 읽으며, 읽은 내용은 사용자의 서버로만 전송합니다."
+  },
+  "worth_skip": {
+    "message": "건너뛰기"
+  },
+  "worth_low": {
+    "message": "낮음"
+  },
+  "worth_normal": {
+    "message": "볼 만함"
+  },
+  "worth_must_see": {
+    "message": "★ 필독"
+  },
+  "httpsRequired": {
+    "message": "http는 localhost에서만 사용할 수 있습니다. 다른 서버에는 https:// 주소를 사용하세요."
+  },
+  "tokenRejected": {
+    "message": "서버가 토큰을 거부했습니다(HTTP 401). 토큰을 확인하세요."
+  },
+  "unreachableLocal": {
+    "message": "이 컴퓨터의 driftnet에 연결할 수 없습니다. 터미널에서 npx driftnet을 실행하고 창을 열어 두세요."
+  },
+  "unreachableRemote": {
+    "message": "$URL$의 driftnet에 연결할 수 없습니다. 실행 중인지, 주소가 맞는지 확인하세요.",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "helpLink": {
+    "message": "방법 보기"
+  },
+  "helpUrl": {
+    "message": "https://github.com/KevinChu1110/driftnet/blob/main/README.md#-quick-start"
+  }
+}

@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { createProvider } from "@driftnet/core";
 import { isLocal, isPrivate, newKey, readKey, strength, token } from "../access.ts";
+import { detectLocalAi, testAiConnection } from "../ai-probe.ts";
 import { SettingsError } from "../settings.ts";
 import { pairRoute } from "../pair.ts";
 import { tokenRoute } from "../tokens.ts";
@@ -63,6 +64,23 @@ export const routes: Route[] = [
         }
       }
       return send(200, { ...settings.view(), engines: dn.engines, chats: app.chats?.status() ?? null, plugins, restorePending: restorePending(dbPathOf(env)), ...accessView(req, app) });
+    },
+  },
+  {
+    method: "GET", pattern: "/api/settings/detect-ai", access: "password", noPasswordHint: SETTINGS_HINT,
+    handler: async ({ req, send, app }) => {
+      if (!app.settingsShape(req)) return send(403, shapeDenied(app, SETTINGS_HINT));
+      return send(200, { detected: await detectLocalAi({ env: app.env }) });
+    },
+  },
+  {
+    method: "POST", pattern: "/api/settings/test-ai", access: "password", noPasswordHint: SETTINGS_HINT,
+    handler: async ({ req, send, json, app }) => {
+      if (!app.settingsShape(req)) return send(403, shapeDenied(app, SETTINGS_HINT));
+      const { values = {} } = await json<{ values?: Record<string, unknown> }>();
+      const locked = new Set(app.settings.view().settings.filter((s) => s.locked).map((s) => s.key));
+      const r = await testAiConnection(app.env, values, { locked });
+      return send(r.ok ? 200 : 400, r);
     },
   },
   // Agent tokens: one named key per agent. Admin password only, never a token itself (tokenRoute adds the per-method rules).

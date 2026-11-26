@@ -64,7 +64,16 @@ test("a video tool setting must be the full path of that tool, not any program",
   for (const bad of [{ DRIFTNET_YTDLP_IMPERSONATE: "--cookies /etc/passwd" }, { DRIFTNET_YTDLP_IMPERSONATE: "chrome;rm" }, { DRIFTNET_YTDLP_IMPERSONATE: "-chrome" }]) {
     assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
   }
-  for (const bad of [{ DRIFTNET_YTDLP_COOKIES: "cookies.txt" }, { DRIFTNET_YTDLP_COOKIES: "/tmp/" }, { DRIFTNET_YTDLP_COOKIES: "# Netscape HTTP Cookie File\n.x.com\tTRUE" }]) {
+  for (const bad of [
+    { DRIFTNET_YTDLP_COOKIES: "cookies.txt" },
+    { DRIFTNET_YTDLP_COOKIES: "/tmp/" },
+    { DRIFTNET_YTDLP_COOKIES: "/tmp/../etc/passwd" },
+    { DRIFTNET_YTDLP_COOKIES: "# Netscape HTTP Cookie File\n.x.com\tTRUE" },
+    { DRIFTNET_VERTEX_CREDENTIALS: "sa.json" },
+    { DRIFTNET_VERTEX_CREDENTIALS: "/tmp/../etc/passwd" },
+    { DRIFTNET_JUDGE_RULES: "rules.json" },
+    { DRIFTNET_JUDGE_RULES: "/tmp/../etc/passwd" },
+  ]) {
     assert.throws(() => settings.update(bad), SettingsError, JSON.stringify(bad));
   }
 });

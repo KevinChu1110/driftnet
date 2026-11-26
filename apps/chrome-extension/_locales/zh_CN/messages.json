@@ -1,0 +1,108 @@
+{
+  "name": {
+    "message": "driftnet"
+  },
+  "description": {
+    "message": "把你正在看的帖子（正文、评论、链接，登录后才能看到的也行）发送到你自己的 driftnet。支持 Threads、X 和 Instagram。"
+  },
+  "actionTitle": {
+    "message": "将此页面发送到 driftnet"
+  },
+  "menuLink": {
+    "message": "将链接发送到 driftnet"
+  },
+  "menuPage": {
+    "message": "将此页面发送到 driftnet"
+  },
+  "menuSelection": {
+    "message": "将选中内容发送到 driftnet"
+  },
+  "sending": {
+    "message": "正在发送到 driftnet…"
+  },
+  "saved": {
+    "message": "已收录"
+  },
+  "alreadySaved": {
+    "message": "之前已收录"
+  },
+  "failed": {
+    "message": "发送失败"
+  },
+  "notConfigured": {
+    "message": "请先设置 driftnet 服务器。"
+  },
+  "openSettings": {
+    "message": "设置"
+  },
+  "openItem": {
+    "message": "在 driftnet 中打开"
+  },
+  "cantReadPage": {
+    "message": "无法读取此页面（浏览器内置页面或应用商店页面）。"
+  },
+  "settingsTitle": {
+    "message": "driftnet 设置"
+  },
+  "serverUrl": {
+    "message": "服务器地址"
+  },
+  "serverHint": {
+    "message": "这台电脑可访问的 driftnet 地址，例如 http://localhost:8787"
+  },
+  "token": {
+    "message": "令牌（DRIFTNET_TOKEN）"
+  },
+  "save": {
+    "message": "保存并测试"
+  },
+  "savedOk": {
+    "message": "连接成功：目录中共有 $COUNT$ 条记录。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "permissionDenied": {
+    "message": "未授予访问此服务器的权限。"
+  },
+  "privacy": {
+    "message": "扩展仅在你点击图标或使用右键菜单时读取当前标签页，且仅将读取的内容发送到你自己的服务器。"
+  },
+  "worth_skip": {
+    "message": "跳过"
+  },
+  "worth_low": {
+    "message": "一般"
+  },
+  "worth_normal": {
+    "message": "值得一看"
+  },
+  "worth_must_see": {
+    "message": "★ 必看"
+  },
+  "httpsRequired": {
+    "message": "仅 localhost 可使用 http，其他服务器请使用 https:// 地址。"
+  },
+  "tokenRejected": {
+    "message": "服务器拒绝了该令牌（HTTP 401），请检查。"
+  },
+  "unreachableLocal": {
+    "message": "无法连接到本机的 driftnet。请在终端运行 npx driftnet 启动它，并保持该窗口开启。"
+  },
+  "unreachableRemote": {
+    "message": "无法连接到 $URL$ 上的 driftnet。请确认它正在运行且地址正确。",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "helpLink": {
+    "message": "怎么做？"
+  },
+  "helpUrl": {
+    "message": "https://github.com/KevinChu1110/driftnet/blob/main/README.zh-TW.md#-開始使用"
+  }
+}

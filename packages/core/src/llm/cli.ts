@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { z } from "zod";
@@ -40,6 +40,7 @@ export class CliProvider implements LlmProvider {
   readonly label: string;
   private readonly workdir = mkdtempSync(join(tmpdir(), "driftnet-cli-"));
   private readonly queue: Semaphore;
+  private readonly cleanup = () => { try { rmSync(this.workdir, { recursive: true, force: true }); } catch { /* best effort */ } };
 
   constructor(private readonly opts: CliOptions) {
     this.label = `${opts.kind}-cli${opts.model ? `:${opts.model}` : ""}`;
@@ -47,6 +48,13 @@ export class CliProvider implements LlmProvider {
     if (opts.kind === "gemini") {
       writeFileSync(join(this.workdir, "gemini-settings.json"), JSON.stringify(GEMINI_LOCKDOWN));
     }
+    process.once("exit", this.cleanup);
+  }
+
+  /** Remove the temporary working directory immediately. */
+  dispose(): void {
+    process.off("exit", this.cleanup);
+    this.cleanup();
   }
 
   complete<T extends z.ZodType>(req: StructuredRequest<T>): Promise<z.infer<T>> {
@@ -144,23 +152,37 @@ interface RunResult {
   stderr: string;
 }
 
+function killGroup(pid: number | undefined, signal: NodeJS.Signals): void {
+  if (!pid || process.platform === "win32") return;
+  try { process.kill(-pid, signal); } catch { /* already gone */ }
+}
+
 function run(bin: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number }): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    // No shell: the prompt is an argument, never interpreted.
-    const child = spawn(bin, args, { cwd: opts.cwd, env: opts.env, stdio: ["ignore", "pipe", "pipe"] });
+    // No shell: the prompt is an argument, never interpreted. Own process group so timeout kills children too.
+    const child = spawn(bin, args, { cwd: opts.cwd, env: opts.env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
     let stdout = "";
     let stderr = "";
+    let settled = false;
     child.stdout.on("data", (d) => { if (stdout.length < 5_000_000) stdout += d; });
     child.stderr.on("data", (d) => { if (stderr.length < 200_000) stderr += d; });
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      killGroup(child.pid, "SIGTERM");
       child.kill("SIGTERM");
+      setTimeout(() => { killGroup(child.pid, "SIGKILL"); child.kill("SIGKILL"); }, 500).unref();
       reject(new Error(`${bin} timed out after ${opts.timeoutMs} ms`));
     }, opts.timeoutMs);
     child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       reject((err as NodeJS.ErrnoException).code === "ENOENT" ? new Error(`${bin} not found — is it installed and on PATH?`) : err);
     });
     child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       resolve({ code, stdout, stderr });
     });

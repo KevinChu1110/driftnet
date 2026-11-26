@@ -69,10 +69,13 @@ test("no password: this machine may, anyone else may not", () => {
   assert.equal(route({ local: true, method: "POST" }, null, { name: "local", scope: "read" }, open).status, 200);
 });
 
-test("a page on another site cannot manage tokens, even from this machine", () => {
+test("a page on another site or a browser extension cannot manage tokens, even from this machine", () => {
   const foreign = req({ local: true });
   foreign.headers.origin = "https://evil.example";
   assert.equal(tokenRoute(store, {}, foreign, null).status, 403);
+  const ext = req({ local: true, method: "POST" });
+  ext.headers.origin = "chrome-extension://abcdefghijklmnop";
+  assert.equal(tokenRoute(store, {}, ext, null, { name: "stolen", scope: "write" }).status, 403);
 });
 
 test("bad input is a 400, a non-JSON body a 415", () => {

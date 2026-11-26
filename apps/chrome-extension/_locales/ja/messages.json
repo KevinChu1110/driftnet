@@ -1,0 +1,108 @@
+{
+  "name": {
+    "message": "driftnet"
+  },
+  "description": {
+    "message": "今見ている投稿（本文、コメント、リンク、ログインが必要なページも）を自分の driftnet に送ります。Threads、X、Instagram に対応。"
+  },
+  "actionTitle": {
+    "message": "このページを driftnet に送る"
+  },
+  "menuLink": {
+    "message": "リンクを driftnet に送る"
+  },
+  "menuPage": {
+    "message": "このページを driftnet に送る"
+  },
+  "menuSelection": {
+    "message": "選択範囲を driftnet に送る"
+  },
+  "sending": {
+    "message": "driftnet に送信中…"
+  },
+  "saved": {
+    "message": "保存しました"
+  },
+  "alreadySaved": {
+    "message": "保存済みです"
+  },
+  "failed": {
+    "message": "送信できませんでした"
+  },
+  "notConfigured": {
+    "message": "先に driftnet サーバーを設定してください。"
+  },
+  "openSettings": {
+    "message": "設定"
+  },
+  "openItem": {
+    "message": "driftnet で開く"
+  },
+  "cantReadPage": {
+    "message": "このページは読み取れません（ブラウザの内部ページまたはストアページ）。"
+  },
+  "settingsTitle": {
+    "message": "driftnet 設定"
+  },
+  "serverUrl": {
+    "message": "サーバー URL"
+  },
+  "serverHint": {
+    "message": "このパソコンからアクセスできる driftnet サーバーの URL（例: http://localhost:8787）"
+  },
+  "token": {
+    "message": "トークン（DRIFTNET_TOKEN）"
+  },
+  "save": {
+    "message": "保存してテスト"
+  },
+  "savedOk": {
+    "message": "接続成功：カタログに $COUNT$ 件あります。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "permissionDenied": {
+    "message": "このサーバーへのアクセス権限が許可されませんでした。"
+  },
+  "privacy": {
+    "message": "この拡張機能はボタンをクリックするか右クリックメニューを使ったときだけタブを読み取り、読み取った内容をご自身のサーバーにのみ送信します。"
+  },
+  "worth_skip": {
+    "message": "スキップ"
+  },
+  "worth_low": {
+    "message": "低"
+  },
+  "worth_normal": {
+    "message": "見る価値あり"
+  },
+  "worth_must_see": {
+    "message": "★ 必見"
+  },
+  "httpsRequired": {
+    "message": "http が使えるのは localhost のみです。それ以外のサーバーでは https:// を使用してください。"
+  },
+  "tokenRejected": {
+    "message": "サーバーがトークンを拒否しました（HTTP 401）。内容を確認してください。"
+  },
+  "unreachableLocal": {
+    "message": "このパソコン上の driftnet に接続できません。ターミナルで npx driftnet を実行し、そのウィンドウを開いたままにしてください。"
+  },
+  "unreachableRemote": {
+    "message": "$URL$ の driftnet に接続できません。起動しているか、URL が正しいか確認してください。",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "helpLink": {
+    "message": "方法は？"
+  },
+  "helpUrl": {
+    "message": "https://github.com/KevinChu1110/driftnet/blob/main/README.md#-quick-start"
+  }
+}

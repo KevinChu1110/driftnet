@@ -7,9 +7,9 @@
 
 **English** · [繁體中文](README.zh-TW.md)
 
-**[▶ Try the demo](https://kevinchu1110.github.io/driftnet/demo/)** · **[Website](https://kevinchu1110.github.io/driftnet/)** · **[Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[Docs](#-docs)**
+**[▶ Try the demo](https://kevinchu1110.github.io/driftnet/demo/)** · **[Quick start](#-quick-start)** · **[Website](https://kevinchu1110.github.io/driftnet/)** · **[Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)** · **[Docs](#-docs)**
 
-🆕 **1.2 is out:** chat replies link each card with its own signature instead of the share key, LINE answers before its reply token expires, model and embedding endpoints go through the SSRF guard, and yt-dlp gets a cookies file and a stale-version warning. [What's new](https://github.com/KevinChu1110/driftnet/releases/tag/v1.2.0) · [What stays stable](docs/stability.md)
+🆕 **1.3 is out:** 6 languages (EN / 繁中 / 简中 / 日本語 / 한국어 / ES) loaded on demand, zero-config local AI detection & connection test, `driftnet export --format site` static showcase, desktop tray app & PWA share target, `driftnet init` for Gemini CLI & VS Code, and a 50 MB slimmer runtime (native Anthropic & Discord clients) with security hardening. [What's new](https://github.com/KevinChu1110/driftnet/releases/tag/v1.3.0) · [What stays stable](docs/stability.md)
 
 [![npm](https://img.shields.io/npm/v/driftnet?logo=npm&color=CB3837)](https://www.npmjs.com/package/driftnet)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm)
@@ -32,6 +32,106 @@ catches each one, follows a post to the project it is really about, boils it dow
 in your language, and files it in your own folders, in a local catalogue with full-text search
 (Chinese included). Your agents haul in the same catalogue over MCP. It runs on your own computer
 and works with any model, or none.
+
+## 🚀 Quick start
+
+Everything runs on your own computer — no server to rent, no account required.
+
+### 1. Try it in 10 seconds (no install)
+
+**[▶ Try the live demo](https://kevinchu1110.github.io/driftnet/demo/)** — runs the real driftnet web page directly in your browser.
+
+### 2. Run on your computer (1 command)
+
+Requires [Node.js](https://nodejs.org) 22.13 or newer. Never used a terminal? [Step by step for Mac and Windows](docs/install-beginners.md).
+
+```bash
+npx driftnet
+```
+
+Your browser opens **http://localhost:8787** (*localhost* means "this machine"; nobody else can see it). Go to **⚙ Settings → AI** to pick a provider and model — or skip it (links are still saved under "Other", and an AI agent can write the summaries; see [Agents](docs/agents.md)).
+
+- **Connect your AI apps** (Claude Code, Claude Desktop, Cursor, Windsurf, Codex) in one go: `npx driftnet init`
+- **Run in the background at login** (macOS, Linux, Windows — otherwise closing the terminal stops driftnet):
+  ```bash
+  npx driftnet service install      # status: npx driftnet service status · undo: npx driftnet service uninstall
+  ```
+
+Settings live in `~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`.
+
+### 3. Or let your AI agent install it
+
+Copy this into Claude Code, Cursor, Codex or any agent that can run commands on your computer:
+
+```text
+Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
+```
+
+It checks Node.js, starts driftnet, connects itself over MCP and tells you when it is done.
+
+<details>
+<summary><b>Add your first link</b></summary>
+
+Any of these works:
+
+- **On the page:** paste a link into the box and press Add.
+- **In a terminal:** `npx driftnet add https://github.com/paperclipai/paperclip`
+- **From the browser:** the [Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm) sends the page you are looking at.
+- **From a chat:** paste a Discord, Telegram, Slack or LINE bot token in ⚙ Settings → Chats ([how to get one](docs/ways-in.md)) and drop links there.
+
+A card shows up within 5–30 seconds: what it is, why it might matter to you, and where it was filed.
+
+</details>
+
+<details>
+<summary><b>Which setup is yours?</b></summary>
+
+| You are | Start with | Model |
+|---|---|---|
+| Just me, on my computer | The [Chrome extension](docs/chrome-extension.md) and [the web page](docs/web-page.md) | A local one through Ollama (see [Models](docs/models.md)), or none |
+| A group chat | A Discord, Telegram, Slack or LINE bot, see [Ways in](docs/ways-in.md) | Any |
+| My agents | [MCP, the Claude Code plugin or the agent queue](docs/agents.md) | None needed: the agent does the reading |
+
+</details>
+
+<details>
+<summary><b>Other ways to run it: from source, Docker</b></summary>
+
+From source, to hack on it or run it as a login service:
+
+```bash
+git clone https://github.com/KevinChu1110/driftnet && cd driftnet
+pnpm install
+pnpm start                                                 # http://localhost:8787
+pnpm service:install                                       # optional: start at login (macOS / Linux)
+```
+
+With Docker (one-liner):
+
+```bash
+docker run -d -p 127.0.0.1:8787:8787 -v driftnet_data:/data -e DRIFTNET_HOST=0.0.0.0 ghcr.io/kevinchu1110/driftnet:latest start
+```
+
+Or with Docker Compose (uses [docker-compose.yml](docker-compose.yml)):
+
+```bash
+docker compose up -d
+```
+
+Without `start`, the container is the MCP server over stdio (`docker run -i --rm -v driftnet_data:/data ghcr.io/kevinchu1110/driftnet:latest`).
+`DRIFTNET_HOME` moves the settings and the catalogue somewhere else.
+
+</details>
+
+<details>
+<summary><b>Not working?</b></summary>
+
+- **Port 8787 is in use**: another driftnet is probably running; open http://localhost:8787, or start this one with `PORT=8788`.
+- **`driftnet needs Node 22.13 or newer`**: install it with `nvm install 22` or from [nodejs.org](https://nodejs.org).
+- **Cards stay ⏳ with no summary**: no model is set up yet. Choose one in ⚙ Settings → AI, or let your agent work the queue ([Agents](docs/agents.md)).
+- **Opened from another computer and got `421`**: without a password driftnet only answers on this machine. Set a password (`DRIFTNET_TOKEN`), or list the address in `DRIFTNET_ALLOWED_HOSTS`.
+
+</details>
 
 ## 🎥 See it work
 
@@ -61,14 +161,14 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 
 - 🎯 **Finds the actual tool.** A post linking a repo becomes the repo; a post that only *names* projects gets them looked up on GitHub by exact name. Links a model makes up are thrown away.
 - 💬 **Reads "link in the comments".** The [Chrome extension](docs/chrome-extension.md) opens the comments; a weekly roundup becomes one item per project.
-- 📥 **Many ways in.** A Chrome button, Discord, Telegram, Slack or LINE bots, your agent, or one HTTP call ([Ways in](docs/ways-in.md)).
+- 📥 **Many ways in.** A Chrome button, mobile PWA Share Target, Discord, Telegram, Slack or LINE bots, your agent, or one HTTP call ([Ways in](docs/ways-in.md)).
 
 ### Understand and sort it
 
 - 🖼️ **Cards you can read at a glance.** Pictures, a one-line answer, what you'll see, why it's here.
 - 🗂️ **Your folders are the categories.** The AI files new links by each folder's path and description; its suggestions wait in the Inbox.
 - 🧠 **Mind map and split view.** Drag cards onto folders; ✨ AI tidy-up proposes a plan that changes nothing until you apply it ([the web page](docs/web-page.md)).
-- 📱 **A page you can search, on a phone too.** Notes, undo and trash, keyboard shortcuts, read-only share links.
+- 📱 **Desktop app, mobile PWA, or static showcase.** Run as a native desktop app (macOS / Windows / Linux) or in any browser; includes notes, undo and trash, keyboard shortcuts, read-only share links, and static site export (`driftnet export --format site -o ./docs`).
 - 🚫 **Not a read-later app.** Pocket and Raindrop keep the link you gave them. driftnet follows the post to the tool it is about, keeps a short outline instead of the whole page, and lets your agents read and write the same catalogue over MCP.
 
 ### Cheap, safe and yours
@@ -78,100 +178,7 @@ bot ▸ 📌 This week in AI (3/11)｜News ＋ Paperclip, RealWonder
 - 🗳️ **Learns what to ignore.** 👎 a result and its publisher loses reputation; sources that keep getting voted down stop costing anything.
 - 🛡️ **Safe by default.** Private and local addresses are refused, and prompt injection is never passed on to agents.
 - 🤖 **Agents use it too.** MCP, `/openapi.json`, `/llms.txt`, `/feed.xml` and an outgoing webhook; or let them do the reading ([Agents](docs/agents.md)).
-- 🧩 **Any model or none, and it stays yours.** A free local model through Ollama, a Claude or Gemini subscription you already have, a paid API key (pennies), or no model (links are then saved and wait unsorted under "Other"). Local SQLite; English and Traditional Chinese throughout.
-
-## 🚀 Quick start
-
-Everything runs on your own computer: no server to rent, no account. Want a look first?
-**[Try the demo](https://kevinchu1110.github.io/driftnet/demo/)** runs the real page in your browser.
-
-### Easiest: let your AI agent install it
-
-Copy this into Claude Code, Cursor, Codex or any agent that can run commands on your computer:
-
-```text
-Read https://raw.githubusercontent.com/KevinChu1110/driftnet/main/docs/llms-install.txt and set up driftnet for me.
-```
-
-It checks Node.js, starts driftnet, connects itself over MCP and tells you when it is done.
-
-### Or run one command yourself
-
-You need [Node.js](https://nodejs.org) 22.13 or newer. Never used a terminal?
-[Step by step for Mac and Windows](docs/install-beginners.md). Then, in a terminal:
-
-```bash
-npx driftnet
-```
-
-Your browser opens **http://localhost:8787**: that is driftnet's page, served by your own computer
-(*localhost* means "this machine"; nobody else can see it). ⚙ Settings → AI: pick a provider and fill
-in its key and model. Or skip it: links are still saved and wait unsorted under "Other", and an AI agent
-can write the summaries ([Agents](docs/agents.md)). To connect the AI apps on this computer (Claude Code,
-Claude Desktop, Cursor, Windsurf, Codex) in one go: `npx driftnet init`.
-
-**Closing that terminal window stops driftnet.** To have it start at login and run in the background
-instead (macOS, Linux, Windows), run once:
-
-```bash
-npx driftnet service install      # status: npx driftnet service status · undo: npx driftnet service uninstall
-```
-
-Your settings live in `~/.driftnet/.env` and the catalogue in `~/.driftnet/driftnet.db`.
-
-### Add your first link
-
-Any of these works:
-
-- **On the page:** paste a link into the box and press Add.
-- **In a terminal:** `npx driftnet add https://github.com/paperclipai/paperclip`
-- **From the browser:** the [Chrome extension](https://chromewebstore.google.com/detail/driftnet/inmlinbodfopmanbllkkjcgheelacddm) sends the page you are looking at.
-- **From a chat:** paste a Discord, Telegram, Slack or LINE bot token in ⚙ Settings → Chats ([how to get one](docs/ways-in.md)) and drop links there.
-
-A card shows up within 5–30 seconds: what it is, why it might matter to you, and where it was filed.
-
-<details>
-<summary><b>Other ways to run it: from source, Docker</b></summary>
-
-From source, to hack on it or run it as a login service:
-
-```bash
-git clone https://github.com/KevinChu1110/driftnet && cd driftnet
-pnpm install
-pnpm start                                                 # http://localhost:8787
-pnpm service:install                                       # optional: start at login (macOS / Linux)
-```
-
-With Docker:
-
-```bash
-docker build -t driftnet https://github.com/KevinChu1110/driftnet.git
-docker run -d -p 127.0.0.1:8787:8787 -v driftnet:/data -e DRIFTNET_HOST=0.0.0.0 driftnet start
-```
-
-Without `start`, the container is the MCP server over stdio (`docker run -i --rm -v driftnet:/data driftnet`).
-`DRIFTNET_HOME` moves the settings and the catalogue somewhere else.
-
-</details>
-
-<details>
-<summary><b>Not working?</b></summary>
-
-- **Port 8787 is in use**: another driftnet is probably running; open http://localhost:8787, or start this one with `PORT=8788`.
-- **`driftnet needs Node 22.13 or newer`**: install it with `nvm install 22` or from [nodejs.org](https://nodejs.org).
-- **Cards stay ⏳ with no summary**: no model is set up yet. Choose one in ⚙ Settings → AI, or let your agent work the queue ([Agents](docs/agents.md)).
-- **Opened from another computer and got `421`**: without a password driftnet only answers on this machine. Set a password (`DRIFTNET_TOKEN`), or list the address in `DRIFTNET_ALLOWED_HOSTS`.
-
-</details>
-
-### Which setup is yours?
-
-| You are | Start with | Model |
-|---|---|---|
-| Just me, on my computer | The [Chrome extension](docs/chrome-extension.md) and [the web page](docs/web-page.md) | A local one through Ollama (see [Models](docs/models.md)), or none |
-| A group chat | A Discord, Telegram, Slack or LINE bot, see [Ways in](docs/ways-in.md) | Any |
-| My agents | [MCP, the Claude Code plugin or the agent queue](docs/agents.md) | None needed: the agent does the reading |
-
+- 🧩 **Any model or none, and it stays yours.** A free local model through Ollama, a Claude or Gemini subscription you already have, a paid API key (pennies), or no model (links are then saved and wait unsorted under "Other"). Local SQLite; UI and bot replies in 6 languages (**English, 繁體中文, 简体中文, 日本語, 한국어, Español**).
 
 ## 📚 Docs
 

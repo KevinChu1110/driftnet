@@ -1,4 +1,3 @@
-import { Client, Events, GatewayIntentBits, Partials, type Message } from "discord.js";
 import type { Driftnet } from "@driftnet/core";
 import { handleChat, type ChatReply } from "./handle.ts";
 import { reactionVote, rememberReply, voteOnReply } from "./reactions.ts";
@@ -7,6 +6,48 @@ import type { Report } from "../chats.ts";
 
 const LAST = "discord:last:";
 const MAX_CATCH_UP = 1000; // per channel
+const DEFAULT_API_URL = "https://discord.com/api/v10";
+const DEFAULT_GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
+const USER_AGENT = "DiscordBot (https://github.com/KevinChu1110/driftnet, 1.0)";
+const SUPPRESS_EMBEDS = 1 << 2; // 4
+const RECONNECT_MS = 3_000;
+
+// Guilds (1<<0) | GuildMessages (1<<9) | GuildMessageReactions (1<<10) |
+// DirectMessages (1<<12) | DirectMessageReactions (1<<13) | MessageContent (1<<15)
+const GATEWAY_INTENTS = (1 << 0) | (1 << 9) | (1 << 10) | (1 << 12) | (1 << 13) | (1 << 15); // 46593
+
+const FATAL_CLOSE_CODES: Record<number, string> = {
+  4004: "Authentication failed (invalid DISCORD_BOT_TOKEN)",
+  4010: "Invalid shard",
+  4011: "Sharding required",
+  4012: "Invalid API version",
+  4013: "Invalid intents",
+  4014: "Disallowed intents (enable Message Content Intent in the Discord Developer Portal)",
+};
+
+const api = (path: string) => `${(process.env.DISCORD_API_URL ?? DEFAULT_API_URL).replace(/\/+$/, "")}${path}`;
+
+const authHeaders = (token: string, json = false): Record<string, string> => ({
+  authorization: `Bot ${token}`,
+  "user-agent": USER_AGENT,
+  ...(json ? { "content-type": "application/json" } : {}),
+});
+
+interface RawDiscordMessage {
+  id: string;
+  channel_id: string;
+  content?: string;
+  author?: { id?: string; bot?: boolean };
+  timestamp?: string;
+  message_snapshots?: Array<{
+    content?: string;
+    embeds?: Array<{ url?: string }>;
+    message?: {
+      content?: string;
+      embeds?: Array<{ url?: string }>;
+    };
+  }>;
+}
 
 /** The parts of a Discord message driftnet uses, so catch-up can be tested without a gateway. */
 export interface ChatMessage {
@@ -16,7 +57,7 @@ export interface ChatMessage {
   authorId: string;
   fromBot: boolean;
   createdAt: number;
-  /** Where a forwarded message's text lives (messageSnapshots). */
+  /** Where a forwarded message's text lives (message_snapshots). */
   forwardedContent?: string[];
 }
 
@@ -56,7 +97,7 @@ export async function handleDiscordMessage(dn: Driftnet, msg: ChatMessage, allow
   return (await processDiscordMessage(dn, msg, allowed))?.text ?? null;
 }
 
-/** What discord.js's `message.reply` takes and returns, as far as we use it. */
+/** What a Discord reply sender takes and returns, as far as we use it. */
 export type DiscordSend = (options: Record<string, unknown>) => Promise<{ id: string; react: (emoji: string) => Promise<unknown> }>;
 
 /**
@@ -141,86 +182,275 @@ export async function catchUp(
   return handled;
 }
 
-const toChatMessage = (m: Message): ChatMessage => ({
-  id: m.id,
-  channelId: m.channelId,
-  content: m.content,
-  authorId: m.author.id,
-  fromBot: m.author.bot,
-  createdAt: m.createdTimestamp,
-  forwardedContent: [...(((m as any).messageSnapshots?.values?.() ?? []) as Iterable<any>)].flatMap((snap) => [
-    snap.content,
-    ...(snap.embeds ?? []).map((e: any) => e.url),
-  ]),
-});
+const toChatMessage = (m: RawDiscordMessage): ChatMessage => {
+  const ts = m.timestamp ? Date.parse(m.timestamp) : 0;
+  const forwardedContent = (m.message_snapshots ?? []).flatMap((snap) => {
+    const inner = snap.message ?? snap;
+    return [
+      ...(inner.content ? [inner.content] : []),
+      ...(inner.embeds ?? []).map((e) => e.url).filter((u): u is string => Boolean(u)),
+    ];
+  });
+  return {
+    id: m.id,
+    channelId: m.channel_id,
+    content: m.content ?? "",
+    authorId: m.author?.id ?? "",
+    fromBot: Boolean(m.author?.bot),
+    createdAt: Number.isNaN(ts) ? 0 : ts,
+    forwardedContent,
+  };
+};
+
+function toRestPayload(options: Record<string, unknown>, replyToId: string): Record<string, unknown> {
+  const payload: Record<string, unknown> = { message_reference: { message_id: replyToId } };
+  if (options.content !== undefined) payload.content = options.content;
+  if (options.embeds !== undefined) payload.embeds = options.embeds;
+  if (options.allowedMentions !== undefined) payload.allowed_mentions = options.allowedMentions;
+  else if (options.allowed_mentions !== undefined) payload.allowed_mentions = options.allowed_mentions;
+  if (Array.isArray(options.flags)) {
+    let bits = 0;
+    if (options.flags.includes("SuppressEmbeds")) bits |= SUPPRESS_EMBEDS;
+    if (bits) payload.flags = bits;
+  } else if (typeof options.flags === "number") {
+    payload.flags = options.flags;
+  }
+  return payload;
+}
+
+function makeDiscordReplySender(token: string, channelId: string, msgId: string): DiscordSend {
+  return async (options) => {
+    const res = await fetch(api(`/channels/${encodeURIComponent(channelId)}/messages`), {
+      method: "POST",
+      headers: authHeaders(token, true),
+      body: JSON.stringify(toRestPayload(options, msgId)),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Discord answered ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+    }
+    const sent = (await res.json()) as { id: string };
+    return {
+      id: sent.id,
+      react: async (emoji: string) => {
+        const r = await fetch(
+          api(`/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(sent.id)}/reactions/${encodeURIComponent(emoji)}/@me`),
+          {
+            method: "PUT",
+            headers: authHeaders(token),
+            signal: AbortSignal.timeout(15_000),
+          },
+        );
+        if (!r.ok) throw new Error(`Discord react answered ${r.status}`);
+        await r.body?.cancel();
+      },
+    };
+  };
+}
+
+async function fetchMessagesAfter(token: string, channelId: string, afterId: string): Promise<ChatMessage[]> {
+  const res = await fetch(
+    api(`/channels/${encodeURIComponent(channelId)}/messages?after=${encodeURIComponent(afterId)}&limit=100`),
+    {
+      method: "GET",
+      headers: authHeaders(token),
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+  const rows = (await res.json()) as RawDiscordMessage[];
+  return Array.isArray(rows) ? rows.map(toChatMessage) : [];
+}
+
+async function resolveGatewayUrl(token: string): Promise<string> {
+  try {
+    const res = await fetch(api("/gateway/bot"), {
+      method: "GET",
+      headers: authHeaders(token),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (res.status === 401) throw new Error(FATAL_CLOSE_CODES[4004]!);
+    if (res.ok) {
+      const data = (await res.json()) as { url?: string };
+      if (data.url && (/^wss:\/\//i.test(data.url) || (process.env.DISCORD_API_URL && /^ws:\/\//i.test(data.url)))) {
+        return data.url.includes("?") ? data.url : `${data.url.replace(/\/+$/, "")}/?v=10&encoding=json`;
+      }
+    }
+  } catch (err) {
+    if ((err as Error).message === FATAL_CLOSE_CODES[4004]) throw err;
+  }
+  return DEFAULT_GATEWAY_URL;
+}
 
 /**
  * Discord via the gateway (no public URL needed). Needs DISCORD_BOT_TOKEN and the
  * Message Content intent enabled in the developer portal.
  */
 export function startDiscord(dn: Driftnet, token: string, report: Report = () => {}): () => void {
-  const client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
-      GatewayIntentBits.DirectMessages,
-      // Voting by reaction (enable nothing extra in the portal: these are not privileged).
-      GatewayIntentBits.GuildMessageReactions,
-      GatewayIntentBits.DirectMessageReactions,
-    ],
-    // Reactions on messages the bot hasn't cached (after a restart) still arrive.
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
-  });
+  let stopped = false;
+  let ws: WebSocket | undefined;
+  let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let seq: number | null = null;
+  let botUserId: string | undefined;
+  let caughtUp = false;
 
-  client.on(Events.MessageCreate, async (msg) => {
-    const reply = await processDiscordMessage(dn, toChatMessage(msg)).catch((err) => {
-      console.warn("[discord]", (err as Error).message);
-      return null;
-    });
-    if (reply) {
-      await sendDiscordReply(dn, (o) => msg.reply(o as any), reply).catch((err) => console.warn("[discord]", (err as Error).message));
+  const clearHeartbeat = () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = undefined;
     }
-  });
-  client.on(Events.MessageReactionAdd, async (reaction, user) => {
+  };
+
+  const sendJson = (socket: WebSocket, payload: unknown) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    }
+  };
+
+  const scheduleReconnect = () => {
+    if (stopped || reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined;
+      void connect();
+    }, RECONNECT_MS);
+  };
+
+  const connect = async () => {
+    if (stopped) return;
+    let url: string;
     try {
-      if (user.bot || user.id === client.user?.id) return;
-      onDiscordReaction(dn, {
-        messageId: reaction.message.id,
-        channelId: reaction.message.channelId,
-        emoji: reaction.emoji.name,
-        userId: user.id,
-        fromBot: !!user.bot,
-      });
+      url = await resolveGatewayUrl(token);
     } catch (err) {
+      if (stopped) return;
       console.warn("[discord]", (err as Error).message);
+      report("error", (err as Error).message);
+      return;
     }
-  });
-  client.once(Events.ClientReady, async (c) => {
-    console.log(`[discord] ready as ${c.user.tag}`);
-    report("connected", c.user.tag);
-    await catchUp(dn, async (channelId, after) => {
-      const channel = await c.channels.fetch(channelId);
-      if (!channel?.isTextBased()) return [];
-      return [...(await channel.messages.fetch({ after, limit: 100 })).values()].map(toChatMessage);
-    });
-  });
-  client.on(Events.Error, (err) => report("error", err.message));
-  // A wrong token, or the Message Content intent left off ("Used disallowed intents").
-  client.login(token).catch((err: Error) => {
-    console.warn("[discord]", err.message);
-    report("error", err.message);
-  });
-  return () => void client.destroy().catch(() => {});
+    if (stopped) return;
+
+    seq = null;
+    const socket = new WebSocket(url);
+    ws = socket;
+
+    socket.onmessage = (ev) => {
+      try {
+        const payload = JSON.parse(String(ev.data)) as { op: number; d?: any; s?: number | null; t?: string | null };
+        if (typeof payload.s === "number") seq = payload.s;
+
+        switch (payload.op) {
+          case 10: {
+            const interval = Number(payload.d?.heartbeat_interval) || 41_250;
+            clearHeartbeat();
+            heartbeatTimer = setInterval(() => sendJson(socket, { op: 1, d: seq }), interval);
+            sendJson(socket, {
+              op: 2,
+              d: {
+                token,
+                intents: GATEWAY_INTENTS,
+                properties: { os: process.platform, browser: "driftnet", device: "driftnet" },
+              },
+            });
+            break;
+          }
+          case 1:
+            sendJson(socket, { op: 1, d: seq });
+            break;
+          case 7:
+          case 9:
+            clearHeartbeat();
+            socket.close();
+            break;
+          case 0: {
+            const d = payload.d;
+            if (payload.t === "READY") {
+              botUserId = d?.user?.id;
+              const tag = d?.user?.discriminator && d.user.discriminator !== "0"
+                ? `${d.user.username}#${d.user.discriminator}`
+                : (d?.user?.username ?? "bot");
+              console.log(`[discord] ready as ${tag}`);
+              report("connected", tag);
+              if (!caughtUp) {
+                caughtUp = true;
+                void catchUp(dn, (channelId, after) => fetchMessagesAfter(token, channelId, after));
+              }
+            } else if (payload.t === "MESSAGE_CREATE") {
+              if (!d || d.author?.id === botUserId || d.author?.bot) break;
+              const msg = toChatMessage(d as RawDiscordMessage);
+              void processDiscordMessage(dn, msg)
+                .catch((err) => {
+                  console.warn("[discord]", (err as Error).message);
+                  return null;
+                })
+                .then((reply) => {
+                  if (reply) {
+                    return sendDiscordReply(dn, makeDiscordReplySender(token, msg.channelId, msg.id), reply).catch((err) =>
+                      console.warn("[discord]", (err as Error).message),
+                    );
+                  }
+                });
+            } else if (payload.t === "MESSAGE_REACTION_ADD") {
+              if (!d || d.user_id === botUserId || d.member?.user?.bot) break;
+              try {
+                onDiscordReaction(dn, {
+                  messageId: String(d.message_id ?? ""),
+                  channelId: String(d.channel_id ?? ""),
+                  emoji: d.emoji?.name ?? null,
+                  userId: String(d.user_id ?? ""),
+                  fromBot: Boolean(d.member?.user?.bot),
+                });
+              } catch (err) {
+                console.warn("[discord]", (err as Error).message);
+              }
+            }
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn("[discord] gateway message:", (err as Error).message);
+      }
+    };
+
+    socket.onerror = () => {
+      if (!stopped) report("error", "Discord gateway connection error");
+    };
+
+    socket.onclose = (ev) => {
+      clearHeartbeat();
+      if (ws === socket) ws = undefined;
+      if (stopped) return;
+      const fatal = FATAL_CLOSE_CODES[ev.code];
+      if (fatal) {
+        console.warn("[discord]", fatal);
+        report("error", fatal);
+        return;
+      }
+      scheduleReconnect();
+    };
+  };
+
+  void connect();
+
+  return () => {
+    stopped = true;
+    clearHeartbeat();
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
+    }
+    ws?.close();
+    ws = undefined;
+  };
 }
 
 /** Post a message to a channel over REST with the bot token (a scheduled digest); no gateway needed. Throws on refusal. */
 export async function sendDiscordMessage(token: string, channelId: string, text: string): Promise<void> {
-  const res = await fetch(`https://discord.com/api/v10/channels/${encodeURIComponent(channelId)}/messages`, {
+  const res = await fetch(api(`/channels/${encodeURIComponent(channelId)}/messages`), {
     method: "POST",
-    headers: { authorization: `Bot ${token}`, "content-type": "application/json" },
+    headers: authHeaders(token, true),
     // flags 4: no link embeds. No @-mentions from card text.
-    body: JSON.stringify({ content: text.slice(0, 2000), flags: 4, allowed_mentions: { parse: [] } }),
+    body: JSON.stringify({ content: text.slice(0, 2000), flags: SUPPRESS_EMBEDS, allowed_mentions: { parse: [] } }),
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`Discord answered ${res.status}`);

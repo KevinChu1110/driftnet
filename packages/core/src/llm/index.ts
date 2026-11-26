@@ -13,7 +13,7 @@ export { registerProvider, type ProviderFactory } from "./registry.ts";
 
 /**
  * DRIFTNET_LLM_PROVIDER picks the adapter:
- *   anthropic — Claude through the official SDK
+ *   anthropic — Claude via the Messages API directly
  *   openai    — any OpenAI-compatible Chat Completions API: OpenAI, Gemini, Grok,
  *               DeepSeek, OpenRouter, LiteLLM, Ollama, LM Studio… (set DRIFTNET_LLM_BASE_URL)
  *   gemini    — Google's Gemini API directly (key: DRIFTNET_LLM_API_KEY or GEMINI_API_KEY)
@@ -97,7 +97,10 @@ export function createProvider(env: NodeJS.ProcessEnv): LlmProvider | undefined 
   switch (provider) {
     case "anthropic":
       if (!apiKey) throw new Error("DRIFTNET_LLM_API_KEY is required for the anthropic provider");
-      return new AnthropicProvider(apiKey, model, env.DRIFTNET_LLM_EFFORT);
+      return new AnthropicProvider(apiKey, model, env.DRIFTNET_LLM_EFFORT, {
+        ...(env.DRIFTNET_LLM_BASE_URL ? { baseUrl: env.DRIFTNET_LLM_BASE_URL } : {}),
+        env,
+      });
     case "openai":
       return new OpenAICompatibleProvider({
         baseUrl: env.DRIFTNET_LLM_BASE_URL ?? "https://api.openai.com/v1",

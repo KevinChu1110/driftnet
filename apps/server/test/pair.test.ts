@@ -89,7 +89,8 @@ test("only the admin password makes codes", () => {
   assert.equal(make(admin, { name: "  ", scope: "write" }).status, 400);
   assert.equal(make(admin, { name: "x", scope: "owner" }).status, 400);
   assert.equal(pairRoute(store, env, req({ ...admin, method: "GET" }), "create").status, 405);
-  // No password: this machine only.
+  // No password: this machine only, and never a browser extension.
   assert.equal(make({ local: true }, { name: "x", scope: "read" }, undefined, {}).status, 200);
+  assert.equal(make({ local: true, origin: "chrome-extension://abcdefghijklmnop" }, { name: "x", scope: "write" }, undefined, {}).status, 403);
   assert.equal(make({}, { name: "x", scope: "read" }, undefined, {}).status, 403);
 });

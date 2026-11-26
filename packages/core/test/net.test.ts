@@ -5,7 +5,7 @@ import { BlockedUrl, endpointFetch, isLoopbackHost, isPublicAddress, safeFetch, 
 
 test("private, local and metadata addresses are not public", () => {
   for (const a of ["127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0",
-    "::1", "fe80::1", "fd00::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "64:ff9b::7f00:1", "localhost"]) {
+    "::1", "::127.0.0.1", "::7f00:1", "100::1", "2001::1", "2002:7f00:1::", "fe80::1", "fd00::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "64:ff9b::7f00:1", "localhost"]) {
     assert.equal(isPublicAddress(a), false, a);
   }
   for (const a of ["8.8.8.8", "140.82.112.3", "2606:4700:4700::1111"]) assert.equal(isPublicAddress(a), true, a);

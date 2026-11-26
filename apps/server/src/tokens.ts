@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { z } from "zod";
 import type { Store } from "@driftnet/core";
-import { foreignOrigin, isAdmin, isLocal, isPassword, isTrustedLocal, token } from "./access.ts";
+import { isAdmin, isLocal, isPassword, isTrustedLocal, sameOrigin, token } from "./access.ts";
 
 type Reply = { status: number; body: unknown };
 
@@ -22,7 +22,7 @@ const create = z.object({
  * tokens. With no password set, only this machine may.
  */
 export function tokenRoute(store: Store, env: NodeJS.ProcessEnv, req: IncomingMessage, id: string | null, body?: unknown): Reply {
-  const allowed = !foreignOrigin(req) && (isAdmin(req, env, store) || isTrustedLocal(req)) && (isPassword(req, env) || isTrustedLocal(req));
+  const allowed = sameOrigin(req) && (isAdmin(req, env, store) || isTrustedLocal(req)) && (isPassword(req, env) || isTrustedLocal(req));
   if (!allowed || (!token(env) && !isLocal(req))) return { status: 403, body: { error: token(env) ? "unauthorized" : "set an admin password to manage agent tokens remotely" } };
   const method = req.method ?? "GET";
   if (method === "GET" && !id) return { status: 200, body: store.listAgentTokens() };
